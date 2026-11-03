@@ -93,7 +93,7 @@ Las fuentes de cada regla están en `rules/catalogo.json`.
 
 ### Revisión independiente de citas
 
-Un revisor cotejó las 15 fuentes del catálogo y encontró correcciones en 8. Resumen en `qa/REPORTE_FASE_0.md`. Limitación: las páginas web se leyeron con un resumidor automático, no como HTML original, así que conviene cotejar las citas textuales antes de mostrarlas como tales en la app.
+Un revisor cotejó las 15 fuentes del catálogo y encontró correcciones en 7, además de varios `por_que` que afirmaban más que sus fuentes. Resumen en `qa/REPORTE_FASE_0.md`. Limitación: las páginas web se leyeron con un resumidor automático, no como HTML original, así que conviene cotejar las citas textuales antes de mostrarlas como tales en la app.
 
 ### Riesgos legales del producto (interpretación, valídala con un abogado)
 
