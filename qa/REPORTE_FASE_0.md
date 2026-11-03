@@ -8,9 +8,9 @@ Fecha: 3 de noviembre de 2026. Esta fase no incluye código de la app, así que 
 |---|---|
 | Esquema y reglas de negocio del catálogo (`validar_catalogo.py`) | Pasa: 18 reglas, 8 verificadas, 10 pendientes |
 | Tests del validador con catálogos mal formados (9 tests) | Pasan |
-| Enlaces del catálogo (`--urls`) | 13 responden 200. Meta y Facebook rechazan al robot (400). AEPD falla por certificado en esta red |
+| Enlaces del catálogo (`--urls`) | 11 de 15 responden 200. Meta y Facebook rechazan al robot (400). AEPD falla por certificado en esta red |
 | Lectura de esas 4 URLs por otra vía (WebFetch) | Se pudieron leer |
-| Cotejo independiente de citas contra los documentos | 15 fuentes revisadas, 8 con correcciones |
+| Cotejo independiente de citas contra los documentos | 15 fuentes revisadas, 7 con correcciones |
 | Contraste AA, 17 pares en cada tema (`revisar_contraste.py`) | Pasa. Mínimo de texto: 5.66:1 |
 | Simulación de protanopia, deuteranopia y tritanopia | Ver hallazgos |
 | Nombre centralizado (`revisar_nombre.py`) | Pasa |
