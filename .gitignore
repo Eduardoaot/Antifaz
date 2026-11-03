@@ -6,6 +6,8 @@ dist/
 out/
 .DS_Store
 *.log
+.coverage
+.hypothesis/
 # Pesos de modelos: se descargan, no se versionan
 *.onnx
 *.pt
