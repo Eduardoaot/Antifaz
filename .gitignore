@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+*.pyc
+node_modules/
+dist/
+out/
+.DS_Store
+*.log
+# Pesos de modelos: se descargan, no se versionan
+*.onnx
+*.pt
+*.safetensors
