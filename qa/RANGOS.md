@@ -1,0 +1,149 @@
+# Rangos y parámetros de Antifaz
+
+**Estado:** propuesta de la Fase 0. **"(propuesta)" marca un valor sin medir,** que se confirma o se ajusta con benchmark en la fase correspondiente. Los valores de efectos también son propuestas propias, no números derivados de estudios.
+
+Cada parámetro de este archivo tiene pruebas parametrizadas de mínimo-1, mínimo, máximo, máximo+1, null, tipo incorrecto, NaN e Infinity.
+
+## Reglas generales de validación
+
+- **Doble validación:** la UI valida con Zod para dar respuesta inmediata. El sidecar valida de nuevo con Pydantic en modo estricto y nunca confía en la UI.
+- **Sin ajuste silencioso:** un valor escrito fuera de rango se rechaza, no se recorta. Los sliders y controles de arrastre solo pueden producir valores dentro del rango.
+- **Comportamiento estándar ante un valor inválido:**
+  - **UI:** marca el campo con texto e ícono, explica el rango, conserva el último valor válido y no aplica el cambio.
+  - **Sidecar:** responde con un error tipado `VALIDACION`, no ejecuta nada y escribe un log sin datos personales.
+- **Límites de archivo:** se comprueban leyendo encabezados, antes de decodificar los píxeles.
+
+### Normalización de entradas de texto en la UI
+
+| Entrada | Campo entero | Campo decimal | Motivo |
+|---|---|---|---|
+| Vacío, solo espacios | Inválido | Inválido | Ausencia |
+| `null`, `undefined`, `None` | Inválido | Inválido | Ausencia |
+| `" 5 "` | 5 | 5 | Se recortan espacios de los extremos |
+| `5 5` | Inválido | Inválido | Espacio interno |
+| `abc`, emoji | Inválido | Inválido | No es número |
+| `-5` | Según el rango | Según el rango | Se valida como número y luego por rango |
+| `-0` | 0 | 0 | Se normaliza |
+| `2.5` | Inválido | 2.5 | Un entero no admite decimales |
+| `2.0` | Inválido | 2.0 | Un entero se escribe sin decimales |
+| `0,5` | Inválido | 0.5 | La coma decimal se acepta en la UI, sea cual sea la región del sistema |
+| `1,000` | Inválido | Inválido | Ambiguo: puede ser mil o uno |
+| `1e10` | Inválido | Inválido | No se acepta notación científica |
+| `NaN`, `Infinity`, `-Infinity` | Inválido | Inválido | No son valores finitos |
+| `0x10`, `٣`, `５` | Inválido | Inválido | Solo dígitos ASCII |
+| Mayor que 2^53-1 en valor absoluto | Inválido | Inválido | Evita desbordamiento y pérdida de precisión |
+| Texto pegado de más de 64 caracteres | Inválido | Inválido | Se rechaza antes de analizarlo |
+
+### Reglas del IPC (sidecar)
+
+- Solo se aceptan números JSON finitos. Un número enviado como texto se rechaza: la normalización anterior es exclusiva de la UI.
+- Un entero enviado como decimal se rechaza. También los booleanos enviados en lugar de números.
+- Campos faltantes, campos desconocidos, listas vacías donde se requiere contenido y objetos vacíos se rechazan.
+- Un mensaje de más de 16 MiB (propuesta) se rechaza. Los píxeles no viajan por el canal de control.
+
+## Efectos de ocultamiento
+
+| Parámetro | Tipo | Mín | Máx | Default | Ante un valor inválido |
+|---|---|---|---|---|---|
+| `efecto.tipo` | enum: `solido`, `difuminado`, `pixelado`, `emoji` | n/a | n/a | `solido` para texto, códigos, documentos y matrículas; `difuminado` para caras | Estándar. Un tipo desconocido nunca cae en "sin efecto" |
+| `efecto.intensidad` | entero, % | 1 | 100 | 80 | Estándar. Solo cambia el aspecto, nunca la seguridad |
+| `efecto.aviso_intensidad_baja` | entero, % | 1 | 100 | 30 (propuesta) | Estándar. Por debajo de este valor se avisa: "Se verá más nítido, pero lo original ya se sobrescribió" |
+| `efecto.sigma_px` | decimal, px | 25 | 1000 | max(25, 25% del lado corto de la región) | Estándar |
+| `efecto.pixel_px` | entero, px | 8 (propuesta) | 256 (propuesta) | max(16, 10% del lado corto de la región) (propuesta) | Estándar. Se aplica sobre contenido ya sobrescrito |
+| `efecto.color_solido` | enum de colores fijos | n/a | n/a | Negro | Estándar. Nunca se usa el promedio de la región |
+| `efecto.emoji` | enum de emojis incluidos | n/a | n/a | Primero de la lista | Estándar. Se dibuja sobre relleno sólido |
+
+## Máscaras
+
+| Parámetro | Tipo | Mín | Máx | Default | Ante un valor inválido |
+|---|---|---|---|---|---|
+| `mascara.dilatacion_px` | entero, px | 8 | 512 (propuesta) | 8 | Estándar. El mínimo evita dejar bordes sin ocultar |
+| `mascara.dilatacion_pct` | decimal, % del lado corto | 0 | 50 | 10 | Estándar. Se usa el mayor entre este valor y `dilatacion_px` |
+| `mascara.multiplicador_cara` | decimal | 1.0 | 3.0 | 1.3 | Estándar |
+| `mascara.cobertura` | decimal, % de la imagen | Más de 0 | 100 | Calculado | 0%: se rechaza con "La máscara está vacía". 100%: se permite tras confirmar |
+| `pincel.tamano_px` | entero, px | 1 | 512 | 32 | Estándar |
+| `rectangulo.x`, `rectangulo.y` | entero, px | 0 | Ancho-1, alto-1 | n/a | Estándar |
+| `rectangulo.ancho`, `rectangulo.alto` | entero, px | 1 | Hasta el borde de la imagen | n/a | Estándar. No se recorta en silencio |
+
+## Detección
+
+| Parámetro | Tipo | Mín | Máx | Default | Ante un valor inválido |
+|---|---|---|---|---|---|
+| `deteccion.umbral_confianza` | decimal | 0 | 1 | 0.25 (propuesta, favorece recall) | Estándar |
+| `deteccion.umbral_revision` | decimal | 0 | 1 | 0.5 (propuesta) | Estándar. Debe ser mayor o igual que `umbral_confianza`, o se rechaza. Por debajo se marca para revisión manual |
+| `ocr.umbral_texto` | decimal | 0 | 1 | 0.3 (propuesta) | Estándar |
+| `clic.x`, `clic.y` | entero, px de la imagen original | 0 | Ancho-1, alto-1 | n/a | Fuera de la imagen: se ignora y se avisa "Ese punto queda fuera de la imagen". El sidecar lo rechaza |
+
+## Archivos
+
+| Parámetro | Tipo | Mín | Máx | Default | Ante un valor inválido |
+|---|---|---|---|---|---|
+| `lote.archivos` | entero | 1 | 500 | n/a | Se aceptan los primeros 500 solo si tú lo confirmas; nunca se descartan en silencio |
+| `archivo.tamano_bytes` (imagen) | entero | 1 | 1 GiB (propuesta) | n/a | 0 bytes: "Este archivo está vacío". Rechazo por archivo; el lote sigue |
+| `archivo.tamano_bytes` (video) | entero | 1 | 20 GiB (propuesta) | n/a | Igual que imagen |
+| `imagen.megapixeles` | decimal, MP | Más de 0 | 200 (propuesta) | n/a | Rechazo antes de decodificar, como protección contra bombas de descompresión |
+| `imagen.lado_px` | entero, px | 1 | 30000 (propuesta) | n/a | Rechazo por archivo |
+| `imagen.relacion_aspecto` | decimal, lado largo entre lado corto | 1 | 100 (propuesta) | n/a | Rechazo por archivo, con mensaje específico |
+| `imagen.deteccion_lado_min_px` | entero, px | 1 | 64 | 16 (propuesta) | Debajo de este lado se avisa que es demasiado pequeña para analizarla bien, y no se presenta como revisada |
+| `gif.frames` | entero | 1 | 5000 (propuesta) | n/a | Rechazo por archivo |
+
+## Video de entrada
+
+| Parámetro | Tipo | Mín | Máx | Default | Ante un valor inválido |
+|---|---|---|---|---|---|
+| `video.duracion_s` | decimal, s | Más de 0 (1 frame es válido) | 7200 (propuesta) | n/a | Por encima: rechazo explicado |
+| `video.duracion_aviso_s` | entero, s | 1 | 7200 | 180 (propuesta) | Por encima se muestra el tiempo estimado y se pide confirmar |
+| `video.lado_px` | entero, px | 16 (propuesta) | 8192 (propuesta, cubre 8K) | n/a | Rechazo por archivo |
+| `video.fps` | decimal, fps | Más de 0 | 240 (propuesta) | n/a | Rechazo por archivo. El frame rate variable es válido |
+
+## Procesamiento de video
+
+| Parámetro | Tipo | Mín | Máx | Default | Ante un valor inválido |
+|---|---|---|---|---|---|
+| `proxy.lado_corto_px` | entero, px | 240 (propuesta) | 720 (propuesta) | 480 (propuesta) | Estándar |
+| `tracking.fps` | decimal, fps | 1 (propuesta) | 30 (propuesta) | 10 (propuesta) | Estándar. Entre frames rastreados se interpola y se amplía la máscara |
+| `bloque.frames` | entero, frames | 30 (propuesta) | 3000 (propuesta) | 300 (propuesta) | Estándar |
+| `pista.margen_frames` | entero, frames | 0 | 120 (propuesta) | 5 | Estándar. Oculta antes y después de cada pista |
+| `pista.inicio_ms` | entero, ms | 0 | Menor que `fin_ms` | 0 | Estándar. `inicio` mayor o igual que `fin`: se rechaza |
+| `pista.fin_ms` | entero, ms | Mayor que `inicio_ms` | Duración del video | Duración | Estándar. Fuera de la duración: se rechaza, sin recortar en silencio |
+| `cortes.umbral` | decimal | 0 (propuesta) | 100 (propuesta) | Se define con benchmark | Estándar |
+| `cache.tamano_gb` | decimal, GB | 1 (propuesta) | 50 (propuesta) | 10 (propuesta) | Estándar. Si no hay espacio libre, se avisa antes de empezar |
+
+## Exportación
+
+| Parámetro | Tipo | Mín | Máx | Default | Ante un valor inválido |
+|---|---|---|---|---|---|
+| `export.preset` | enum: `9:16` (1080×1920), `4:5` (1080×1350), `1:1` (1080×1080), `original` | n/a | n/a | `4:5` en foto, `9:16` en video | Estándar. No hay exportación con un preset desconocido |
+| `export.jpeg_calidad` | entero | 60 (propuesta) | 100 | 92 (propuesta) | Estándar |
+| `export.crf` | entero | 14 (propuesta) | 30 (propuesta) | 20 (propuesta) | Estándar |
+| `export.video_mbps` | decimal, Mbps | 1 (propuesta) | 25 (referencia: API de Instagram) | 16 (propuesta) | Estándar |
+| `export.video_fps` | decimal, fps | 23 | 60 | Igual al original, si cabe en el rango | Estándar. Referencia: API de Instagram |
+| `export.ruta` | texto | 1 carácter | Sin límite propio; lo define Windows | Carpeta elegida | Sin permisos o sin espacio: la exportación se detiene, no queda archivo final y se explica qué hacer |
+| `export.quitar_metadatos` | booleano | n/a | n/a | `true` | Estándar. No se ofrece en la UI; solo admite `true` |
+
+Los límites de Instagram cambian, y sus propias fuentes se contradicen (4:5 o 3:4). Por eso son configurables y no se tratan como cifras estables.
+
+## Interfaz y proyecto
+
+| Parámetro | Tipo | Mín | Máx | Default | Ante un valor inválido |
+|---|---|---|---|---|---|
+| `vista.zoom_pct` | entero, % | 10 | 1600 | Ajustar a la ventana | Estándar |
+| `historial.pasos` | entero | 1 | 500 (propuesta) | 100 (propuesta) | Estándar. Deshacer sin historial queda desactivado y no hace nada |
+| `tema` | enum: `sistema`, `claro`, `oscuro` | n/a | n/a | `sistema` | Se usa `sistema` y se registra el error |
+| `proyecto.nombre` | texto | 1 carácter | 120 caracteres | Nombre sin extensión del primer archivo | Estándar |
+| `proyecto.guardar_embeddings` | booleano | n/a | n/a | `false` | Estándar. Ante cualquier duda, no se guardan |
+| `ventana.ancho_px`, `ventana.alto_px` | entero, px lógicos | 800 × 600 (propuesta) | Sin límite propio | 1280 × 800 (propuesta) | Windows no permite reducirla más; una posición fuera de pantalla se reubica |
+| `log.tamano_mb` | entero, MB | 1 | 200 (propuesta) | 50 (propuesta) | Estándar |
+| `log.retencion_dias` | entero, días | 1 | 90 (propuesta) | 14 (propuesta) | Estándar |
+
+## Relaciones entre valores
+
+| Relación | Regla |
+|---|---|
+| `inicio_ms` y `fin_ms` | `inicio` menor que `fin`, ambos dentro de la duración. Debe cubrir al menos 1 frame |
+| Coordenadas y dimensiones | Todo punto y rectángulo cabe dentro de la imagen |
+| Máscara | No vacía. Si cubre el 100%, se pide confirmar |
+| `umbral_confianza` y `umbral_revision` | Revisión mayor o igual que confianza |
+| `duracion_aviso_s` y `duracion_s` | El aviso no supera el máximo |
+| `proxy` y video original | El proxy nunca es mayor que el original; si el original es menor, se usa su tamaño |
+| Tamaño de la región y `pixel_px` | Si el bloque es mayor que la región, la región queda como un solo bloque de relleno |

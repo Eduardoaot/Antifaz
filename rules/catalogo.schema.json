@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "catalogo.schema.json",
+  "title": "Catálogo de riesgos",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "fecha_actualizacion", "aviso", "marco_general", "reglas"],
+  "properties": {
+    "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+    "fecha_actualizacion": { "$ref": "#/$defs/fecha" },
+    "aviso": { "type": "string", "minLength": 1 },
+    "marco_general": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/fuente" } },
+    "reglas": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/regla" } }
+  },
+  "$defs": {
+    "fecha": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+    "fuente": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["institucion", "documento", "url", "fecha_consulta", "vigente", "resumen", "alcance", "tipo", "respaldo", "verificacion"],
+      "properties": {
+        "institucion": { "type": "string", "minLength": 1 },
+        "documento": { "type": "string", "minLength": 1 },
+        "url": { "type": "string", "pattern": "^https://[^\\s]+$" },
+        "fecha_consulta": { "$ref": "#/$defs/fecha" },
+        "fecha_documento": { "type": "string", "minLength": 4 },
+        "vigente": { "type": ["boolean", "null"], "description": "null = vigencia sin confirmar" },
+        "resumen": { "type": "string", "minLength": 1, "maxLength": 320 },
+        "referencia": { "type": "string", "description": "Artículo, fracción o página" },
+        "alcance": { "enum": ["mexico_federal", "mexico_local", "internacional", "plataforma"] },
+        "tipo": { "enum": ["ley", "recomendacion_oficial", "documento_historico", "politica_plataforma", "prensa", "tecnica", "resolucion"] },
+        "respaldo": { "enum": ["directo", "parcial", "contexto"] },
+        "verificacion": { "enum": ["abierta", "pendiente"] }
+      }
+    },
+    "regla": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "categoria", "que_detecta", "nivel_riesgo", "por_que", "fuentes", "aplica_a", "estado"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[A-Z]{3}-\\d{2}$" },
+        "categoria": {
+          "enum": ["caras_terceros", "posibles_menores", "documentos_identidad", "informacion_financiera", "boletos_viajes", "ubicacion", "matriculas", "objetos_valor", "pantallas", "contacto_personal", "informacion_medica", "codigos"]
+        },
+        "que_detecta": { "type": "string", "minLength": 1 },
+        "nivel_riesgo": { "enum": ["alto", "medio", "bajo"] },
+        "por_que": { "type": "string", "minLength": 1, "maxLength": 240 },
+        "fuentes": { "type": "array", "items": { "$ref": "#/$defs/fuente" } },
+        "aplica_a": { "enum": ["foto", "video", "ambos"] },
+        "estado": { "enum": ["verificada", "pendiente_de_verificar"] },
+        "nota": { "type": "string", "minLength": 1 },
+        "texto_aviso": { "type": "string", "minLength": 1 },
+        "requiere_confirmacion": { "type": "boolean" }
+      }
+    }
+  }
+}

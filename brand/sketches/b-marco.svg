@@ -1,0 +1,4 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Antifaz dentro de las esquinas de un encuadre de foto">
+  <path fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="square" d="M4 16V4H16M48 4H60V16M60 48V60H48M16 60H4V48"/>
+  <path fill="currentColor" fill-rule="evenodd" d="M10 27C10 23 14 21 18 21C23 21 27 23 32 25C37 23 41 21 46 21C50 21 54 23 54 27V33C54 39 50 43 44 43C39 43 36 41 32 36C28 41 25 43 20 43C14 43 10 39 10 33ZM15 30.5a6 4 0 1 0 12 0a6 4 0 1 0-12 0ZM37 30.5a6 4 0 1 0 12 0a6 4 0 1 0-12 0Z"/>
+</svg>

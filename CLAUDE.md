@@ -1,0 +1,65 @@
+# Antifaz
+
+App de escritorio que revisa fotos y videos antes de publicarlos, explica el riesgo con fuentes y oculta lo privado. **Todo el análisis es local: ninguna foto ni video sale del dispositivo.**
+
+Estado: Fase 0 (investigación, marca, catálogo y plan de QA). Todavía no hay código de la app. Cada fase espera la aprobación del responsable.
+
+## Decisiones vigentes
+
+- **Plataforma:** solo Windows, solo CPU. Sin macOS, MPS, VoiceOver ni CUDA por ahora: no hay con qué probarlos.
+- **Licencia:** proyecto personal, sin venta. Repo público con AGPL-3.0. Se permiten modelos no comerciales, aislados tras interfaces por si cambia el plan.
+- **Sin Fase 7:** sin API de Instagram, QR por Wi-Fi ni "Copiar descripción". La app exporta a una carpeta.
+- **Menores:** no se estima edad. Con cualquier cara se pregunta "¿Hay menores en esta foto?".
+- **Nombre:** cambiable. Lee `brand/brand.json`; no lo escribas a mano en código ni en el catálogo.
+
+## Arquitectura (se construye desde la Fase 1)
+
+Electron + React/TypeScript (strict) + sidecar Python 3.12 con uv.
+
+- **IPC:** stdio con mensajes delimitados por longitud, sin abrir puertos. Zod en la UI y Pydantic en el sidecar, que siempre valida de nuevo.
+- **Rutas:** el proceso main entrega IDs opacos; el renderer nunca ve rutas reales.
+- **Modelos:** ver la tabla en `docs/INVESTIGACION.md`. Los pesos se descargan aparte, con hash, y nunca durante un análisis. No se versionan.
+- **Cero tráfico:** CSP, bloqueo en la sesión de Electron, auditoría de sockets en Python y test con captura.
+- **Datos sensibles:** caché cifrada con llave solo en memoria. Embeddings solo en RAM salvo que el usuario guarde. La recuperación guarda ediciones, sin píxeles.
+- **Exportación fail-closed:** archivo temporal, verificación con ffprobe y exiftool contra lista blanca, y renombrado atómico. Las imágenes se recodifican desde píxeles.
+- **Ocultamiento:** texto, códigos, documentos y matrículas con relleno sólido. Los efectos de caras se aplican sobre contenido ya sobrescrito. El blur o pixelado solo no cuenta como irreversible.
+
+## Reglas de validación
+
+Detalle en `qa/PLAN_QA.md`, `qa/RANGOS.md` y `qa/MATRIZ_PRUEBAS.md`.
+
+1. Toda entrada se valida: ausencia, tipo incorrecto, rangos y relaciones entre valores. El backend nunca confía en la UI.
+2. Sin condicionales incompletos: `switch`/`match` exhaustivos. Prohibido `catch` vacío y `except: pass`.
+3. Todo parámetro configurable está en `qa/RANGOS.md`. Si agregas uno, agrega su fila y sus pruebas de límites.
+4. **Fail-closed:** un error nunca produce un archivo aparentemente limpio ni algo presentado como revisado sin estarlo. Si se pierde un objeto, se marca para revisión y se sigue ocultando.
+5. Errores tipados con código interno, mensaje en tono de marca y log técnico local. Los logs nunca llevan imágenes, texto de OCR ni rutas sin anonimizar.
+
+## Catálogo de riesgos
+
+`rules/catalogo.json`, validado con `rules/catalogo.schema.json`.
+
+**Regla de oro:** no se inventan citas. Si no hay fuente abierta y leída, la regla queda `pendiente_de_verificar` con una `nota`. Distingue ley, recomendación oficial, política de plataforma y prensa. El extinto INAI siempre va con `vigente: false`.
+
+## Marca
+
+`brand/BRAND.md` y `brand/tokens.json`. Colores de riesgo solo para advertencias, siempre con ícono y texto. Tono: español de México, de "tú", tranquilo. Nunca "seguro para publicar" ni "es ilegal".
+
+## Comandos
+
+Python 3.14 basta para las herramientas de la Fase 0, con los comandos desde la raíz:
+
+```
+python -m venv .venv
+.venv\Scripts\pip install -r tools\requirements.txt
+.venv\Scripts\python tools\validar_catalogo.py          # agrega --urls para abrir cada enlace
+.venv\Scripts\python -m unittest tools\test_validar_catalogo.py
+.venv\Scripts\python tools\revisar_contraste.py
+.venv\Scripts\python tools\revisar_nombre.py
+```
+
+## Convenciones
+
+- Identificadores de dominio y documentos en español; TypeScript `strict` + `noImplicitReturns`; pyright estricto.
+- Git: no subas al remoto sin que el responsable lo pida. El repo es público.
+- Terminado significa: tests en verde en Windows local y CI, matriz de la fase ejecutada, cero errores de linter y tipado, y app ejecutada con capturas revisadas en claro y oscuro. Lo manual pendiente se marca pendiente, nunca aprobado.
+- No uses user-agents falsos ni intentes saltar bloqueos de sitios. Si un sitio no se deja leer, la fuente queda pendiente y se revisa a mano.

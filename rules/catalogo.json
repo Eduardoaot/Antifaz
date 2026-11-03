@@ -1,0 +1,621 @@
+{
+  "version": "0.1.0",
+  "fecha_actualizacion": "2026-11-03",
+  "aviso": "{app} es una herramienta orientativa y no constituye asesoría legal.",
+  "marco_general": [
+    {
+      "institucion": "Congreso de la Unión (Cámara de Diputados)",
+      "documento": "Ley Federal de Protección de Datos Personales en Posesión de los Particulares",
+      "url": "https://www.diputados.gob.mx/LeyesBiblio/pdf/LFPDPPP.pdf",
+      "fecha_consulta": "2026-11-03",
+      "vigente": true,
+      "resumen": "Define datos personales como información de una persona identificada o identificable. Es el marco general; se refiere a quien trata datos, no da reglas sobre fotos.",
+      "alcance": "mexico_federal",
+      "tipo": "ley",
+      "respaldo": "contexto",
+      "verificacion": "abierta",
+      "referencia": "Art. 2, fr. V",
+      "fecha_documento": "DOF 20-03-2025, última reforma 14-11-2025"
+    },
+    {
+      "institucion": "Congreso de la Unión (Cámara de Diputados)",
+      "documento": "Ley Federal de Protección de Datos Personales en Posesión de los Particulares",
+      "url": "https://www.diputados.gob.mx/LeyesBiblio/pdf/LFPDPPP.pdf",
+      "fecha_consulta": "2026-11-03",
+      "vigente": true,
+      "resumen": "Define datos sensibles: los que afectan la esfera más íntima o pueden causar discriminación o riesgo grave, como el estado de salud.",
+      "alcance": "mexico_federal",
+      "tipo": "ley",
+      "respaldo": "contexto",
+      "verificacion": "abierta",
+      "referencia": "Art. 2, fr. VI",
+      "fecha_documento": "DOF 20-03-2025, última reforma 14-11-2025"
+    },
+    {
+      "institucion": "Extinto INAI (documento histórico)",
+      "documento": "Guía para la Configuración de Privacidad en Redes Sociales (edición mayo 2023)",
+      "url": "https://home.inai.org.mx/wp-content/uploads/Guia_Configuracion_RS.pdf",
+      "fecha_consulta": "2026-11-03",
+      "vigente": false,
+      "resumen": "Guía práctica de ajustes de privacidad por red social. El INAI ya no existe; se usa solo como referencia.",
+      "alcance": "mexico_federal",
+      "tipo": "documento_historico",
+      "respaldo": "contexto",
+      "verificacion": "abierta",
+      "fecha_documento": "Mayo de 2023"
+    },
+    {
+      "institucion": "Meta / Instagram",
+      "documento": "Condiciones de uso de Instagram",
+      "url": "https://www.facebook.com/help/instagram/581066165581870",
+      "fecha_consulta": "2026-11-03",
+      "vigente": true,
+      "resumen": "Indica que no puedes publicar información privada o confidencial de otra persona sin permiso. Anuncia cambios con efecto el 20-01-2027.",
+      "alcance": "plataforma",
+      "tipo": "politica_plataforma",
+      "respaldo": "contexto",
+      "verificacion": "abierta",
+      "referencia": "§4.2"
+    }
+  ],
+  "reglas": [
+    {
+      "id": "CAR-01",
+      "categoria": "caras_terceros",
+      "que_detecta": "Caras de personas que no eres tú",
+      "nivel_riesgo": "medio",
+      "por_que": "Se ve la cara de otra persona. Puede que no quiera aparecer en redes, así que conviene preguntarle u ocultarla.",
+      "fuentes": [
+        {
+          "institucion": "Agencia Española de Protección de Datos (AEPD)",
+          "documento": "FAQ 1004: imágenes o videos en eventos escolares",
+          "url": "https://www.aepd.es/preguntas-frecuentes/10-menores-y-educacion/FAQ-1004-se-pueden-tomar-imagenes-o-grabar-videos-en-eventos-escolares",
+          "fecha_consulta": "2026-11-03",
+          "vigente": true,
+          "resumen": "En eventos escolares, publicar en abierto imágenes tomadas por familiares necesita el consentimiento de los afectados. Aplica en España.",
+          "alcance": "internacional",
+          "tipo": "recomendacion_oficial",
+          "respaldo": "parcial",
+          "verificacion": "abierta"
+        },
+        {
+          "institucion": "Extinto INAI (documento histórico)",
+          "documento": "Guía para la Configuración de Privacidad en Redes Sociales (edición mayo 2023)",
+          "url": "https://home.inai.org.mx/wp-content/uploads/Guia_Configuracion_RS.pdf",
+          "fecha_consulta": "2026-11-03",
+          "vigente": false,
+          "resumen": "Pide tener cuidado con lo que publicas sobre otras personas; no habla de caras en concreto.",
+          "alcance": "mexico_federal",
+          "tipo": "documento_historico",
+          "respaldo": "parcial",
+          "verificacion": "abierta",
+          "referencia": "p. 7",
+          "fecha_documento": "Mayo de 2023"
+        }
+      ],
+      "aplica_a": "ambos",
+      "estado": "pendiente_de_verificar",
+      "nota": "Sin fuente oficial directa sobre caras de terceros en fotos en general. La AEPD solo trata eventos escolares en España."
+    },
+    {
+      "id": "MEN-01",
+      "categoria": "posibles_menores",
+      "que_detecta": "Cualquier cara, junto con pistas de contexto como uniformes. No se estima ninguna edad",
+      "nivel_riesgo": "alto",
+      "por_que": "Una foto puede revelar la escuela, el horario o la rutina de una niña o un niño. Conviene ocultar su cara o preguntarte si debe aparecer.",
+      "fuentes": [
+        {
+          "institucion": "Secretaría de Seguridad Ciudadana de la CDMX, Policía Cibernética",
+          "documento": "Comunicado 2452: recomendaciones a padres de familia",
+          "url": "https://www.ssc.cdmx.gob.mx/comunicacion/nota/2452-ante-el-inicio-del-ciclo-escolar-2024-2025-la-unidad-de-policia-cibernetica-de-la-ssc-emite-recomendaciones-los-padres-de-familia",
+          "fecha_consulta": "2026-11-03",
+          "vigente": true,
+          "resumen": "Una foto muestra uniforme y colegio, y la hora de publicación permite intuir el horario.",
+          "alcance": "mexico_local",
+          "tipo": "recomendacion_oficial",
+          "respaldo": "directo",
+          "verificacion": "abierta",
+          "fecha_documento": "27-08-2024"
+        },
+        {
+          "institucion": "Agencia Española de Protección de Datos (AEPD)",
+          "documento": "Blog: Los riesgos del sharenting en la vida de los menores",
+          "url": "https://www.aepd.es/prensa-y-comunicacion/blog/los-riesgos-del-sharenting-en-la-vida-de-los-menores",
+          "fecha_consulta": "2026-11-03",
+          "vigente": true,
+          "resumen": "La geolocalización y el contexto de la imagen pueden exponer a los menores.",
+          "alcance": "internacional",
+          "tipo": "recomendacion_oficial",
+          "respaldo": "directo",
+          "verificacion": "abierta",
+          "fecha_documento": "28-06-2024"
+        },
+        {
+          "institucion": "Congreso de la Unión (Cámara de Diputados)",
+          "documento": "Ley General de los Derechos de Niñas, Niños y Adolescentes",
+          "url": "https://www.diputados.gob.mx/LeyesBiblio/pdf/LGDNNA.pdf",
+          "fecha_consulta": "2026-11-03",
+          "vigente": true,
+          "resumen": "Reconoce el derecho a la intimidad y a la protección de datos. El art. 77 se dirige a medios, no a particulares.",
+          "alcance": "mexico_federal",
+          "tipo": "ley",
+          "respaldo": "parcial",
+          "verificacion": "abierta",
+          "referencia": "Arts. 76 y 77",
+          "fecha_documento": "Reforma 15-01-2026"
+        }
+      ],
+      "aplica_a": "ambos",
+      "estado": "verificada",
+      "texto_aviso": "Podría haber menores en la foto",
+      "requiere_confirmacion": true
+    },
+    {
+      "id": "DOC-01",
+      "categoria": "documentos_identidad",
+      "que_detecta": "INE, pasaporte, licencia, actas y otros documentos de identidad",
+      "nivel_riesgo": "alto",
+      "por_que": "Se ve un documento de identidad. Alguien podría usar mal sus datos, así que es mejor ocultarlo.",
+      "fuentes": [
+        {
+          "institucion": "Meta / Instagram",
+          "documento": "Normas Comunitarias: Privacy Violations",
+          "url": "https://transparency.meta.com/policies/community-standards/privacy-violations",
+          "fecha_consulta": "2026-11-03",
+          "vigente": true,
+          "resumen": "Prohíbe compartir números de pasaporte e identificación nacional, y actas de nacimiento, matrimonio o defunción.",
+          "alcance": "plataforma",
+          "tipo": "politica_plataforma",
+          "respaldo": "directo",
+          "verificacion": "abierta"
+        },
+        {
+          "institucion": "N+ (prensa, citando al INAI)",
+          "documento": "Cosas que no debes publicar en redes sociales por seguridad (recomendaciones del INAI)",
+          "url": "https://www.nmas.com.mx/seguridad/cosas-que-no-debes-publicar-en-redes-sociales-por-seguridad-recomendaciones-inai/",
+          "fecha_consulta": "2026-11-03",
+          "vigente": true,
+          "resumen": "Lista las actas de nacimiento y el pasaporte entre lo que no conviene publicar. Fuente de prensa.",
+          "alcance": "mexico_federal",
+          "tipo": "prensa",
+          "respaldo": "directo",
+          "verificacion": "abierta",
+          "fecha_documento": "01-11-2024"
+        }
+      ],
+      "aplica_a": "ambos",
+      "estado": "verificada"
+    },
+    {
+      "id": "FIN-01",
+      "categoria": "informacion_financiera",
+      "que_detecta": "Tarjetas, estados de cuenta, cheques y números de cuenta",
+      "nivel_riesgo": "alto",
+      "por_que": "Se ve información de tus finanzas. Con esos datos alguien podría intentar un fraude, así que conviene ocultarla.",
+      "fuentes": [
+        {
+          "institucion": "Secretaría de Seguridad y Protección Ciudadana (SSPC)",
+          "documento": "Ciberguía 3.1",
+          "url": "https://www.gob.mx/cms/uploads/attachment/file/830372/Cibergu_a_3.1.pdf",
+          "fecha_consulta": "2026-11-03",
+          "vigente": true,
+          "resumen": "Recomienda no compartir información financiera ni ubicaciones que vulneren tu integridad.",
+          "alcance": "mexico_federal",
+          "tipo": "recomendacion_oficial",
+          "respaldo": "directo",
+          "verificacion": "abierta",
+          "fecha_documento": "Ficha 07-11-2025"
+        },
+        {
+          "institucion": "Meta / Instagram",
+          "documento": "Normas Comunitarias: Privacy Violations",
+          "url": "https://transparency.meta.com/policies/community-standards/privacy-violations",
+          "fecha_consulta": "2026-11-03",
+          "vigente": true,
+          "resumen": "Prohíbe compartir estados financieros no públicos, tarjetas con vencimiento o código de seguridad y cuentas con PIN. No cubre cualquier número suelto.",
+          "alcance": "plataforma",
+          "tipo": "politica_plataforma",
+          "respaldo": "directo",
+          "verificacion": "abierta"
+        },
+        {
+          "institucion": "N+ (prensa, citando al INAI)",
+          "documento": "Cosas que no debes publicar en redes sociales por seguridad (recomendaciones del INAI)",
+          "url": "https://www.nmas.com.mx/seguridad/cosas-que-no-debes-publicar-en-redes-sociales-por-seguridad-recomendaciones-inai/",
+          "fecha_consulta": "2026-11-03",
+          "vigente": true,
+          "resumen": "Advierte que los datos financieros publicados pueden usarse para cometer robos o fraudes. Fuente de prensa.",
+          "alcance": "mexico_federal",
+          "tipo": "prensa",
+          "respaldo": "directo",
+          "verificacion": "abierta",
+          "fecha_documento": "01-11-2024"
+        }
+      ],
+      "aplica_a": "ambos",
+      "estado": "verificada"
+    },
+    {
+      "id": "VIA-01",
+      "categoria": "boletos_viajes",
+      "que_detecta": "Pases de abordar y su código, y boletos",
+      "nivel_riesgo": "alto",
+      "por_que": "Se ve un boleto o pase de abordar. Revela tus fechas de viaje y su código puede contener tus datos, así que conviene ocultarlo.",
+      "fuentes": [
+        {
+          "institucion": "INCIBE (España)",
+          "documento": "Blog: ¿Qué información se oculta detrás de una foto?",
+          "url": "https://www.incibe.es/ciudadania/blog/que-informacion-se-oculta-detras-de-una-foto",
+          "fecha_consulta": "2026-11-03",
+          "vigente": true,
+          "resumen": "Una foto de una maleta puede revelar fechas y billetes, y facilitar un robo.",
+          "alcance": "internacional",
+          "tipo": "recomendacion_oficial",
+          "respaldo": "directo",
+          "verificacion": "abierta",
+          "fecha_documento": "23-05-2018"
+        },
+        {
+          "institucion": "The Peninsula, citando a NCSA Qatar",
+          "documento": "Qatar's cybersecurity agency warns against sharing boarding pass on social media",
+          "url": "https://thepeninsulaqatar.com/article/03/08/2026/qatars-cybersecurity-agency-warns-against-sharing-boarding-pass-on-social-media",
+          "fecha_consulta": "2026-11-03",
+          "vigente": true,
+          "resumen": "La agencia pide no publicar pases de abordar, porque su QR puede enlazar con datos del viajero.",
+          "alcance": "internacional",
+          "tipo": "prensa",
+          "respaldo": "directo",
+          "verificacion": "abierta",
+          "fecha_documento": "03-08-2026"
+        },
+        {
+          "institucion": "IATA",
+          "documento": "Bar Coded Boarding Pass Implementation Guide, 7.ª ed.",
+          "url": "https://www.iata.org/contentassets/1dccc9ed041b4f3bbdcf8ee8682e75c4/2021_03_02-bcbp-implementation-guide-version-7-.pdf",
+          "fecha_consulta": "2026-11-03",
+          "vigente": null,
+          "resumen": "Documento técnico: el código incluye nombre y asiento. No advierte contra publicarlo.",
+          "alcance": "internacional",
+          "tipo": "tecnica",
+          "respaldo": "contexto",
+          "verificacion": "abierta",
+          "fecha_documento": "2018"
+        }
+      ],
+      "aplica_a": "ambos",
+      "estado": "verificada"
+    },
+    {
+      "id": "VIA-02",
+      "categoria": "boletos_viajes",
+      "que_detecta": "Etiquetas de maleta",
+      "nivel_riesgo": "medio",
+      "por_que": "Se ve una etiqueta de maleta. Podría mostrar tu nombre o datos de tu viaje, así que conviene ocultarla.",
+      "fuentes": [],
+      "aplica_a": "ambos",
+      "estado": "pendiente_de_verificar",
+      "nota": "Sin fuente oficial sobre etiquetas de maleta. INCIBE habla de una foto de maleta, sin mencionar etiquetas."
+    },
+    {
+      "id": "UBI-01",
+      "categoria": "ubicacion",
+      "que_detecta": "Coordenadas GPS en los metadatos del archivo",
+      "nivel_riesgo": "alto",
+      "por_que": "Este archivo guarda el lugar exacto donde se tomó. Al exportar, se borra para que no viaje con tu foto o video.",
+      "fuentes": [
+        {
+          "institucion": "INCIBE (España)",
+          "documento": "Blog: ¿Qué información se oculta detrás de una foto?",
+          "url": "https://www.incibe.es/ciudadania/blog/que-informacion-se-oculta-detras-de-una-foto",
+          "fecha_consulta": "2026-11-03",
+          "vigente": true,
+          "resumen": "Los metadatos de una foto pueden incluir la ubicación exacta.",
+          "alcance": "internacional",
+          "tipo": "recomendacion_oficial",
+          "respaldo": "directo",
+          "verificacion": "abierta",
+          "fecha_documento": "23-05-2018"
+        },
+        {
+          "institucion": "INCIBE (España)",
+          "documento": "Blog: Geolocalización y privacidad en dispositivos móviles",
+          "url": "https://www.incibe.es/ciudadania/blog/geolocalizacion-y-privacidad-en-dispositivos-moviles",
+          "fecha_consulta": "2026-11-03",
+          "vigente": true,
+          "resumen": "Compartir la ubicación en tiempo real en redes puede facilitar rastreo y robos. No trata metadatos de fotos.",
+          "alcance": "internacional",
+          "tipo": "recomendacion_oficial",
+          "respaldo": "contexto",
+          "verificacion": "abierta",
+          "fecha_documento": "17-07-2024"
+        }
+      ],
+      "aplica_a": "ambos",
+      "estado": "verificada",
+      "nota": "No afirmar que una red concreta expone el GPS: INCIBE decía en 2018 que varias redes lo eliminan al subir. El riesgo también incluye enviar el archivo por otros medios."
+    },
+    {
+      "id": "UBI-02",
+      "categoria": "ubicacion",
+      "que_detecta": "Fachadas de casas y números de domicilio",
+      "nivel_riesgo": "medio",
+      "por_que": "Se ve algo que podría ubicar tu casa. Si no quieres que se sepa dónde vives, conviene ocultarlo.",
+      "fuentes": [
+        {
+          "institucion": "Extinto INAI (documento histórico)",
+          "documento": "Guía para la Configuración de Privacidad en Redes Sociales (edición mayo 2023)",
+          "url": "https://home.inai.org.mx/wp-content/uploads/Guia_Configuracion_RS.pdf",
+          "fecha_consulta": "2026-11-03",
+          "vigente": false,
+          "resumen": "Para Instagram, recomienda evitar publicar fotos de tu casa, teléfonos y correos. El INAI ya no existe.",
+          "alcance": "mexico_federal",
+          "tipo": "documento_historico",
+          "respaldo": "directo",
+          "verificacion": "abierta",
+          "referencia": "p. 32",
+          "fecha_documento": "Mayo de 2023"
+        },
+        {
+          "institucion": "Meta / Instagram",
+          "documento": "Normas Comunitarias: Privacy Violations",
+          "url": "https://transparency.meta.com/policies/community-standards/privacy-violations",
+          "fecha_consulta": "2026-11-03",
+          "vigente": true,
+          "resumen": "Trata los exteriores de vivienda solo bajo condiciones acumulativas.",
+          "alcance": "plataforma",
+          "tipo": "politica_plataforma",
+          "respaldo": "parcial",
+          "verificacion": "abierta"
+        }
+      ],
+      "aplica_a": "ambos",
+      "estado": "pendiente_de_verificar",
+      "nota": "Su única fuente directa es de una institución extinta y no vigente. Ninguna fuente menciona números de domicilio."
+    },
+    {
+      "id": "UBI-03",
+      "categoria": "ubicacion",
+      "que_detecta": "Uniformes y logos de escuela",
+      "nivel_riesgo": "medio",
+      "por_que": "Se ve algo que podría indicar a qué escuela va alguien, así que conviene ocultarlo.",
+      "fuentes": [
+        {
+          "institucion": "Secretaría de Seguridad Ciudadana de la CDMX, Policía Cibernética",
+          "documento": "Comunicado 2452: recomendaciones a padres de familia",
+          "url": "https://www.ssc.cdmx.gob.mx/comunicacion/nota/2452-ante-el-inicio-del-ciclo-escolar-2024-2025-la-unidad-de-policia-cibernetica-de-la-ssc-emite-recomendaciones-los-padres-de-familia",
+          "fecha_consulta": "2026-11-03",
+          "vigente": true,
+          "resumen": "Presenta el uniforme y el colegio de menores como ejemplo de lo que una foto puede revelar. No menciona logos.",
+          "alcance": "mexico_local",
+          "tipo": "recomendacion_oficial",
+          "respaldo": "parcial",
+          "verificacion": "abierta",
+          "fecha_documento": "27-08-2024"
+        }
+      ],
+      "aplica_a": "ambos",
+      "estado": "pendiente_de_verificar",
+      "nota": "Un solo comunicado local, centrado en menores y sin mención de logos."
+    },
+    {
+      "id": "UBI-04",
+      "categoria": "ubicacion",
+      "que_detecta": "Letreros de calles y referencias del lugar",
+      "nivel_riesgo": "medio",
+      "por_que": "Se ve un letrero que podría indicar dónde estás. Si no quieres compartir el lugar, conviene ocultarlo.",
+      "fuentes": [
+        {
+          "institucion": "INCIBE (España)",
+          "documento": "Blog: Geolocalización y privacidad en dispositivos móviles",
+          "url": "https://www.incibe.es/ciudadania/blog/geolocalizacion-y-privacidad-en-dispositivos-moviles",
+          "fecha_consulta": "2026-11-03",
+          "vigente": true,
+          "resumen": "Habla de compartir la ubicación en tiempo real, no de letreros en una imagen.",
+          "alcance": "internacional",
+          "tipo": "recomendacion_oficial",
+          "respaldo": "contexto",
+          "verificacion": "abierta",
+          "fecha_documento": "17-07-2024"
+        }
+      ],
+      "aplica_a": "ambos",
+      "estado": "pendiente_de_verificar",
+      "nota": "Sin fuente oficial directa sobre letreros visibles."
+    },
+    {
+      "id": "UBI-05",
+      "categoria": "ubicacion",
+      "que_detecta": "Gafetes de trabajo o de escuela",
+      "nivel_riesgo": "medio",
+      "por_que": "Se ve un gafete. Puede mostrar tu nombre y dónde trabajas o estudias, así que conviene ocultarlo.",
+      "fuentes": [],
+      "aplica_a": "ambos",
+      "estado": "pendiente_de_verificar",
+      "nota": "Sin fuente oficial directa sobre gafetes. N+ menciona el lugar de trabajo, pero no gafetes."
+    },
+    {
+      "id": "MAT-01",
+      "categoria": "matriculas",
+      "que_detecta": "Placas de autos y motos",
+      "nivel_riesgo": "medio",
+      "por_que": "Se ve una matrícula. Alguien podría usarla para identificar tu auto.",
+      "fuentes": [
+        {
+          "institucion": "Instituto Nacional Electoral",
+          "documento": "Resolución INE-CI099/2016",
+          "url": "https://repositoriodocumental.ine.mx/xmlui/bitstream/handle/123456789/163587/20160407-E-4-3-320-8-8.pdf",
+          "fecha_consulta": "2026-11-03",
+          "vigente": null,
+          "resumen": "En ese caso concreto, las placas se consideran un dato que identifica o puede hacer identificable a una persona.",
+          "alcance": "mexico_federal",
+          "tipo": "resolucion",
+          "respaldo": "parcial",
+          "verificacion": "abierta",
+          "fecha_documento": "07-04-2016"
+        }
+      ],
+      "aplica_a": "ambos",
+      "estado": "pendiente_de_verificar",
+      "nota": "Sin criterio general oficial sobre matrículas en fotos de redes. La resolución del INE solo vale para su caso."
+    },
+    {
+      "id": "VAL-01",
+      "categoria": "objetos_valor",
+      "que_detecta": "Llaves visibles",
+      "nivel_riesgo": "medio",
+      "por_que": "Se ven unas llaves. Una imagen clara a veces deja ver su forma, así que conviene ocultarlas.",
+      "fuentes": [],
+      "aplica_a": "ambos",
+      "estado": "pendiente_de_verificar",
+      "nota": "Sin fuente oficial. Riesgo basado en criterio propio; decidir antes de entregar a testers si se conserva."
+    },
+    {
+      "id": "VAL-02",
+      "categoria": "objetos_valor",
+      "que_detecta": "Joyas, efectivo y compras costosas",
+      "nivel_riesgo": "bajo",
+      "por_que": "Se ve algo de valor. Mostrarlo puede llamar la atención de quien no quieres, así que tú decides si dejarlo.",
+      "fuentes": [
+        {
+          "institucion": "N+ (prensa, citando al INAI)",
+          "documento": "Cosas que no debes publicar en redes sociales por seguridad (recomendaciones del INAI)",
+          "url": "https://www.nmas.com.mx/seguridad/cosas-que-no-debes-publicar-en-redes-sociales-por-seguridad-recomendaciones-inai/",
+          "fecha_consulta": "2026-11-03",
+          "vigente": true,
+          "resumen": "Incluye las compras caras entre lo que no conviene publicar. Fuente de prensa, sin documento oficial localizado.",
+          "alcance": "mexico_federal",
+          "tipo": "prensa",
+          "respaldo": "parcial",
+          "verificacion": "abierta",
+          "fecha_documento": "01-11-2024"
+        }
+      ],
+      "aplica_a": "ambos",
+      "estado": "pendiente_de_verificar",
+      "nota": "Solo prensa que cita al INAI. No se localizó el documento oficial."
+    },
+    {
+      "id": "PAN-01",
+      "categoria": "pantallas",
+      "que_detecta": "Celulares, monitores o TV con contenido legible",
+      "nivel_riesgo": "medio",
+      "por_que": "Se ve una pantalla con texto. Podría mostrar mensajes o datos que no quieres compartir, así que conviene ocultarla.",
+      "fuentes": [
+        {
+          "institucion": "INCIBE (España)",
+          "documento": "Blog: ¿Qué información se oculta detrás de una foto?",
+          "url": "https://www.incibe.es/ciudadania/blog/que-informacion-se-oculta-detras-de-una-foto",
+          "fecha_consulta": "2026-11-03",
+          "vigente": true,
+          "resumen": "Da ejemplos de pantallas al fondo de una foto que dejaron ver direcciones y citas.",
+          "alcance": "internacional",
+          "tipo": "recomendacion_oficial",
+          "respaldo": "directo",
+          "verificacion": "abierta",
+          "fecha_documento": "23-05-2018"
+        }
+      ],
+      "aplica_a": "ambos",
+      "estado": "verificada",
+      "nota": "Una sola fuente, española y de 2018, que habla de pantallas de computadora. Celulares y TV se incluyen por extensión."
+    },
+    {
+      "id": "CON-01",
+      "categoria": "contacto_personal",
+      "que_detecta": "Teléfonos, correos y direcciones escritas",
+      "nivel_riesgo": "alto",
+      "por_que": "Se ve un dato de contacto. Cualquiera podría usarlo para buscarte o molestarte, así que conviene ocultarlo.",
+      "fuentes": [
+        {
+          "institucion": "Extinto INAI (documento histórico)",
+          "documento": "Guía para la Configuración de Privacidad en Redes Sociales (edición mayo 2023)",
+          "url": "https://home.inai.org.mx/wp-content/uploads/Guia_Configuracion_RS.pdf",
+          "fecha_consulta": "2026-11-03",
+          "vigente": false,
+          "resumen": "En el perfil de Facebook, recomienda no compartir dirección ni teléfono; en Instagram, evitar publicar teléfonos y correos. El INAI ya no existe.",
+          "alcance": "mexico_federal",
+          "tipo": "documento_historico",
+          "respaldo": "directo",
+          "verificacion": "abierta",
+          "referencia": "pp. 7 y 32",
+          "fecha_documento": "Mayo de 2023"
+        },
+        {
+          "institucion": "Meta / Instagram",
+          "documento": "Normas Comunitarias: Privacy Violations",
+          "url": "https://transparency.meta.com/policies/community-standards/privacy-violations",
+          "fecha_consulta": "2026-11-03",
+          "vigente": true,
+          "resumen": "Prohíbe compartir datos de contacto de otras personas, salvo que esa persona los haya hecho públicos y otras excepciones.",
+          "alcance": "plataforma",
+          "tipo": "politica_plataforma",
+          "respaldo": "directo",
+          "verificacion": "abierta"
+        },
+        {
+          "institucion": "Secretaría de Seguridad y Protección Ciudadana (SSPC)",
+          "documento": "Ciberguía 3.1",
+          "url": "https://www.gob.mx/cms/uploads/attachment/file/830372/Cibergu_a_3.1.pdf",
+          "fecha_consulta": "2026-11-03",
+          "vigente": true,
+          "resumen": "Recomienda no dar datos exactos en tus perfiles.",
+          "alcance": "mexico_federal",
+          "tipo": "recomendacion_oficial",
+          "respaldo": "parcial",
+          "verificacion": "abierta",
+          "fecha_documento": "Ficha 07-11-2025"
+        }
+      ],
+      "aplica_a": "ambos",
+      "estado": "verificada"
+    },
+    {
+      "id": "MED-01",
+      "categoria": "informacion_medica",
+      "que_detecta": "Recetas, pulseras de hospital y resultados médicos",
+      "nivel_riesgo": "alto",
+      "por_que": "Se ve información de salud. Es un dato muy personal, tuyo o de alguien más, así que conviene ocultarlo.",
+      "fuentes": [
+        {
+          "institucion": "Congreso de la Unión (Cámara de Diputados)",
+          "documento": "Ley Federal de Protección de Datos Personales en Posesión de los Particulares",
+          "url": "https://www.diputados.gob.mx/LeyesBiblio/pdf/LFPDPPP.pdf",
+          "fecha_consulta": "2026-11-03",
+          "vigente": true,
+          "resumen": "El estado de salud es un dato personal sensible. La ley no habla de fotos en concreto.",
+          "alcance": "mexico_federal",
+          "tipo": "ley",
+          "respaldo": "parcial",
+          "verificacion": "abierta",
+          "referencia": "Art. 2, fr. VI",
+          "fecha_documento": "DOF 20-03-2025, última reforma 14-11-2025"
+        },
+        {
+          "institucion": "Meta / Instagram",
+          "documento": "Normas Comunitarias: Privacy Violations",
+          "url": "https://transparency.meta.com/policies/community-standards/privacy-violations",
+          "fecha_consulta": "2026-11-03",
+          "vigente": true,
+          "resumen": "Prohíbe compartir información médica de otras personas que claramente provenga de historiales o documentos oficiales.",
+          "alcance": "plataforma",
+          "tipo": "politica_plataforma",
+          "respaldo": "directo",
+          "verificacion": "abierta"
+        }
+      ],
+      "aplica_a": "ambos",
+      "estado": "verificada"
+    },
+    {
+      "id": "COD-01",
+      "categoria": "codigos",
+      "que_detecta": "Códigos QR y de barras legibles",
+      "nivel_riesgo": "medio",
+      "por_que": "Se ve un código que se puede leer. Podría guardar datos que no se ven a simple vista, así que conviene ocultarlo.",
+      "fuentes": [],
+      "aplica_a": "ambos",
+      "estado": "pendiente_de_verificar",
+      "nota": "Sin fuente oficial sobre publicar códigos en general. El caso de pases de abordar está en VIA-01. El aviso de GN-CERT trata de escanear QR, no de publicarlos, y no respalda esta regla."
+    }
+  ]
+}
