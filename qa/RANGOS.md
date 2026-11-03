@@ -119,7 +119,7 @@ Cada parámetro de este archivo tiene pruebas parametrizadas de mínimo-1, míni
 | `export.video_mbps` | decimal, Mbps | 1 (propuesta) | 25 (referencia: API de Instagram) | 16 (propuesta) | Estándar |
 | `export.video_fps` | decimal, fps | 23 | 60 | Igual al original, si cabe en el rango | Estándar. Referencia: API de Instagram |
 | `export.ruta` | texto | 1 carácter | Sin límite propio; lo define Windows | Carpeta elegida | Sin permisos o sin espacio: la exportación se detiene, no queda archivo final y se explica qué hacer |
-| `export.quitar_metadatos` | booleano | n/a | n/a | `true` | Estándar. No se ofrece en la UI; solo admite `true` |
+| `export.quitar_metadatos` | booleano | n/a | n/a | `true` | Estándar. No se ofrece en la UI; solo admite `true`. Decisión confirmada por el responsable del proyecto: siempre se borran |
 
 Los límites de Instagram cambian, y sus propias fuentes se contradicen (4:5 o 3:4). Por eso son configurables y no se tratan como cifras estables.
 

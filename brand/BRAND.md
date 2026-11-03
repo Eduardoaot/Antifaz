@@ -1,6 +1,6 @@
 # Marca de Antifaz
 
-Estado: propuesta de la Fase 0, pendiente de que elijas logo y eslogan.
+Estado: aprobada por el responsable del proyecto el 3 de noviembre de 2026 (logo B, eslogan propio e índigo).
 
 ## Nombre
 
@@ -54,22 +54,24 @@ Revisados el 3 de noviembre de 2026 en dominios, App Store México, GitHub y bú
 
 ## Eslogan
 
-Propuesto: **"Publica sin exponerte."** Alternativas: "Revisa antes de publicar." y "Lo tuyo, antes de compartirlo."
+**"Comparte lo que quieres que vean"**
 
 ## Logo
 
-Bocetos en `brand/sketches/`. Recomiendo **A**: es el único dibujado sobre una cuadrícula de 16×16, así que se ve nítido en el tamaño más difícil.
+**Elegido: B, un antifaz dentro de las esquinas de un encuadre de foto.** Las esquinas van sueltas para no parecerse al ícono de cámara de Instagram. Los otros bocetos siguen en `brand/sketches/`.
 
-| Opción | Archivo | A favor | En contra |
-|---|---|---|---|
-| A, píxeles | `a-pixeles.svg` | Nítido a 16 px; une máscara y píxel | Menos cálido |
-| B, encuadre | `b-marco.svg` | Dice "foto" de inmediato | Se empasta a 16 px |
-| C, curvas | `c-ojos-pixel.svg` | El más amable | Lo de foto se nota poco |
-| D, lucha libre | `d-lucha.svg` | Más carácter y más mexicano | Menos tranquilo; puede sonar a superhéroe |
+| Archivo | Uso |
+|---|---|
+| `brand/logo/horizontal-{claro,oscuro,mono-negro,mono-blanco}.svg` | Símbolo + nombre. El texto está en trazos |
+| `brand/logo/isotipo-{claro,oscuro,mono-negro,mono-blanco}.svg` | Solo el símbolo |
+| `brand/logo/isotipo-16.svg` | Dibujo propio para 16 px, en cuadrícula de píxeles |
+| `brand/icon/icono-{16...1024}.png` e `icono.ico` | Ícono de la app, sin texto, sobre mosaico índigo |
 
-**Reglas:** simple, geométrico y vectorial. Reconocible de 16 a 1024 px. Una sola tinta, en positivo y negativo. Sin copiar máscaras de luchadores reales. Nada de candados, escudos policiales ni ojos que vigilan. El ícono no lleva texto.
+**Tamaño chico:** a 16 px el dibujo grande se empasta, así que ese tamaño usa un dibujo propio.
 
-**Pendiente tras elegir:** pulir el logo; hacer logo horizontal e isotipo en versiones clara, oscura y monocroma; generar ícono `.ico` y PNG. El `.icns` queda fuera porque el proyecto es solo Windows.
+**Regenerar:** todo sale de `tools/generar_logo.py`, que lee el nombre de `brand.json`.
+
+**Reglas:** simple, geométrico y vectorial. Reconocible de 16 a 1024 px. Una sola tinta, en positivo y negativo. Sin copiar máscaras de luchadores reales. Nada de candados, escudos policiales ni ojos que vigilan. El ícono no lleva texto. El `.icns` queda fuera porque el proyecto es solo Windows.
 
 ## Color
 
@@ -86,7 +88,7 @@ Máximo dos familias, ambas OFL 1.1 e incluidas en la app, sin CDN.
 - **Atkinson Hyperlegible Next:** toda la interfaz.
 - **Inter:** cifras y tiempos, con numerales tabulares. "Inter" es nombre reservado según su README: se distribuye sin modificar ni crear subconjuntos.
 
-CI debe comprobar `ñ á é í ó ú ü ¿ ¡` con fontTools, porque no hallé listas oficiales de glifos.
+Archivos y licencias en `brand/fonts/`. Comprobado con fontTools: ambas incluyen `ñ á é í ó ú ü ¿ ¡` y sus mayúsculas.
 
 ## Tono de voz
 
