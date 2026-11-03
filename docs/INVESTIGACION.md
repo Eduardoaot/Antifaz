@@ -83,9 +83,17 @@ Las fuentes de cada regla están en `rules/catalogo.json`.
 - **La lista del brief** (boletos, pasaporte, actas, compras caras, menores, quejas) **no está en ninguna de las dos.** Una búsqueda de esas palabras en el texto extraído de 2023 no halló coincidencias relevantes. Su única fuente abierta es prensa ([N+, 2024](https://www.nmas.com.mx/seguridad/cosas-que-no-debes-publicar-en-redes-sociales-por-seguridad-recomendaciones-inai/)), que además incluye información de familiares y amigos.
 - **Título:** el texto extraído dice "Guía para la configuración de privacidad en redes sociales". La portada es una imagen, así que no confirmé el agregado "y Aplicaciones de Contenido".
 
+### Comunicados de la SSPC
+
+Están detrás de un bloqueo antirrobots, así que el responsable del proyecto los abrió en su navegador y pegó el texto. No hay lectura automática que los confirme.
+
+- [Comunicado 25](https://gabinetedeseguridad.gob.mx/contenido/4533/sspc-presenta-decalogo-de-recomendaciones-en-el-dia-de-la-internet-segura), 11 de febrero de 2025: "No compartir información personal al navegar por internet ni subir documentos con datos personales, bancarios, fotografías, dirección y ubicación en tiempo real."
+- [Comunicado 137](https://www.gob.mx/sspc/prensa/la-sspc-emite-recomendaciones-de-seguridad-en-el-dia-mundial-de-las-redes-sociales?idiom=es), 30 de junio de 2025: "Evita compartir información personal o sensible, como son dirección, número de teléfono, escuela, lugar de trabajo o rutinas diarias."
+
+Con ellos, UBI-02, UBI-03 y UBI-05 pasaron a `verificada`. Criterio: la fuente respalda la información que el objeto revela, aunque no mencione el objeto, y la `nota` de cada regla lo aclara.
+
 ### Sin confirmar
 
-- **SSPC:** los comunicados [Día de la Internet Segura](https://gabinetedeseguridad.gob.mx/contenido/4533/sspc-presenta-decalogo-de-recomendaciones-en-el-dia-de-la-internet-segura) y [Día de las Redes Sociales](https://gabinetedeseguridad.gob.mx/contenido/5985/la-sspc-emite-recomendaciones-de-seguridad-en-el-dia-mundial-de-las-redes-sociales) están detrás de un bloqueo antirrobots. Según el buscador cubren documentos, ubicación, escuela y rutinas. **Una persona debe abrirlos en un navegador:** podrían sustentar varias reglas.
 - **Guardia Nacional:** no hallé una recomendación sobre publicar fotos o viajes.
 - **Policía Cibernética de Nuevo León:** solo hallé una [página archivada](https://historico.nl.gob.mx/campanas/conoce-que-tipo-de-delitos-investiga-la-policia-cibernetica-y-denuncia), sin recomendaciones.
 - **AEPD E-07336/2014** sobre matrículas: respondió error 500.

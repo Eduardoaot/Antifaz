@@ -6,7 +6,7 @@ Fecha: 3 de noviembre de 2026. Esta fase no incluye código de la app, así que 
 
 | Prueba | Resultado |
 |---|---|
-| Esquema y reglas de negocio del catálogo (`validar_catalogo.py`) | Pasa: 18 reglas, 8 verificadas, 10 pendientes |
+| Esquema y reglas de negocio del catálogo (`validar_catalogo.py`) | Pasa: 18 reglas, 11 verificadas, 7 pendientes |
 | Tests del validador con catálogos mal formados (9 tests) | Pasan |
 | Enlaces del catálogo (`--urls`) | 11 de 15 responden 200. Meta y Facebook rechazan al robot (400). AEPD falla por certificado en esta red |
 | Lectura de esas 4 URLs por otra vía (WebFetch) | Se pudieron leer |
@@ -23,7 +23,7 @@ El cotejo de la matriz busca palabras clave: confirma que cada tema aparece, no 
 ## Qué falló y cómo se corrigió
 
 1. **Citas que exageraban.** El revisor independiente encontró afirmaciones más fuertes que sus fuentes.
-   - UBI-02 (fachadas) y UBI-03 (uniformes) bajaron de `verificada` a `pendiente_de_verificar`.
+   - UBI-02 (fachadas) y UBI-03 (uniformes) bajaron a `pendiente_de_verificar`. Después volvieron a `verificada` con los comunicados de la SSPC, que respaldan la dirección y la escuela, aunque no mencionan esos objetos.
    - DOC-01 ya no dice "hacerse pasar por ti". MAT-01 ya no dice "o tu casa". UBI-03 ya no habla de horarios.
    - FIN-01 ganó la fuente que sustenta el riesgo de fraude.
    - Las etiquetas de maleta pasaron a su propia regla pendiente (VIA-02), porque ninguna fuente las menciona.
@@ -45,9 +45,12 @@ El cotejo de la matriz busca palabras clave: confirma que cada tema aparece, no 
 ## Pendiente
 
 **Lo que necesita a una persona:**
-- Abrir en un navegador los dos comunicados de la SSPC (enlaces en `docs/INVESTIGACION.md`). Podrían sustentar varias reglas pendientes.
-- Decidir antes de entregar a testers qué hacer con las 10 reglas pendientes: CAR-01, VIA-02, UBI-02, UBI-03, UBI-04, UBI-05, MAT-01, VAL-01, VAL-02 y COD-01.
-- Elegir logo, eslogan y color de marca.
+- Decidir antes de entregar a testers qué hacer con las 7 reglas pendientes: CAR-01, VIA-02, UBI-04, MAT-01, VAL-01, VAL-02 y COD-01.
+
+**Resuelto por el responsable del proyecto:**
+- Logo B, eslogan "Comparte lo que quieres que vean" e índigo como color de marca.
+- Texto de los dos comunicados de la SSPC, pegado desde su navegador.
+- La exportación siempre borra los metadatos.
 
 **Lo que no se comprobó:**
 - Valores de `RANGOS.md` y presupuestos de `PLAN_QA.md`: son propuestas sin medir.
@@ -57,11 +60,10 @@ El cotejo de la matriz busca palabras clave: confirma que cada tema aparece, no 
 - Licencia de InsightFace para el caso de testers, antes de usarlo.
 - GitHub Actions: aún no hay workflow, llega en la Fase 1.
 
-**Generar tras tu elección:** logo final, logotipo, ícono `.ico` y PNG.
+**Generados tras la elección:** logo horizontal e isotipo en 4 variantes, dibujo propio de 16 px, 9 PNG e `icono.ico` con 7 tamaños. Revisados en capturas. El `.ico` aún no se ha visto en la barra de tareas de Windows: se comprueba en la Fase 1.
 
 ## Decisiones de esta fase que conviene que revises
 
-Tomadas por el subagente de QA en `qa/RANGOS.md`:
-- `export.quitar_metadatos` solo admite `true`, aunque el brief dice "por defecto". Es más seguro, pero nadie podrá conservar metadatos.
+En `qa/RANGOS.md`:
 - Dilatación mínima de 8 px, sin poder bajarla.
 - Video: máximo 7200 s y aviso a partir de 180 s, sin medir aún.
