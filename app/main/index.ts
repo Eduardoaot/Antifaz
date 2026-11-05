@@ -14,6 +14,7 @@ import {
   esquemaEdiciones,
   esquemaExportado,
   esquemaListaOcultamientos,
+  esquemaSegmentado,
   esquemaTema,
   type ArchivoCargado,
   type Edicion,
@@ -292,6 +293,17 @@ function registrarCanales(): void {
     if (!resultado.ok) return resultado;
     const exportado = esquemaExportado.parse(resultado.datos);
     return { ok: true, datos: { nombre: basename(elegido.filePath), zonasOcultas: exportado.zonas_ocultas } };
+  });
+
+  manejar(CANALES.segmentar, FALLO, async (id: unknown, x: unknown, y: unknown): Promise<Resultado<unknown>> => {
+    const archivoId = validar(esquemaArchivoId, id);
+    const punto = validar(z.strictObject({ x: z.number().int().min(0).max(LIMITES.ladoMax - 1), y: z.number().int().min(0).max(LIMITES.ladoMax - 1) }), { x, y });
+    if (archivoId === null || punto === null) return invalido;
+    const sidecarId = await archivos.sidecarId(archivoId);
+    if (!sidecarId.ok) return sidecarId;
+    const { resultado } = await sidecar.pedir({ tipo: 'segmentar', imagen_id: sidecarId.datos, ...punto });
+    if (!resultado.ok) return resultado;
+    return { ok: true, datos: esquemaSegmentado.parse(resultado.datos) };
   });
 
   manejar(CANALES.cerrar, undefined, async (id: unknown): Promise<void> => {

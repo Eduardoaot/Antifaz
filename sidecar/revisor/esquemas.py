@@ -32,6 +32,8 @@ class Ocultamiento(Estricto):
     intensidad: Annotated[int, Field(ge=1, le=100)] = 80
     dilatacion_px: Annotated[int, Field(ge=8, le=512)] = 8
     dilatacion_pct: Annotated[float, Field(ge=0, le=50)] = 10.0
+    # Silueta guardada en el sidecar. Si ya no está, se oculta toda la caja.
+    mascara_id: Annotated[str | None, Field(min_length=1, max_length=64)] = None
 
 
 class Ping(Estricto):
@@ -74,13 +76,20 @@ class Exportar(Estricto):
     sobrescribir: bool = False
 
 
+class Segmentar(Estricto):
+    tipo: Literal["segmentar"]
+    imagen_id: Annotated[str, Field(min_length=1, max_length=64)]
+    x: Annotated[int, Field(ge=0, le=LADO_MAX_PX - 1)]
+    y: Annotated[int, Field(ge=0, le=LADO_MAX_PX - 1)]
+
+
 class Cerrar(Estricto):
     tipo: Literal["cerrar"]
     imagen_id: Annotated[str, Field(min_length=1, max_length=64)]
 
 
 Comando = Annotated[
-    Ping | AbrirImagen | Analizar | Previsualizar | Exportar | Cerrar,
+    Ping | AbrirImagen | Analizar | Previsualizar | Exportar | Segmentar | Cerrar,
     Field(discriminator="tipo"),
 ]
 

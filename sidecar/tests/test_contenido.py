@@ -9,7 +9,7 @@ import numpy as np
 import pytest
 from PIL import Image
 
-from revisor import analisis, cargador, contenido
+from revisor import analisis, cargador, contenido, objetos
 from revisor.caras import ModeloNoDisponible
 from revisor.contenido import ETIQUETAS_NUDENET, RevisorContenido, Zona, decodificar_zonas
 
@@ -81,6 +81,12 @@ def test_modelo_real_en_imagenes_comunes() -> None:
 
 
 def _simular(monkeypatch: pytest.MonkeyPatch, escena: dict[str, float], zonas: list[Zona]) -> None:
+    class SinObjetos:
+        def buscar(self, _p: Any) -> list[Any]:
+            return []
+
+    monkeypatch.setattr(objetos, "detector_de", lambda _c: SinObjetos())
+
     class Falso:
         def escena(self, _p: Any) -> dict[str, float]:
             return escena
@@ -106,7 +112,7 @@ def test_foto_comun_no_genera_avisos_de_contenido(tmp_path: Path, monkeypatch: p
     assert {"ARM-01", "EXT-01", "DES-01", "SUG-01"} <= set(resultado["cobertura"]["reglas_revisadas"])
 
 
-@pytest.mark.parametrize(("regla", "puntaje", "aparece"), [("ARM-01", 0.34, False), ("ARM-01", 0.35, True), ("EXT-01", 0.9, True), ("DES-01", 0.5, True), ("SUG-01", 0.5, True)])
+@pytest.mark.parametrize(("regla", "puntaje", "aparece"), [("ARM-01", 0.34, False), ("ARM-01", 0.35, True), ("EXT-01", 0.59, False), ("EXT-01", 0.9, True), ("DES-01", 0.5, True), ("SUG-01", 0.5, True)])
 def test_escena_avisa_sobre_la_imagen_completa(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, regla: str, puntaje: float, aparece: bool) -> None:
     _simular(monkeypatch, {**NEUTRO, regla: puntaje}, [])
     hallazgos = [h for h in _analizar(tmp_path)["hallazgos"] if h["regla_id"] == regla]

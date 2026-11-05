@@ -19,7 +19,8 @@ from typing import Any, BinaryIO, NoReturn, assert_never
 from PIL import Image
 from pydantic import ValidationError
 
-from . import analisis, cargador, efectos, exportar
+from . import analisis, cargador, efectos, exportar, segmentar
+from .caras import ModeloNoDisponible
 from .errores import Codigo, ErrorRevisor
 from .esquemas import (
     MAX_BYTES_MENSAJE,
@@ -29,6 +30,7 @@ from .esquemas import (
     Exportar,
     Ping,
     Previsualizar,
+    Segmentar,
     Solicitud,
 )
 
@@ -73,6 +75,8 @@ class Sesion:
     def __init__(self, carpeta_modelos: Path) -> None:
         self.carpeta_modelos = carpeta_modelos
         self.imagenes: dict[str, cargador.ImagenCargada] = {}
+        self.preparados: dict[str, dict[str, Any]] = {}
+        self.mascaras: dict[str, dict[str, Any]] = {}
 
     def _imagen(self, imagen_id: str) -> cargador.ImagenCargada:
         imagen = self.imagenes.get(imagen_id)
@@ -89,6 +93,28 @@ class Sesion:
         else:
             imagen.save(salida, format="JPEG", quality=CALIDAD_VISTA)
         return salida.getvalue()
+
+    def _segmentar(self, comando: Segmentar) -> dict[str, object]:
+        imagen = self._imagen(comando.imagen_id)
+        if comando.x >= imagen.ancho or comando.y >= imagen.alto:
+            raise ErrorRevisor(Codigo.REGION_FUERA_DE_IMAGEN)
+        try:
+            modelo = segmentar.segmentador_de(self.carpeta_modelos)
+        except ModeloNoDisponible as e:
+            raise ErrorRevisor(Codigo.MODELO_NO_DISPONIBLE) from e
+        preparado = self.preparados.get(comando.imagen_id)
+        if preparado is None:
+            preparado = modelo.preparar(imagen.pixeles)
+            self.preparados[comando.imagen_id] = preparado
+        mascara = modelo.segmentar(preparado, comando.x, comando.y)
+        if mascara is None:
+            raise ErrorRevisor(Codigo.SIN_OBJETO)
+        mascara_id = uuid.uuid4().hex
+        self.mascaras.setdefault(comando.imagen_id, {})[mascara_id] = mascara.recorte
+        return {
+            "mascara_id": mascara_id,
+            "caja": {"x": mascara.x, "y": mascara.y, "ancho": mascara.ancho, "alto": mascara.alto},
+        }
 
     def ejecutar(self, comando: Any) -> tuple[dict[str, object], bytes | None]:
         match comando:
@@ -116,7 +142,9 @@ class Sesion:
                 ), None
             case Previsualizar():
                 imagen = self._imagen(comando.imagen_id)
-                pixeles, _ = efectos.aplicar(imagen.pixeles, comando.ocultamientos)
+                pixeles, _ = efectos.aplicar(
+                    imagen.pixeles, comando.ocultamientos, self.mascaras.get(comando.imagen_id)
+                )
                 return {"mime": "image/png" if imagen.tiene_alfa else "image/jpeg"}, self._vista(
                     pixeles, comando.lado_max
                 )
@@ -127,9 +155,14 @@ class Sesion:
                     comando.ruta_destino,
                     comando.jpeg_calidad,
                     comando.sobrescribir,
+                    self.mascaras.get(comando.imagen_id),
                 ), None
+            case Segmentar():
+                return self._segmentar(comando), None
             case Cerrar(imagen_id=imagen_id):
                 self.imagenes.pop(imagen_id, None)
+                self.preparados.pop(imagen_id, None)
+                self.mascaras.pop(imagen_id, None)
                 return {"cerrada": True}, None
             case _ as desconocido:
                 assert_never(desconocido)

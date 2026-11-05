@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState, type PointerEvent } from 'react';
 import type { Hallazgo, Ocultamiento } from '../../shared/contrato';
-import type { Revision } from '../../shared/logica';
+import { aPuntoDeImagen, cajaEntre, type Caja, type Herramienta, type Revision } from '../../shared/logica';
 import type { Archivo } from './App';
 
 interface Props {
@@ -8,14 +8,28 @@ interface Props {
   hallazgos: readonly Hallazgo[];
   ocultamientos: readonly Ocultamiento[];
   revision: Revision | null;
+  herramienta: Herramienta;
+  alClic: (x: number, y: number) => void;
+  alDibujar: (caja: Caja) => void;
+  alFuera: () => void;
 }
 
+const porcentajes = (c: Caja, ancho: number, alto: number): React.CSSProperties => ({
+  left: `${(c.x / ancho) * 100}%`,
+  top: `${(c.y / alto) * 100}%`,
+  width: `${(c.ancho / ancho) * 100}%`,
+  height: `${(c.alto / alto) * 100}%`,
+});
+
 /** La imagen la dibuja el sidecar con los mismos efectos que la exportación: lo que ves es lo que sale. */
-export function Visor({ archivo, hallazgos, ocultamientos, revision }: Props): React.JSX.Element {
+export function Visor({ archivo, hallazgos, ocultamientos, revision, herramienta, alClic, alDibujar, alFuera }: Props): React.JSX.Element {
   const { id, ancho, alto, nombre } = archivo.info;
   const clave = JSON.stringify(ocultamientos);
   const [url, setUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [inicio, setInicio] = useState<{ x: number; y: number } | null>(null);
+  const [actual, setActual] = useState<{ x: number; y: number } | null>(null);
+  const lienzo = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     let vigente = true;
@@ -39,32 +53,72 @@ export function Visor({ archivo, hallazgos, ocultamientos, revision }: Props): R
 
   const conCaja = hallazgos.filter((h) => h.caja !== null);
 
+  const punto = (e: PointerEvent): { x: number; y: number } | null => {
+    const rect = lienzo.current?.getBoundingClientRect();
+    return rect === undefined ? null : aPuntoDeImagen(e.clientX, e.clientY, rect, ancho, alto);
+  };
+
+  const alBajar = (e: PointerEvent): void => {
+    if (herramienta === 'rectangulo') {
+      const p = punto(e);
+      setInicio(p);
+      setActual(p);
+      e.currentTarget.setPointerCapture(e.pointerId);
+    }
+  };
+
+  const alMover = (e: PointerEvent): void => {
+    if (inicio === null) return;
+    const rect = lienzo.current?.getBoundingClientRect();
+    if (rect !== undefined) setActual(aPuntoDeImagen(e.clientX, e.clientY, rect, ancho, alto, true));
+  };
+
+  const alSoltar = (e: PointerEvent): void => {
+    if (herramienta === 'clic') {
+      const p = punto(e);
+      if (p === null) alFuera();
+      else alClic(p.x, p.y);
+      return;
+    }
+    if (inicio !== null && actual !== null) {
+      const caja = cajaEntre(inicio, actual);
+      if (caja !== null) alDibujar(caja);
+    }
+    setInicio(null);
+    setActual(null);
+  };
+
+  const dibujo = inicio !== null && actual !== null ? cajaEntre(inicio, actual) : null;
+
   if (error !== null) return <p role="alert">No pudimos mostrar la vista previa. {error}</p>;
   if (url === null) return <p className="suave">Preparando la vista previa…</p>;
   return (
     <figure className="visor">
-      <div className="lienzo" style={{ aspectRatio: `${ancho} / ${alto}` }}>
-        <img src={url} alt={`Vista previa de ${nombre}. El detalle está en el panel de advertencias.`} />
+      <div
+        ref={lienzo}
+        className={`lienzo herramienta-${herramienta}`}
+        style={{ aspectRatio: `${ancho} / ${alto}` }}
+        data-testid="lienzo"
+        onPointerDown={alBajar}
+        onPointerMove={alMover}
+        onPointerUp={alSoltar}
+      >
+        <img src={url} draggable={false} alt={`Vista previa de ${nombre}. El detalle está en el panel de advertencias.`} />
         {conCaja.map((h, i) => {
           const caja = h.caja;
           if (caja === null) return null;
-          const decision = revision?.decisiones[h.id];
           return (
-            <div
-              key={h.id}
-              aria-hidden="true"
-              className={`marca ${decision ?? 'sin-decidir'}`}
-              style={{
-                left: `${(caja.x / ancho) * 100}%`,
-                top: `${(caja.y / alto) * 100}%`,
-                width: `${(caja.ancho / ancho) * 100}%`,
-                height: `${(caja.alto / alto) * 100}%`,
-              }}
-            >
+            <div key={h.id} aria-hidden="true" className={`marca ${revision?.decisiones[h.id] ?? 'sin-decidir'}`} style={porcentajes(caja, ancho, alto)}>
               <span>{i + 1}</span>
             </div>
           );
         })}
+        {revision?.manuales.map((z, i) => (
+          <div key={z.id} aria-hidden="true" className="marca ocultar manual" style={porcentajes(z, ancho, alto)}>
+            <span>T{i + 1}</span>
+          </div>
+        ))}
+        {dibujo !== null && <div aria-hidden="true" className="marca sin-decidir" style={porcentajes(dibujo, ancho, alto)} />}
       </div>
       <figcaption className="suave">{ancho} × {alto} px · {archivo.info.formato}</figcaption>
     </figure>

@@ -7,10 +7,11 @@ import io
 import logging
 import os
 import uuid
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from pathlib import PurePath
 
 import numpy as np
+from numpy.typing import NDArray
 from PIL import Image
 
 from . import efectos, metadatos
@@ -103,6 +104,7 @@ def exportar(
     ruta_destino: str,
     jpeg_calidad: int = 92,
     sobrescribir: bool = False,
+    mascaras: Mapping[str, NDArray[np.bool_]] | None = None,
 ) -> dict[str, object]:
     formato = EXTENSIONES.get(PurePath(ruta_destino).suffix.lower())
     if formato is None or not os.path.isabs(ruta_destino):
@@ -115,7 +117,7 @@ def exportar(
     if os.path.exists(destino) and not sobrescribir:
         raise ErrorRevisor(Codigo.DESTINO_EXISTE)
 
-    pixeles, regiones = efectos.aplicar(imagen.pixeles, ocultamientos)
+    pixeles, regiones = efectos.aplicar(imagen.pixeles, ocultamientos, mascaras)
     match formato:
         case "JPEG":
             esperado = _aplanar(pixeles)

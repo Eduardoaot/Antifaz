@@ -1,5 +1,5 @@
 {
-  "version": "0.5.0",
+  "version": "0.6.0",
   "fecha_actualizacion": "2026-11-06",
   "aviso": "{app} es una herramienta orientativa y no constituye asesoría legal.",
   "marco_general": [
@@ -507,7 +507,8 @@
       ],
       "aplica_a": "ambos",
       "estado": "pendiente_de_verificar",
-      "nota": "Sin fuente oficial directa sobre letreros visibles."
+      "nota": "Sin fuente oficial directa sobre letreros visibles.",
+      "texto_aviso": "Podría ser un letrero que indique el lugar"
     },
     {
       "id": "UBI-05",
@@ -558,7 +559,8 @@
       ],
       "aplica_a": "ambos",
       "estado": "pendiente_de_verificar",
-      "nota": "Sin criterio general oficial sobre matrículas en fotos de redes. La resolución del INE solo vale para su caso."
+      "nota": "Sin criterio general oficial sobre matrículas en fotos de redes. La resolución del INE solo vale para su caso.",
+      "texto_aviso": "Podría ser una matrícula"
     },
     {
       "id": "VAL-01",
@@ -594,7 +596,8 @@
       ],
       "aplica_a": "ambos",
       "estado": "pendiente_de_verificar",
-      "nota": "Solo prensa que cita al INAI. No se localizó el documento oficial."
+      "nota": "Solo prensa que cita al INAI. No se localizó el documento oficial. Por ahora solo se detectan joyas: el efectivo y las compras costosas aún no.",
+      "texto_aviso": "Podrían ser joyas u objetos de valor"
     },
     {
       "id": "PAN-01",
@@ -619,7 +622,8 @@
       ],
       "aplica_a": "ambos",
       "estado": "verificada",
-      "nota": "Una sola fuente, española y de 2018, que habla de pantallas de computadora. Celulares y TV se incluyen por extensión."
+      "nota": "Una sola fuente, española y de 2018, que habla de pantallas de computadora. Celulares y TV se incluyen por extensión.",
+      "texto_aviso": "Podría ser una pantalla con contenido"
     },
     {
       "id": "CON-01",
@@ -824,7 +828,7 @@
       ],
       "aplica_a": "ambos",
       "estado": "pendiente_de_verificar",
-      "nota": "Meta regula la venta y la promoción de armas, pero no prohíbe mostrarlas por sí solo, y no hallé una fuente oficial sobre fotos de armas o uniformes. Puede avisar de más con disfraces, juguetes o noticias. Por ahora avisa sobre toda la imagen.",
+      "nota": "Meta regula la venta y la promoción de armas, pero no prohíbe mostrarlas por sí solo, y no hallé una fuente oficial sobre fotos de armas o uniformes. Puede avisar de más con disfraces, juguetes o noticias. Cuando no ubica el arma, avisa sobre toda la imagen.",
       "texto_aviso": "Podría mostrar armas o personas armadas"
     },
     {

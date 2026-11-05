@@ -114,7 +114,7 @@ test('foto sin nada: lo dice sin prometer de más', async () => {
   await abrir(sesion, [m('negra.png')]);
   await expect(veredicto(pagina)).toHaveText('No encontramos nada riesgoso en lo que revisamos', { timeout: 60_000 });
   await expect(pagina.getByText('La revisión es orientativa')).toBeVisible();
-  await expect(pagina.getByText(/Lo que todavía no revisamos \(9\)/)).toBeVisible();
+  await expect(pagina.getByText(/Lo que todavía no revisamos \(5\)/)).toBeVisible();
   await sinViolaciones(pagina);
 });
 
@@ -163,6 +163,108 @@ test('texto y código: los encuentra, los tapa y el dato no sale en la copia', a
     { cwd: join(RAIZ, 'sidecar') },
   ).toString().trim();
   expect(lectura, 'el dato o el código siguen legibles en la copia').toBe('0 0');
+});
+
+test('Guía de privacidad: se consulta sin ninguna foto', async () => {
+  sesion = await lanzar();
+  const { pagina } = sesion;
+  await pagina.getByRole('button', { name: 'Guía de privacidad' }).click();
+  await expect(pagina.getByRole('heading', { name: 'Guía de privacidad', level: 1 })).toBeVisible();
+  await expect(pagina.getByRole('heading', { name: 'Armas y grupos armados' })).toBeVisible();
+  await expect(pagina.getByText('Placas de autos y motos')).toBeVisible();
+  await sinViolaciones(pagina);
+  await pagina.getByRole('button', { name: /^Ver fuentes: Placas/ }).click();
+  await expect(pagina.getByRole('dialog')).toContainText('Aún no tenemos una fuente oficial directa');
+  await sinViolaciones(pagina);
+  await pagina.keyboard.press('Escape');
+  await pagina.getByRole('button', { name: 'Guía de privacidad' }).click();
+  await expect(pagina.getByRole('heading', { name: 'Revisa tus fotos antes de publicarlas' })).toBeVisible();
+});
+
+async function arrastrar(p: Page, de: [number, number], a: [number, number]): Promise<void> {
+  const caja = await p.getByTestId('lienzo').boundingBox();
+  if (caja === null) throw new Error('sin lienzo');
+  await p.mouse.move(caja.x + caja.width * de[0], caja.y + caja.height * de[1]);
+  await p.mouse.down();
+  await p.mouse.move(caja.x + caja.width * a[0], caja.y + caja.height * a[1], { steps: 4 });
+  await p.mouse.up();
+}
+
+test('rectángulo con el mouse: tapa esa zona en la copia, y se puede deshacer', async () => {
+  sesion = await lanzar();
+  const { pagina, app } = sesion;
+  await abrir(sesion, [m('negra.png')]);
+  await expect(veredicto(pagina)).toBeVisible({ timeout: 60_000 });
+  await pagina.getByRole('button', { name: 'Dibujar rectángulo' }).click();
+  await arrastrar(pagina, [0.2, 0.2], [0.5, 0.5]);
+  await expect(pagina.getByText('Tu zona 1')).toBeVisible();
+  await sinViolaciones(pagina);
+  await pagina.keyboard.press('Control+z');
+  await expect(pagina.getByText('Tu zona 1')).toHaveCount(0);
+  await pagina.keyboard.press('Control+y');
+  await expect(pagina.getByText('Tu zona 1')).toBeVisible();
+  await arrastrar(pagina, [0.7, 0.7], [0.7, 0.7]);
+  await expect(pagina.getByText('Tu zona 2')).toHaveCount(0);
+  await pagina.getByRole('button', { name: /^Quitar/ }).click();
+  await expect(pagina.getByText('Tu zona 1')).toHaveCount(0);
+  await arrastrar(pagina, [0.2, 0.2], [0.5, 0.5]);
+  const salida = join(mkdtempSync(join(tmpdir(), 'revisor-salida-')), 'rect.png');
+  await simularGuardar(app, salida);
+  await pagina.getByRole('button', { name: 'Exportar copia' }).click();
+  await expect(pagina.getByTestId('anuncio')).toContainText('con 1 zona oculta', { timeout: 60_000 });
+});
+
+test('coordenadas sin mouse: valida, avisa si cubre todo y agrega', async () => {
+  sesion = await lanzar();
+  const { pagina } = sesion;
+  await abrir(sesion, [m('negra.png')]);
+  await expect(veredicto(pagina)).toBeVisible({ timeout: 60_000 });
+  await pagina.getByText('Escribir coordenadas (sin mouse)').click();
+  const llenar = async (x: string, y: string, an: string, al: string): Promise<void> => {
+    await pagina.getByLabel('X', { exact: true }).fill(x);
+    await pagina.getByLabel('Y', { exact: true }).fill(y);
+    await pagina.getByLabel('Ancho').fill(an);
+    await pagina.getByLabel('Alto').fill(al);
+    await pagina.getByRole('button', { name: 'Agregar rectángulo' }).click();
+  };
+  await llenar('600', '0', '100', '10');
+  await expect(pagina.getByRole('alert').filter({ hasText: 'se sale de la imagen' })).toBeVisible();
+  await llenar('abc', '0', '10', '10');
+  await expect(pagina.getByRole('alert').filter({ hasText: 'Escribe X de 0 a 639' })).toBeVisible();
+  await llenar('0', '0', '640', '480');
+  await expect(pagina.getByRole('dialog')).toContainText('cubre toda la imagen');
+  await pagina.getByRole('button', { name: 'Volver', exact: true }).click();
+  await expect(pagina.getByText('Tu zona 1')).toHaveCount(0);
+  await llenar('10', '10', '100', '100');
+  await expect(pagina.getByText('Tu zona 1')).toBeVisible();
+  await expect(pagina.getByText('(rectángulo)')).toBeVisible();
+});
+
+test('clic en un objeto: SAM da la silueta y la cara deja de verse en la copia', async () => {
+  sesion = await lanzar();
+  const { pagina, app } = sesion;
+  await abrir(sesion, [m('cara con ñ.jpg')]);
+  await expect(veredicto(pagina)).toBeVisible({ timeout: 60_000 });
+  await pagina.getByRole('button', { name: 'Clic en un objeto' }).click();
+  await pagina.getByTestId('lienzo').click({ position: { x: 0, y: 0 } }).catch(() => undefined);
+  const caja = await pagina.getByTestId('lienzo').boundingBox();
+  if (caja === null) throw new Error('sin lienzo');
+  await pagina.mouse.click(caja.x + caja.width * (230 / 512), caja.y + caja.height * (100 / 512));
+  await expect(pagina.getByText('(silueta)').first()).toBeVisible({ timeout: 60_000 });
+  await pagina.waitForTimeout(500);
+  await pagina.screenshot({ path: join(CAPTURAS, 'silueta.png') });
+  await pagina.getByRole('button', { name: 'No', exact: true }).click();
+  await pagina.getByRole('button', { name: /^Dejar visible/ }).click();
+  const salida = join(mkdtempSync(join(tmpdir(), 'revisor-salida-')), 'silueta.jpg');
+  await simularGuardar(app, salida);
+  await pagina.getByRole('button', { name: 'Exportar copia' }).click();
+  await expect(pagina.getByTestId('anuncio')).toContainText('sin metadatos', { timeout: 60_000 });
+  const lectura = execFileSync(
+    join(RAIZ, 'sidecar', '.venv', 'Scripts', 'python.exe'),
+    ['-c', 'import sys;from pathlib import Path;from revisor import cargador;from revisor.caras import DetectorCaras;i=cargador.abrir(sys.argv[1]);print(len([c for c in DetectorCaras(Path("modelos")).detectar(i.pixeles,0.25) if c.confianza>=0.6]))', salida],
+    { cwd: join(RAIZ, 'sidecar') },
+  ).toString().trim().split(/\s+/).at(-1);
+  expect(lectura, 'la cara sigue reconocible').toBe('0');
 });
 
 test('imagen diminuta: nunca se presenta como limpia', async () => {
