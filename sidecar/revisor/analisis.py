@@ -6,7 +6,7 @@ import logging
 from typing import Any
 
 from . import codigos, contenido, texto
-from .caras import DetectorCaras, ModeloNoDisponible
+from .caras import Cara, DetectorCaras, ModeloNoDisponible
 from .cargador import ImagenCargada
 
 registro = logging.getLogger(__name__)
@@ -18,6 +18,8 @@ REGLAS_DE_CONTENIDO = ("ARM-01", "EXT-01", "DES-01", "SUG-01")
 # Medido en una muestra chica: imágenes comunes hasta 0.19, ejemplos de riesgo desde 0.71.
 UMBRAL_ESCENA = 0.35
 UMBRAL_ZONAS = 0.25
+# Medido en una muestra chica: falsas alarmas hasta 0.49, caras reales dudosas desde 0.82.
+UMBRAL_CONFIRMAR_CARA = 0.6
 REGLAS_DE_TEXTO = ("CON-01", "DOC-01", "FIN-01", "MED-01", "VIA-01")
 REGLA_DE_CODIGOS = "COD-01"
 
@@ -48,6 +50,29 @@ def _ampliar(
         "ancho": min(img_ancho - x0, nuevo_ancho),
         "alto": min(img_alto - y0, nuevo_alto),
     }
+
+
+def _confirmar_dudosas(
+    caras: list[Cara], imagen: ImagenCargada, carpeta_modelos: Any, umbral_revision: float
+) -> list[Cara]:
+    """Quita falsas alarmas como relojes o texturas. Una cara con confianza alta nunca se descarta.
+
+    Si no se puede confirmar, se conserva: ante la duda, avisar de más.
+    """
+    dudosas = [c for c in caras if c.confianza < umbral_revision]
+    if not dudosas:
+        return caras
+    try:
+        revisor = contenido.revisor_de(carpeta_modelos)
+        return [
+            c
+            for c in caras
+            if c.confianza >= umbral_revision
+            or revisor.probabilidad_cara(imagen.pixeles, c.x, c.y, c.ancho, c.alto) >= UMBRAL_CONFIRMAR_CARA
+        ]
+    except Exception as e:  # noqa: BLE001 - sin confirmación se conservan todas
+        registro.warning("No se pudieron confirmar caras dudosas: %s", type(e).__name__)
+        return caras
 
 
 def _revisar_contenido(
@@ -185,6 +210,7 @@ def analizar(
     else:
         try:
             caras = DetectorCaras(carpeta_modelos).detectar(imagen.pixeles, umbral_confianza)
+            caras = _confirmar_dudosas(caras, imagen, carpeta_modelos, umbral_revision)
         except ModeloNoDisponible as e:
             registro.error("Modelo de caras no disponible: %s", e)
             motivos.append("modelo_no_disponible")

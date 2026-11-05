@@ -69,6 +69,29 @@ FRASES_NEUTRAS = (
     "a toy or costume party",
 )
 
+# Para confirmar una cara dudosa. Incluye caras tapadas o lejanas: no deben descartarse.
+FRASES_CARA = (
+    "a photo of a human face",
+    "a close-up of a person's head",
+    "a person wearing a mask or balaclava",
+    "a blurry photo of a person's face",
+    "a small distant person's face",
+    "a drawing of a human face",
+)
+FRASES_NO_CARA = (
+    "a photo of a clock or watch",
+    "a photo of an object",
+    "a texture or abstract pattern",
+    "a photo of an animal",
+    "a photo of food or drink",
+    "a photo of stars or the sky",
+    "a photo of the moon or a planet",
+    "a photo of a building",
+    "a photo of text",
+    "a photo of a plant",
+)
+MARGEN_RECORTE_CARA = 0.35
+
 ETIQUETAS_NUDENET = (
     "FEMALE_GENITALIA_COVERED",
     "FACE_FEMALE",
@@ -174,6 +197,9 @@ class RevisorContenido:
         codificado = tokenizador.encode_batch(self._frases)
         self._ids = np.array([e.ids for e in codificado], dtype=np.int64)
         self._mascara = np.array([e.attention_mask for e in codificado], dtype=np.int64)
+        codificado_cara = tokenizador.encode_batch([*FRASES_CARA, *FRASES_NO_CARA])
+        self._ids_cara = np.array([e.ids for e in codificado_cara], dtype=np.int64)
+        self._mascara_cara = np.array([e.attention_mask for e in codificado_cara], dtype=np.int64)
 
     def escena(self, pixeles: Pixeles) -> dict[str, float]:
         """Probabilidad de cada grupo de riesgo. Suman menos de 1 porque compiten con las frases neutras."""
@@ -193,6 +219,27 @@ class RevisorContenido:
         exponente = np.exp(logits - logits.max())
         probabilidad = exponente / exponente.sum()
         return {r: float(probabilidad[i].sum()) for r, i in self._grupos.items()}
+
+    def probabilidad_cara(self, pixeles: Pixeles, x: int, y: int, ancho: int, alto: int) -> float:
+        """Qué tan probable es que un recorte, con algo de contexto, sea una cara de verdad."""
+        alto_img, ancho_img = pixeles.shape[:2]
+        mx, my = int(ancho * MARGEN_RECORTE_CARA), int(alto * MARGEN_RECORTE_CARA)
+        recorte = pixeles[
+            max(0, y - my) : min(alto_img, y + alto + my), max(0, x - mx) : min(ancho_img, x + ancho + mx), :3
+        ]
+        reducido = cv2.resize(recorte, (LADO_CLIP, LADO_CLIP), interpolation=cv2.INTER_CUBIC)
+        normalizado = (reducido.astype(np.float32) / 255 - MEDIA_CLIP) / DESVIACION_CLIP
+        salidas: Any = self._clip.run(
+            ["logits_per_image"],
+            {
+                "pixel_values": normalizado.transpose(2, 0, 1)[None].astype(np.float32),
+                "input_ids": self._ids_cara,
+                "attention_mask": self._mascara_cara,
+            },
+        )
+        logits = salidas[0][0]
+        exponente = np.exp(logits - logits.max())
+        return float((exponente / exponente.sum())[: len(FRASES_CARA)].sum())
 
     def zonas(self, pixeles: Pixeles, umbral: float) -> list[Zona]:
         bgr = pixeles[:, :, 2::-1]

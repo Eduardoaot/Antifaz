@@ -1,5 +1,5 @@
 {
-  "version": "0.4.0",
+  "version": "0.5.0",
   "fecha_actualizacion": "2026-11-06",
   "aviso": "{app} es una herramienta orientativa y no constituye asesoría legal.",
   "marco_general": [
@@ -805,7 +805,7 @@
       "categoria": "armas",
       "que_detecta": "Posibles armas o personas armadas o con uniforme militar",
       "nivel_riesgo": "alto",
-      "por_que": "Esta imagen podría mostrar armas o personas armadas. Podría traerte problemas con la plataforma o ponerte en riesgo a ti o a quienes aparecen.",
+      "por_que": "Esta imagen podría mostrar armas o personas armadas. Podría ponerte en riesgo a ti o a quienes aparecen, o limitar su alcance en la plataforma.",
       "fuentes": [
         {
           "institucion": "Meta / Instagram",
@@ -813,16 +813,18 @@
           "url": "https://transparency.meta.com/es-la/policies/community-standards/restricted-goods-services/",
           "fecha_consulta": "2026-11-06",
           "vigente": true,
-          "resumen": "Página localizada. Su texto no se pudo leer de forma automática, así que aún no se cita su contenido.",
+          "resumen": "Regula comprar, vender, regalar o solicitar armas de fuego, y restringe a mayores de 18 hablar de ellas de manera positiva. No prohíbe mostrar un arma por sí solo.",
           "alcance": "plataforma",
           "tipo": "politica_plataforma",
-          "respaldo": "contexto",
-          "verificacion": "pendiente"
+          "respaldo": "parcial",
+          "verificacion": "abierta",
+          "referencia": "Texto copiado del navegador por el responsable del proyecto",
+          "fecha_documento": "Cambio más reciente: 09-09-2026"
         }
       ],
       "aplica_a": "ambos",
       "estado": "pendiente_de_verificar",
-      "nota": "La política de Meta no se pudo leer de forma automática: falta cotejarla. Puede avisar de más con disfraces, juguetes o fotos de noticias. Por ahora avisa sobre toda la imagen, sin tapar por zona.",
+      "nota": "Meta regula la venta y la promoción de armas, pero no prohíbe mostrarlas por sí solo, y no hallé una fuente oficial sobre fotos de armas o uniformes. Puede avisar de más con disfraces, juguetes o noticias. Por ahora avisa sobre toda la imagen.",
       "texto_aviso": "Podría mostrar armas o personas armadas"
     },
     {
@@ -838,16 +840,18 @@
           "url": "https://transparency.meta.com/es-la/policies/community-standards/dangerous-individuals-organizations/",
           "fecha_consulta": "2026-11-06",
           "vigente": true,
-          "resumen": "Página localizada. Su texto no se pudo leer de forma automática, así que aún no se cita su contenido.",
+          "resumen": "No permite símbolos de organizaciones terroristas o de odio designadas, ni su glorificación, y elimina el contenido si la intención es ambigua. Permite noticias, debate neutral y condena.",
           "alcance": "plataforma",
           "tipo": "politica_plataforma",
-          "respaldo": "contexto",
-          "verificacion": "pendiente"
+          "respaldo": "directo",
+          "verificacion": "abierta",
+          "referencia": "Texto copiado del navegador por el responsable del proyecto",
+          "fecha_documento": "Cambio más reciente: 19-03-2026"
         }
       ],
       "aplica_a": "ambos",
-      "estado": "pendiente_de_verificar",
-      "nota": "La política de Meta no se pudo leer de forma automática: falta cotejarla. Es orientativo: nunca afirma que la foto sea de un grupo concreto, y puede fallar con banderas comunes o noticias.",
+      "estado": "verificada",
+      "nota": "Es orientativo: nunca afirma que la foto sea de un grupo concreto. Puede fallar con banderas comunes, y Meta permite estas imágenes en noticias o como condena si la intención queda clara.",
       "texto_aviso": "Podría mostrar símbolos de un grupo armado o extremista"
     }
   ]

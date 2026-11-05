@@ -51,7 +51,7 @@ Agregada a pedido del responsable el 6 de noviembre de 2026; no estaba en el bri
 
 **Limitaciones:** CLIP no da ubicación, así que armas y extremismo solo avisan sobre la imagen completa. NudeNet revisa la imagen a 320 px, así que puede perder personas pequeñas en fotos grandes.
 
-**Fuentes sin leer:** las políticas de Meta sobre organizaciones peligrosas y bienes restringidos llegan truncadas a la lectura automática. Una persona debe abrirlas: ARM-01 y EXT-01 quedan pendientes hasta entonces.
+**Fuentes de Meta:** las políticas sobre organizaciones peligrosas y bienes restringidos llegan truncadas a la lectura automática, así que el responsable pegó su texto desde el navegador. La primera respalda EXT-01. La segunda regula vender y promover armas, pero no prohíbe mostrarlas, por lo que ARM-01 sigue pendiente.
 
 ## Confianza del detector de caras
 
@@ -65,6 +65,18 @@ Medido el 6 de noviembre de 2026 con YuNet, en una muestra pequeña que no se ve
 | La misma cara a 24 px | 0.31 |
 
 De ahí salen los dos niveles: 0.6 o más es "cara", y de 0.25 a 0.6 es "podría ser una cara". No se sube el umbral de 0.25 para no perder caras diminutas.
+
+**Confirmación con CLIP.** El responsable reportó que su foto de un reloj de bolsillo seguía dando dos posibles caras. Por eso cada detección dudosa se confirma con CLIP y se descarta si queda por debajo de 0.6. Una cara con confianza alta nunca se consulta.
+
+| Detección dudosa | Probabilidad de cara según CLIP |
+|---|---|
+| Reloj (recorte de la captura del responsable) | 0.06 |
+| Galaxias | 0.03 a 0.16 |
+| Café, gato, luna | 0.10, 0.33, 0.49 |
+| Personas enmascaradas al fondo | 0.83 a 0.99 |
+| Cara de 24 px, muy desenfocada, muy oscura | 0.99, 0.82, 0.86 |
+
+La luna queda cerca del corte, así que hay poco margen, y la muestra es chica. No se probó la foto original del reloj, solo un recorte de la captura. **Riesgo:** una cara real dudosa con menos de 0.6 se descartaría sin aviso.
 
 ## Metadatos
 

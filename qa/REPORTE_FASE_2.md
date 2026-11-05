@@ -14,8 +14,8 @@ A pedido del responsable, tras probar la app, se agregó revisión de contenido,
 |---|---|---|---|
 | Desnudez | NudeNet y CLIP | Sí, por zona. Se marca sola con bloque sólido | Verificada |
 | Contenido sugerente | NudeNet y CLIP | Sí, por zona | Pendiente |
-| Armas y militares | CLIP | No: solo avisa sobre la imagen completa | Pendiente |
-| Símbolos extremistas | CLIP | No: solo avisa sobre la imagen completa | Pendiente |
+| Armas y militares | CLIP | No: solo avisa sobre la imagen completa | Pendiente: Meta no prohíbe mostrarlas por sí solo |
+| Símbolos extremistas | CLIP | No: solo avisa sobre la imagen completa | Verificada |
 | Teléfonos, correos y direcciones | OCR y patrones | Sí | Verificada |
 | CURP, RFC y palabras de documentos | OCR y patrones | Sí | Verificada |
 | Tarjetas (Luhn), CLABE y palabras financieras | OCR y patrones | Sí | Verificada |
@@ -30,7 +30,7 @@ El texto y el contenido de los códigos nunca se muestran, ni se guardan, ni van
 
 | Prueba | Resultado |
 |---|---|
-| Sidecar | 386 pasan |
+| Sidecar | 393 pasan |
 | Interfaz y main | 124 pasan |
 | E2E con la app real, incluidas 4 pruebas con los ejemplos locales del responsable | 37 pasan |
 | Tipado estricto y lint | Sin errores |
@@ -52,7 +52,8 @@ Estos números son de la última corrida completa, hecha después de todos los c
 - **Un documento o una tarjeta sin texto legible puede pasar sin aviso.** La app lo dice.
 - **Palabras y números pueden dar falsas alarmas:** por ejemplo, "hospital" en un letrero, o una fecha que parece teléfono.
 - **NudeNet revisa a 320 px:** puede perder personas pequeñas en fotos grandes.
-- **La foto del reloj:** sigue sin confirmarse que el arreglo de los dos niveles lo resuelva.
+- **La foto del reloj:** los dos niveles no bastaron y seguía dando dos posibles caras. Ahora cada detección dudosa se confirma con CLIP. Se comprobó con un recorte de la captura (0.06), no con la foto original: **falta que el responsable la vuelva a probar.**
+- **Una cara real dudosa puede descartarse sin aviso** si CLIP le da menos de 0.6. En la muestra, ninguna bajó de 0.82.
 - **Prueba intermitente:** "recuperación sobre una foto que cambió" falló una vez en una corrida completa, sin error guardado. Después pasó en 24 repeticiones y en la corrida completa siguiente. Causa desconocida.
 
 ## Pendiente de la Fase 2
@@ -62,7 +63,7 @@ Estos números son de la última corrida completa, hecha después de todos los c
 3. Selección por clic con SAM, pincel y rectángulo.
 4. Guía de privacidad.
 5. Dataset de evaluación y recall mínimo por categoría, que necesitan tu aprobación.
-6. Una persona debe abrir las políticas de Meta sobre organizaciones peligrosas y bienes restringidos: la lectura automática llega truncada.
+6. Buscar una fuente oficial sobre fotos de armas o uniformes para ARM-01.
 
 ## Licencias nuevas
 
