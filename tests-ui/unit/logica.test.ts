@@ -185,7 +185,7 @@ describe('veredicto: una falla nunca parece limpia', () => {
     );
   });
 
-  it.each(['metadatos', 'demasiado_pequena', 'modelo_no_disponible', 'deteccion_fallo', 'contenido_no_disponible', 'contenido_fallo'] as Motivo[])('motivo %s tiene texto', (m) => {
+  it.each(['metadatos', 'demasiado_pequena', 'modelo_no_disponible', 'deteccion_fallo', 'contenido_no_disponible', 'contenido_fallo', 'texto_fallo', 'codigos_fallo'] as Motivo[])('motivo %s tiene texto', (m) => {
     expect(textoMotivo(m).length).toBeGreaterThan(0);
   });
 
@@ -266,6 +266,12 @@ describe('revisión de contenido', () => {
     expect(soloAvisaSinZona(desnudez)).toBe(false);
     expect(soloAvisaSinZona(gps)).toBe(false);
     expect(soloAvisaSinZona(menores)).toBe(false);
+  });
+
+  it('avisa que un documento sin texto legible podría pasar', () => {
+    const a: Analisis = { hallazgos: [], cobertura: { completa: true, motivos: [], reglas_revisadas: ['CON-01', 'COD-01'] } };
+    expect(textoRevisado(a)).toContain('sin texto legible podría pasar');
+    expect(textoRevisado(a)).toContain('códigos QR');
   });
 
   it('nombra solo lo que sí se revisó', () => {

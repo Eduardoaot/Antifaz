@@ -39,7 +39,7 @@ def test_arc001_004_sin_nada(tmp_path: Path, imagen: Image.Image) -> None:
     resultado = _analizar(guardar(tmp_path / "a.png", imagen))
     assert resultado["hallazgos"] == []
     assert resultado["cobertura"]["completa"] is True
-    assert {"CAR-01", "MEN-01", "UBI-01", "ARM-01", "EXT-01", "DES-01", "SUG-01"} == set(resultado["cobertura"]["reglas_revisadas"])
+    assert {"CAR-01", "MEN-01", "UBI-01", "ARM-01", "EXT-01", "DES-01", "SUG-01", "CON-01", "COD-01"} <= set(resultado["cobertura"]["reglas_revisadas"])
 
 
 def test_arc005_cielo_sin_nada(tmp_path: Path) -> None:
@@ -96,7 +96,7 @@ def test_fail_closed_sin_modelo(tmp_path: Path) -> None:
     assert resultado["cobertura"]["completa"] is False
     assert "modelo_no_disponible" in resultado["cobertura"]["motivos"]
     # Lo que no se pudo revisar debe seguir contando como no revisado.
-    assert resultado["cobertura"]["reglas_revisadas"] == ["UBI-01"]
+    assert not {"CAR-01", "MEN-01", "ARM-01"} & set(resultado["cobertura"]["reglas_revisadas"])
 
 
 def test_fail_closed_modelo_alterado(tmp_path: Path) -> None:

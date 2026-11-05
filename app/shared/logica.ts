@@ -125,13 +125,18 @@ const NOMBRE_REVISADO: Readonly<Record<string, string>> = {
   'SUG-01': 'contenido sugerente',
   'ARM-01': 'armas',
   'EXT-01': 'símbolos extremistas',
+  'CON-01': 'datos en texto legible (contacto, documentos, finanzas, salud y viajes)',
+  'COD-01': 'códigos QR y de barras',
 };
 
 /** Dice qué se revisó de verdad en esta foto, no lo que la app sabría revisar. */
 export function textoRevisado(analisis: Analisis): string {
   const nombres = analisis.cobertura.reglas_revisadas.flatMap((id) => NOMBRE_REVISADO[id] ?? []);
   if (nombres.length === 0) return 'La revisión es orientativa. En esta foto no pudimos revisar nada.';
-  return `La revisión es orientativa. En esta foto revisamos: ${nombres.join(', ')}.`;
+  const aviso = analisis.cobertura.reglas_revisadas.includes('CON-01')
+    ? ' Un documento o una tarjeta sin texto legible podría pasar sin aviso.'
+    : '';
+  return `La revisión es orientativa. En esta foto revisamos: ${nombres.join(', ')}.${aviso}`;
 }
 
 const PESO_NIVEL: Readonly<Record<string, number>> = { alto: 0, medio: 1, bajo: 2 };
@@ -172,6 +177,10 @@ export function textoMotivo(motivo: Motivo): string {
       return 'La detección de caras falló, así que no revisamos si hay personas.';
     case 'contenido_no_disponible':
       return 'Faltan los modelos de contenido, así que no revisamos desnudez, contenido sugerente, armas ni extremismo.';
+    case 'texto_fallo':
+      return 'No pudimos leer el texto de la imagen, así que no revisamos teléfonos, correos ni documentos.';
+    case 'codigos_fallo':
+      return 'No pudimos revisar si hay códigos QR o de barras.';
     case 'contenido_fallo':
       return 'La revisión de contenido falló, así que no revisamos desnudez, contenido sugerente, armas ni extremismo.';
     default: {

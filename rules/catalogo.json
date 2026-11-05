@@ -1,5 +1,5 @@
 {
-  "version": "0.3.0",
+  "version": "0.4.0",
   "fecha_actualizacion": "2026-11-06",
   "aviso": "{app} es una herramienta orientativa y no constituye asesoría legal.",
   "marco_general": [
@@ -212,7 +212,8 @@
         }
       ],
       "aplica_a": "ambos",
-      "estado": "verificada"
+      "estado": "verificada",
+      "texto_aviso": "Podría ser un dato de un documento de identidad"
     },
     {
       "id": "FIN-01",
@@ -275,7 +276,8 @@
         }
       ],
       "aplica_a": "ambos",
-      "estado": "verificada"
+      "estado": "verificada",
+      "texto_aviso": "Podría ser información financiera"
     },
     {
       "id": "VIA-01",
@@ -325,7 +327,8 @@
         }
       ],
       "aplica_a": "ambos",
-      "estado": "verificada"
+      "estado": "verificada",
+      "texto_aviso": "Podría ser información de un boleto o viaje"
     },
     {
       "id": "VIA-02",
@@ -680,7 +683,8 @@
         }
       ],
       "aplica_a": "ambos",
-      "estado": "verificada"
+      "estado": "verificada",
+      "texto_aviso": "Podría ser un dato de contacto"
     },
     {
       "id": "MED-01",
@@ -717,7 +721,8 @@
         }
       ],
       "aplica_a": "ambos",
-      "estado": "verificada"
+      "estado": "verificada",
+      "texto_aviso": "Podría ser información médica"
     },
     {
       "id": "COD-01",
@@ -728,7 +733,8 @@
       "fuentes": [],
       "aplica_a": "ambos",
       "estado": "pendiente_de_verificar",
-      "nota": "Sin fuente oficial sobre publicar códigos en general. El caso de pases de abordar está en VIA-01. El aviso de GN-CERT trata de escanear QR, no de publicarlos, y no respalda esta regla."
+      "nota": "Sin fuente oficial sobre publicar códigos en general. El caso de pases de abordar está en VIA-01. El aviso de GN-CERT trata de escanear QR, no de publicarlos, y no respalda esta regla.",
+      "texto_aviso": "Se ve un código que se puede leer"
     },
     {
       "id": "DES-01",

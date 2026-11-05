@@ -1,4 +1,4 @@
-import { AlertCircle, AlertTriangle, Baby, Crosshair, Eye, EyeOff, Flag, Info, MapPin, Shirt, Users } from 'lucide-react';
+import { AlertCircle, AlertTriangle, Baby, CreditCard, Crosshair, Eye, EyeOff, Flag, IdCard, Info, MapPin, Phone, Plane, QrCode, Shirt, Stethoscope, Users } from 'lucide-react';
 import { useState } from 'react';
 import { etiquetaNivel, reglaDe, type Nivel, type Regla } from '../../shared/catalogo';
 import { esquemaEfecto, LIMITES, type Analisis, type Hallazgo } from '../../shared/contrato';
@@ -45,6 +45,18 @@ function IconoCategoria({ regla }: { regla: Regla }): React.JSX.Element | null {
     case 'desnudez':
     case 'contenido_sugerente':
       return <Shirt aria-hidden="true" />;
+    case 'contacto_personal':
+      return <Phone aria-hidden="true" />;
+    case 'documentos_identidad':
+      return <IdCard aria-hidden="true" />;
+    case 'informacion_financiera':
+      return <CreditCard aria-hidden="true" />;
+    case 'informacion_medica':
+      return <Stethoscope aria-hidden="true" />;
+    case 'boletos_viajes':
+      return <Plane aria-hidden="true" />;
+    case 'codigos':
+      return <QrCode aria-hidden="true" />;
     case 'armas':
       return <Crosshair aria-hidden="true" />;
     case 'extremismo':

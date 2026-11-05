@@ -18,6 +18,15 @@ cara.save(d / "cara con ñ.jpg", exif=exif, quality=90, comment=b"Comentario sec
 Image.new("RGB", (640, 480), (0, 0, 0)).save(d / "negra.png")
 Image.new("RGB", (640, 480), (40, 90, 200)).save(d / "gps.jpg", exif=exif)
 Image.new("RGB", (5, 5), (1, 2, 3)).save(d / "diminuta.png")
+import numpy as np, zxingcpp
+from PIL import ImageDraw, ImageFont
+lienzo = Image.new("RGB", (1200, 700), (255, 255, 255))
+fuente = ImageFont.truetype(sys.argv[3], 44)
+ImageDraw.Draw(lienzo).text((40, 40), "Tel: 81 8123 4567", fill=(10, 10, 10), font=fuente)
+ImageDraw.Draw(lienzo).text((40, 130), "persona@ejemplo.com", fill=(10, 10, 10), font=fuente)
+m = np.array(zxingcpp.create_barcode("https://ejemplo.com/f", zxingcpp.BarcodeFormat.QRCode).to_image(scale=8, add_quiet_zones=True))
+lienzo.paste(Image.fromarray((m if m.ndim == 2 else m[:, :, 0]).astype("uint8")).convert("RGB"), (800, 300))
+lienzo.save(d / "datos.png")
 Image.new("RGB", (6000, 4500), (200, 210, 220)).save(d / "grande.png")
 (d / "vacio.jpg").write_bytes(b"")
 (d / "falsa.jpg").write_bytes(b"MZ esto no es una imagen")
@@ -25,7 +34,7 @@ Image.new("RGB", (6000, 4500), (200, 210, 220)).save(d / "grande.png")
 
 export function crearMuestras(): string {
   const carpeta = mkdtempSync(join(tmpdir(), 'revisor-muestras-'));
-  execFileSync(PYTHON, ['-c', GENERADOR, carpeta, join(RAIZ, 'sidecar', 'tests', 'datos', 'astronauta.jpg')]);
+  execFileSync(PYTHON, ['-c', GENERADOR, carpeta, join(RAIZ, 'sidecar', 'tests', 'datos', 'astronauta.jpg'), join(RAIZ, 'brand', 'fonts', 'AtkinsonHyperlegibleNext-Variable.ttf')]);
   return carpeta;
 }
 

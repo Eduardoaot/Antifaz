@@ -15,6 +15,9 @@ from .cargador import Pixeles
 
 registro = logging.getLogger(__name__)
 
+# Sin esto, OpenCV escribe un aviso por cada mosaico y llena el log.
+cv2.utils.logging.setLogLevel(cv2.utils.logging.LOG_LEVEL_ERROR)
+
 ARCHIVO_MODELO = "face_detection_yunet_2023mar.onnx"
 SHA256_MODELO = "8f2383e4dd3cfbb4553ea8718107fc0423210dc964f9f4280604804ed2552fa4"
 LADO_VISTA_COMPLETA = 1600
