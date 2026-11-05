@@ -2,7 +2,7 @@
 
 App de escritorio que revisa fotos y videos antes de publicarlos, explica el riesgo con fuentes y oculta lo privado. **Todo el análisis es local: ninguna foto ni video sale del dispositivo.**
 
-Estado: Fase 0 (investigación, marca, catálogo y plan de QA). Todavía no hay código de la app. Cada fase espera la aprobación del responsable.
+Estado: Fase 1 implementada, con pendientes en `qa/REPORTE_FASE_1.md`. Solo revisa caras y ubicación en metadatos. Cada fase espera la aprobación del responsable.
 
 ## Decisiones vigentes
 
@@ -12,7 +12,9 @@ Estado: Fase 0 (investigación, marca, catálogo y plan de QA). Todavía no hay 
 - **Menores:** no se estima edad. Con cualquier cara se pregunta "¿Hay menores en esta foto?".
 - **Nombre:** cambiable. Lee `brand/brand.json`; no lo escribas a mano en código ni en el catálogo.
 
-## Arquitectura (se construye desde la Fase 1)
+## Arquitectura
+
+`app/main` (único con acceso al sistema), `app/preload` (sin dependencias: corre con sandbox), `app/shared` (Zod y lógica pura), `app/renderer` (React sin rutas ni Node), `sidecar/revisor` (Python).
 
 Electron + React/TypeScript (strict) + sidecar Python 3.12 con uv.
 
@@ -21,7 +23,8 @@ Electron + React/TypeScript (strict) + sidecar Python 3.12 con uv.
 - **Modelos:** ver la tabla en `docs/INVESTIGACION.md`. Los pesos se descargan aparte, con hash, y nunca durante un análisis. No se versionan.
 - **Cero tráfico:** CSP, bloqueo en la sesión de Electron, auditoría de sockets en Python y test con captura.
 - **Datos sensibles:** caché cifrada con llave solo en memoria. Embeddings solo en RAM salvo que el usuario guarde. La recuperación guarda ediciones, sin píxeles.
-- **Exportación fail-closed:** archivo temporal, verificación con ffprobe y exiftool contra lista blanca, y renombrado atómico. Las imágenes se recodifican desde píxeles.
+- **Exportación fail-closed:** verificación contra lista blanca antes de escribir, archivo temporal y renombrado atómico. Las imágenes se recodifican desde píxeles y sus bytes se revisan con `metadatos.py`. En video se usarán ffprobe y exiftool.
+- **Huella:** cada archivo tiene un SHA-256. Las decisiones solo valen para esos mismos bytes: si cambia, no se aplican ni se exporta.
 - **Ocultamiento:** texto, códigos, documentos y matrículas con relleno sólido. Los efectos de caras se aplican sobre contenido ya sobrescrito. El blur o pixelado solo no cuenta como irreversible.
 
 ## Reglas de validación
@@ -46,7 +49,21 @@ Detalle en `qa/PLAN_QA.md`, `qa/RANGOS.md` y `qa/MATRIZ_PRUEBAS.md`.
 
 ## Comandos
 
-Python 3.14 basta para las herramientas de la Fase 0, con los comandos desde la raíz:
+```
+# App
+npm install
+cd sidecar && uv sync --python 3.12 && cd ..
+.venv\Scripts\python tools\descargar_modelos.py
+npm run iniciar
+
+# Pruebas
+npm run tipos; npm run lint; npm run cobertura; npm run e2e
+cd sidecar; .venv\Scripts\ruff check revisor; .venv\Scripts\pyright; .venv\Scripts\python -m pytest
+```
+
+Si tocas `brand/tokens.json`, corre `tools/generar_tokens_css.py`. Dentro de la terminal de Claude Code, `ELECTRON_RUN_AS_NODE` hace que Electron corra como Node: las E2E ya lo limpian.
+
+Herramientas, con Python 3.14 desde la raíz:
 
 ```
 python -m venv .venv

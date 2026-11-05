@@ -9,7 +9,6 @@ import os
 import uuid
 from collections.abc import Sequence
 from pathlib import PurePath
-from typing import assert_never
 
 import numpy as np
 from PIL import Image
@@ -122,8 +121,8 @@ def exportar(
             esperado = _aplanar(pixeles)
         case "PNG":
             esperado = pixeles
-        case _ as otro:
-            assert_never(otro)  # type: ignore[arg-type]
+        case _:
+            raise ErrorRevisor(Codigo.INTERNO, f"formato sin exportador: {formato}")
     try:
         datos = _codificar(esperado, formato, jpeg_calidad)
         _verificar_contenido(datos, formato, esperado, regiones)

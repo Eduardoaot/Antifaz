@@ -1,0 +1,37 @@
+/* Generado por tools/generar_tokens_css.py. No editar a mano. */
+:root {
+  color-scheme: light;
+  --fondo: #F7F7FB;
+  --superficie: #FFFFFF;
+  --texto: #1B1A2E;
+  --texto-suave: #55556E;
+  --borde-control: #83839C;
+  --marca: #3A3590;
+  --sobre-marca: #FFFFFF;
+  --foco: #3A3590;
+  --riesgo-alto: #B3261E;
+  --riesgo-alto-fondo: #FCEBE9;
+  --riesgo-medio: #855000;
+  --riesgo-medio-fondo: #FFF2D9;
+  --riesgo-bajo: #555F6B;
+  --riesgo-bajo-fondo: #EEF0F3;
+}
+@media (prefers-color-scheme: dark) {
+:root {
+  color-scheme: dark;
+  --fondo: #13122A;
+  --superficie: #1D1C38;
+  --texto: #F2F2F8;
+  --texto-suave: #B7B7CD;
+  --borde-control: #7E7EA0;
+  --marca: #B5B0FF;
+  --sobre-marca: #13122A;
+  --foco: #B5B0FF;
+  --riesgo-alto: #FFB4AB;
+  --riesgo-alto-fondo: #4A1612;
+  --riesgo-medio: #FFC75F;
+  --riesgo-medio-fondo: #3B2900;
+  --riesgo-bajo: #C3CAD3;
+  --riesgo-bajo-fondo: #2A3038;
+}
+}

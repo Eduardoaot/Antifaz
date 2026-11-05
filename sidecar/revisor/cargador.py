@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import os
 from dataclasses import dataclass
@@ -47,6 +48,7 @@ class ImagenCargada:
     metadatos_legibles: bool
     tiene_alfa: bool
     demasiado_pequena: bool
+    huella: str = ""
 
     @property
     def ancho(self) -> int:
@@ -166,17 +168,35 @@ def _cargar_raw(ruta: str) -> Pixeles:
         raise ErrorRevisor(Codigo.NO_ES_IMAGEN, f"raw: {type(e).__name__}") from e
 
 
-def _abrir_raw(ruta_original: str, ruta: str) -> ImagenCargada:
+def _abrir_raw(ruta_original: str, ruta: str, huella: str) -> ImagenCargada:
     pixeles = _cargar_raw(ruta)
     try:
         with Image.open(ruta) as cabecera:
             tiene_gps, legibles = _leer_gps(cabecera)
     except (OSError, ValueError, SyntaxError):
         tiene_gps, legibles = False, False
-    return _construir(pixeles, "RAW", ruta_original, tiene_gps, legibles)
+    return _construir(pixeles, "RAW", ruta_original, tiene_gps, legibles, huella)
 
 
-def _construir(pixeles: Pixeles, formato: str, ruta: str, tiene_gps: bool, legibles: bool) -> ImagenCargada:
+def _huella(ruta: str) -> str:
+    """Identifica el contenido del archivo: las decisiones solo valen para estos mismos bytes."""
+    resumen = hashlib.sha256()
+    try:
+        with open(ruta, "rb") as archivo:
+            while parte := archivo.read(1024 * 1024):
+                resumen.update(parte)
+    except FileNotFoundError as e:
+        raise ErrorRevisor(Codigo.ARCHIVO_NO_ENCONTRADO) from e
+    except PermissionError as e:
+        raise ErrorRevisor(Codigo.SIN_PERMISOS) from e
+    except OSError as e:
+        raise ErrorRevisor(Codigo.RUTA_INVALIDA, f"errno {e.errno}") from e
+    return resumen.hexdigest()
+
+
+def _construir(
+    pixeles: Pixeles, formato: str, ruta: str, tiene_gps: bool, legibles: bool, huella: str
+) -> ImagenCargada:
     return ImagenCargada(
         pixeles=pixeles,
         formato=formato,
@@ -185,14 +205,17 @@ def _construir(pixeles: Pixeles, formato: str, ruta: str, tiene_gps: bool, legib
         metadatos_legibles=legibles,
         tiene_alfa=bool(pixeles.shape[2] == 4),
         demasiado_pequena=min(pixeles.shape[0], pixeles.shape[1]) < LADO_MIN_DETECCION,
+        huella=huella,
     )
 
 
 def abrir(ruta_original: str) -> ImagenCargada:
     ruta = ruta_larga(ruta_original)
     _revisar_archivo(ruta)
+    # Se calcula antes de decodificar: si el archivo cambia después, la huella ya no coincidirá.
+    huella = _huella(ruta)
     if PurePath(ruta_original).suffix.lower() in EXTENSIONES_RAW:
-        return _abrir_raw(ruta_original, ruta)
+        return _abrir_raw(ruta_original, ruta, huella)
     try:
         _verificar_integridad_png(ruta)
         with Image.open(ruta) as imagen:
@@ -220,4 +243,4 @@ def abrir(ruta_original: str) -> ImagenCargada:
         raise ErrorRevisor(Codigo.MEMORIA_INSUFICIENTE) from e
     except Exception as e:  # noqa: BLE001 - un archivo malformado puede lanzar casi cualquier cosa
         raise ErrorRevisor(Codigo.IMAGEN_CORRUPTA, type(e).__name__) from e
-    return _construir(pixeles, formato, ruta_original, tiene_gps, legibles)
+    return _construir(pixeles, formato, ruta_original, tiene_gps, legibles, huella)

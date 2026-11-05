@@ -10,8 +10,9 @@ from .cargador import ImagenCargada
 
 registro = logging.getLogger(__name__)
 
-# Lo único que esta versión sabe revisar. La UI compara contra el catálogo para decir qué falta.
-REGLAS_REVISADAS = ("CAR-01", "MEN-01", "UBI-01")
+# Lo que esta versión sabe revisar. La UI compara contra el catálogo para decir qué falta.
+REGLAS_DE_CARAS = ("CAR-01", "MEN-01")
+REGLA_DE_METADATOS = "UBI-01"
 
 
 def describir_posicion(x: int, y: int, ancho: int, alto: int, ancho_img: int, alto_img: int) -> str:
@@ -51,6 +52,7 @@ def analizar(
 ) -> dict[str, object]:
     hallazgos: list[dict[str, object]] = []
     motivos: list[str] = []
+    revisadas: list[str] = []
 
     if imagen.tiene_gps:
         hallazgos.append(
@@ -99,6 +101,7 @@ def analizar(
                         ),
                     }
                 )
+            revisadas.extend(REGLAS_DE_CARAS)
             if caras:
                 hallazgos.append(
                     {
@@ -110,11 +113,14 @@ def analizar(
                         "posicion": None,
                     }
                 )
+    # Una regla que no se pudo revisar debe seguir contando como pendiente.
+    if imagen.metadatos_legibles:
+        revisadas.append(REGLA_DE_METADATOS)
     return {
         "hallazgos": hallazgos,
         "cobertura": {
             "completa": not motivos,
             "motivos": motivos,
-            "reglas_revisadas": list(REGLAS_REVISADAS),
+            "reglas_revisadas": revisadas,
         },
     }

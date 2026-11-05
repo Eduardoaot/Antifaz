@@ -42,6 +42,23 @@ def test_arc001_004_sin_nada(tmp_path: Path, imagen: Image.Image) -> None:
     assert resultado["cobertura"]["reglas_revisadas"] == ["CAR-01", "MEN-01", "UBI-01"]
 
 
+def test_arc005_cielo_sin_nada(tmp_path: Path) -> None:
+    """Degradado suave y un poco de grano, como un cielo vacío."""
+    alto, ancho = 480, 640
+    base = np.linspace(120, 230, alto, dtype=np.float32)[:, None] + np.random.default_rng(3).normal(0, 2, (alto, ancho))
+    cielo = np.stack([base * 0.7, base * 0.85, base], axis=2).clip(0, 255).astype(np.uint8)
+    resultado = _analizar(guardar(tmp_path / "cielo.png", Image.fromarray(cielo)))
+    assert resultado["hallazgos"] == []
+    assert resultado["cobertura"]["completa"] is True
+
+
+def test_arc007_mas_de_100_megapixeles(tmp_path: Path) -> None:
+    ruta = guardar(tmp_path / "enorme.png", Image.new("RGB", (11000, 10000), (200, 210, 220)), compress_level=1)
+    resultado = _analizar(ruta)
+    assert resultado["hallazgos"] == []
+    assert resultado["cobertura"]["completa"] is True
+
+
 def test_cara_real_detectada_y_pregunta_por_menores() -> None:
     resultado = _analizar(ASTRONAUTA)
     reglas = _reglas(resultado)
@@ -78,6 +95,8 @@ def test_fail_closed_sin_modelo(tmp_path: Path) -> None:
     resultado = _analizar(guardar(tmp_path / "a.png", imagen_prueba(100, 100)), tmp_path)
     assert resultado["cobertura"]["completa"] is False
     assert "modelo_no_disponible" in resultado["cobertura"]["motivos"]
+    # Lo que no se pudo revisar debe seguir contando como no revisado.
+    assert resultado["cobertura"]["reglas_revisadas"] == ["UBI-01"]
 
 
 def test_fail_closed_modelo_alterado(tmp_path: Path) -> None:

@@ -12,3 +12,7 @@ out/
 *.onnx
 *.pt
 *.safetensors
+tests-ui/capturas/
+test-results/
+coverage/
+playwright-report/

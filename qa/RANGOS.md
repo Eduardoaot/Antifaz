@@ -133,6 +133,8 @@ Los límites de Instagram cambian, y sus propias fuentes se contradicen (4:5 o 3
 | `proyecto.nombre` | texto | 1 carácter | 120 caracteres | Nombre sin extensión del primer archivo | Estándar |
 | `proyecto.guardar_embeddings` | booleano | n/a | n/a | `false` | Estándar. Ante cualquier duda, no se guardan |
 | `ventana.ancho_px`, `ventana.alto_px` | entero, px lógicos | 800 × 600 (propuesta) | Sin límite propio | 1280 × 800 (propuesta) | Windows no permite reducirla más; una posición fuera de pantalla se reubica |
+| `sidecar.limite_pedido_s` | entero, s | n/a | n/a | 300 (propuesta) | Constante interna. Al rebasarlo se reinicia el sidecar y se avisa que no se completó |
+| `alfa.invisible` | entero | n/a | n/a | 8 (propuesta) | Constante interna. Por debajo, el píxel se borra al exportar, porque su color se recupera con solo subir el alfa |
 | `log.tamano_mb` | entero, MB | 1 | 200 (propuesta) | 50 (propuesta) | Estándar |
 | `log.retencion_dias` | entero, días | 1 | 90 (propuesta) | 14 (propuesta) | Estándar |
 

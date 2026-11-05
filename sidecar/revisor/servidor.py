@@ -105,6 +105,7 @@ class Sesion:
                     "alto": imagen.alto,
                     "formato": imagen.formato,
                     "tiene_alfa": imagen.tiene_alfa,
+                    "huella": imagen.huella,
                 }, None
             case Analizar():
                 return analisis.analizar(
