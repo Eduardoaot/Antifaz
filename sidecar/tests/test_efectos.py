@@ -1,4 +1,5 @@
-"""Irreversibilidad: la zona oculta no debe depender del contenido original."""
+"""Bloque sólido: irreversible. Difuminado y pixelado: colores de la imagen, sin detalle reconocible."""
+
 from __future__ import annotations
 
 import numpy as np
@@ -6,17 +7,16 @@ import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 from hypothesis.extra.numpy import arrays
+from PIL import Image
 
 from revisor import efectos
+from revisor.caras import DetectorCaras
 from revisor.errores import Codigo, ErrorRevisor
 
-from .conftest import oculto
+from .conftest import DATOS, MODELOS, oculto
 
 EFECTOS = ["solido", "difuminado", "pixelado"]
-
-
-def _rng() -> np.random.Generator:
-    return np.random.default_rng(123)
+CON_COLOR = ["difuminado", "pixelado"]
 
 
 def _imagen(alto: int = 200, ancho: int = 300, canales: int = 3, valor: int | None = None) -> np.ndarray:
@@ -25,37 +25,77 @@ def _imagen(alto: int = 200, ancho: int = 300, canales: int = 3, valor: int | No
     return np.random.default_rng(5).integers(0, 256, size=(alto, ancho, canales), dtype=np.uint8)
 
 
-@pytest.mark.parametrize("efecto", EFECTOS)
-def test_irreversible_el_contenido_no_influye(efecto: str) -> None:
-    """Dos fotos que solo difieren dentro de la zona dan exactamente la misma salida."""
+def test_solido_es_irreversible_el_contenido_no_influye() -> None:
     a = _imagen()
     b = a.copy()
     b[60:120, 80:180] = 255 - b[60:120, 80:180]
-    o = oculto(80, 60, 100, 60, efecto)
-    salida_a, regiones = efectos.aplicar(a, [o], _rng())
-    salida_b, _ = efectos.aplicar(b, [o], _rng())
+    o = oculto(80, 60, 100, 60, "solido")
+    salida_a, regiones = efectos.aplicar(a, [o])
+    salida_b, _ = efectos.aplicar(b, [o])
     assert np.array_equal(salida_a, salida_b), "lo original se filtró a la salida"
+    assert regiones[0] == (72, 52, 188, 128)
+
+
+@pytest.mark.parametrize("efecto", CON_COLOR)
+def test_usa_los_colores_de_la_imagen(efecto: str) -> None:
+    """Sobre una foto rojiza, la zona sigue rojiza: no es una mancha gris."""
+    a = np.zeros((300, 300, 3), dtype=np.uint8)
+    a[:, :] = (200, 60, 40)
+    a[120:180, 120:180] = (220, 40, 30)
+    salida, regiones = efectos.aplicar(a, [oculto(120, 120, 60, 60, efecto)])
     x0, y0, x1, y1 = regiones[0]
-    assert (x0, y0) == (72, 52) and (x1, y1) == (188, 128)
+    r, g, b = salida[y0:y1, x0:x1].reshape(-1, 3).mean(axis=0)
+    assert r > 180 and g < 80 and b < 60, (r, g, b)
+
+
+@pytest.mark.parametrize("efecto", CON_COLOR)
+def test_cambia_con_el_contenido(efecto: str) -> None:
+    a = _imagen(valor=40)
+    b = _imagen(valor=200)
+    o = oculto(80, 60, 100, 60, efecto)
+    x0, y0, x1, y1 = efectos.region_dilatada(o, 200, 300)
+    assert abs(float(efectos.aplicar(a, [o])[0][y0:y1, x0:x1].mean()) - float(efectos.aplicar(b, [o])[0][y0:y1, x0:x1].mean())) > 100
 
 
 @pytest.mark.parametrize("efecto", EFECTOS)
-def test_secreto_de_alto_contraste_no_deja_correlacion(efecto: str) -> None:
-    """Texto blanco sobre negro: la salida no debe correlacionar con el patrón."""
+def test_se_borra_el_detalle_fino(efecto: str) -> None:
+    """Rayas finas tipo texto: la salida no debe conservar el patrón."""
     a = _imagen(valor=0)
     a[70:110, 90:170][::2, :] = 255
-    salida, _ = efectos.aplicar(a, [oculto(80, 60, 100, 60, efecto)], _rng())
+    salida, _ = efectos.aplicar(a, [oculto(80, 60, 100, 60, efecto)])
     zona_in = a[70:110, 90:170, 0].astype(float).ravel()
     zona_out = salida[70:110, 90:170, 0].astype(float).ravel()
     if zona_out.std() > 0:
-        assert abs(np.corrcoef(zona_in, zona_out)[0, 1]) < 0.1
+        assert abs(np.corrcoef(zona_in, zona_out)[0, 1]) < 0.2
+
+
+@pytest.mark.parametrize("efecto", EFECTOS)
+def test_una_cara_real_deja_de_detectarse(efecto: str) -> None:
+    """Con la caja justa, sin el margen de la app, el detector ya no la da por cara.
+
+    Difuminado y pixelado aún pueden dejar una señal dudosa, por debajo de 0.6, porque conservan
+    los colores. El flujo completo con el margen real se comprueba en la prueba E2E.
+    """
+    pixeles = np.array(Image.open(DATOS / "astronauta.jpg").convert("RGB"))
+    detector = DetectorCaras(MODELOS)
+    caras = detector.detectar(pixeles, 0.25)
+    assert caras
+    lista = [oculto(c.x, c.y, c.ancho, c.alto, efecto) for c in caras]
+    salida, _ = efectos.aplicar(pixeles, lista)
+    assert all(c.confianza < 0.6 for c in detector.detectar(salida, 0.25))
+
+
+def test_es_determinista_para_que_la_vista_previa_coincida() -> None:
+    a = _imagen()
+    lista = [oculto(10, 10, 40, 40, "difuminado"), oculto(100, 100, 40, 40, "pixelado")]
+    assert np.array_equal(efectos.aplicar(a, lista)[0], efectos.aplicar(a, lista)[0])
 
 
 @pytest.mark.parametrize("efecto", EFECTOS)
 def test_fuera_de_la_zona_no_cambia_y_entrada_intacta(efecto: str) -> None:
     a = _imagen()
     copia = a.copy()
-    salida, regiones = efectos.aplicar(a, [oculto(80, 60, 100, 60, efecto)], _rng())
+    salida, regiones = efectos.aplicar(a, [oculto(80, 60, 100, 60, efecto)])
     assert np.array_equal(a, copia), "se modificó el original en memoria"
     x0, y0, x1, y1 = regiones[0]
     mascara = np.zeros(a.shape[:2], dtype=bool)
@@ -79,72 +119,89 @@ def test_margen_se_ajusta_al_borde() -> None:
 )
 def test_zona_fuera_de_la_imagen_se_rechaza_sin_recortar(x: int, y: int, ancho: int, alto: int) -> None:
     with pytest.raises(ErrorRevisor) as e:
-        efectos.aplicar(_imagen(200, 200), [oculto(x, y, ancho, alto)], _rng())
+        efectos.aplicar(_imagen(200, 200), [oculto(x, y, ancho, alto)])
     assert e.value.codigo is Codigo.REGION_FUERA_DE_IMAGEN
 
 
 def test_borde_exacto_y_toda_la_imagen() -> None:
     a = _imagen(50, 50)
-    salida, _ = efectos.aplicar(a, [oculto(0, 0, 50, 50)], _rng())
+    salida, _ = efectos.aplicar(a, [oculto(0, 0, 50, 50)])
     assert salida.max() == 0
-    salida, regiones = efectos.aplicar(a, [oculto(49, 49, 1, 1)], _rng())
+    salida, regiones = efectos.aplicar(a, [oculto(49, 49, 1, 1)])
     assert regiones[0] == (41, 41, 50, 50)
     assert salida[49, 49].max() == 0
 
 
+@pytest.mark.parametrize("efecto", CON_COLOR)
+def test_efectos_con_color_en_toda_la_imagen_y_en_el_borde(efecto: str) -> None:
+    a = _imagen(50, 50)
+    assert efectos.aplicar(a, [oculto(0, 0, 50, 50, efecto)])[0].shape == a.shape
+    assert efectos.aplicar(a, [oculto(49, 49, 1, 1, efecto)])[0].shape == a.shape
+    assert efectos.aplicar(_imagen(1, 1), [oculto(0, 0, 1, 1, efecto)])[0].shape == (1, 1, 3)
+    assert efectos.aplicar(_imagen(1, 90), [oculto(0, 0, 90, 1, efecto)])[0].shape == (1, 90, 3)
+
+
 def test_lista_vacia_copia_igual() -> None:
     a = _imagen(10, 10)
-    salida, regiones = efectos.aplicar(a, [], _rng())
+    salida, regiones = efectos.aplicar(a, [])
     assert regiones == []
     assert np.array_equal(salida, a)
     assert salida is not a
 
 
-def test_solapados_no_se_filtran_entre_si() -> None:
-    a = _imagen()
-    b = a.copy()
-    b[40:160, 40:260] = 0
-    lista = [oculto(50, 50, 100, 100, "difuminado"), oculto(100, 50, 150, 100, "pixelado")]
-    assert np.array_equal(efectos.aplicar(a, lista, _rng())[0], efectos.aplicar(b, lista, _rng())[0])
-
-
-def test_difuminado_no_toma_color_de_otra_zona_sin_ocultar() -> None:
+def test_difuminado_no_toma_color_de_un_bloque_solido_vecino() -> None:
     a = _imagen(100, 400, valor=0)
     b = a.copy()
-    # La segunda zona queda dentro del alcance del difuminado de la primera.
+    # La zona sólida queda dentro del alcance del difuminado.
     b[40:60, 90:110] = 255
     lista = [oculto(40, 40, 20, 20, "difuminado"), oculto(90, 40, 20, 20, "solido")]
-    assert np.array_equal(efectos.aplicar(a, lista, _rng())[0], efectos.aplicar(b, lista, _rng())[0])
+    assert np.array_equal(efectos.aplicar(a, lista)[0], efectos.aplicar(b, lista)[0])
+
+
+def test_el_efecto_se_calcula_sobre_lo_original_y_no_sobre_otro_efecto() -> None:
+    a = _imagen()
+    lista = [oculto(50, 50, 40, 40, "pixelado"), oculto(150, 50, 40, 40, "difuminado")]
+    solo_pixel, _ = efectos.aplicar(a, lista[:1])
+    ambos, regiones = efectos.aplicar(a, lista)
+    x0, y0, x1, y1 = regiones[0]
+    assert np.array_equal(ambos[y0:y1, x0:x1], solo_pixel[y0:y1, x0:x1])
 
 
 @pytest.mark.parametrize("intensidad", [1, 30, 80, 100])
-@pytest.mark.parametrize("efecto", ["difuminado", "pixelado"])
-def test_intensidad_nunca_cambia_la_seguridad(efecto: str, intensidad: int) -> None:
-    a = _imagen()
-    b = a.copy()
-    o = oculto(80, 60, 100, 60, efecto, intensidad=intensidad)
-    x0, y0, x1, y1 = efectos.region_dilatada(o, *a.shape[:2])
-    b[y0:y1, x0:x1] = 255 - b[y0:y1, x0:x1]
-    assert np.array_equal(efectos.aplicar(a, [o], _rng())[0], efectos.aplicar(b, [o], _rng())[0])
+@pytest.mark.parametrize("efecto", CON_COLOR)
+def test_cualquier_intensidad_borra_detalle_fino(efecto: str, intensidad: int) -> None:
+    a = _imagen(valor=0)
+    a[70:110, 90:170][::2, :] = 255
+    salida, _ = efectos.aplicar(a, [oculto(80, 60, 100, 60, efecto, intensidad=intensidad)])
+    assert salida[70:110, 90:170, 0].std() < a[70:110, 90:170, 0].std() / 2
 
 
-def test_pixelado_bloque_mayor_que_region() -> None:
+def test_mas_intensidad_da_bloques_mas_grandes() -> None:
+    a = _imagen(400, 400)
+    colores = [
+        len(np.unique(efectos.aplicar(a, [oculto(50, 50, 300, 300, "pixelado", intensidad=i)])[0][50:350, 50:350].reshape(-1, 3), axis=0))
+        for i in (10, 50, 100)
+    ]
+    assert colores[0] > colores[1] > colores[2]
+
+
+def test_pixelado_bloque_mayor_que_region_da_un_solo_color() -> None:
     a = _imagen(100, 100)
-    salida, regiones = efectos.aplicar(a, [oculto(40, 40, 1, 1, "pixelado", dilatacion_px=8, intensidad=100)], _rng())
+    salida, regiones = efectos.aplicar(a, [oculto(40, 40, 1, 1, "pixelado", dilatacion_px=8, intensidad=100)])
     x0, y0, x1, y1 = regiones[0]
-    assert len(np.unique(salida[y0:y1, x0:x1].reshape(-1, 3), axis=0)) >= 1
+    assert len(np.unique(salida[y0:y1, x0:x1].reshape(-1, 3), axis=0)) == 1
 
 
-def test_difuminado_con_sigma_grande_rapido_y_correcto() -> None:
+def test_difuminado_con_sigma_grande() -> None:
     a = _imagen(2000, 3000)
-    salida, _ = efectos.aplicar(a, [oculto(100, 100, 2500, 1500, "difuminado")], _rng())
+    salida, _ = efectos.aplicar(a, [oculto(100, 100, 2500, 1500, "difuminado")])
     assert salida.shape == a.shape
 
 
 def test_alfa_transparente_no_esconde_ni_revela() -> None:
     a = _imagen(100, 100, canales=4)
     a[:, :, 3] = 0
-    salida, regiones = efectos.aplicar(a, [oculto(30, 30, 20, 20)], _rng())
+    salida, regiones = efectos.aplicar(a, [oculto(30, 30, 20, 20)])
     x0, y0, x1, y1 = regiones[0]
     assert (salida[y0:y1, x0:x1, 3] == 255).all()
     assert (salida[y0:y1, x0:x1, :3] == 0).all()
@@ -152,35 +209,41 @@ def test_alfa_transparente_no_esconde_ni_revela() -> None:
     assert (salida[0:10, 0:10, :3] == 0).all()
 
 
+@pytest.mark.parametrize("efecto", CON_COLOR)
+def test_efecto_con_color_vuelve_opaca_la_zona(efecto: str) -> None:
+    a = _imagen(100, 100, canales=4)
+    a[:, :, 3] = 128
+    salida, regiones = efectos.aplicar(a, [oculto(30, 30, 20, 20, efecto)])
+    x0, y0, x1, y1 = regiones[0]
+    assert (salida[y0:y1, x0:x1, 3] == 255).all()
+
+
 def test_rgb_bajo_alfa_parcial_se_conserva() -> None:
     a = _imagen(20, 20, canales=4)
     a[:, :, 3] = 128
-    salida, _ = efectos.aplicar(a, [], _rng())
+    salida, _ = efectos.aplicar(a, [])
     assert np.array_equal(salida, a)
 
 
 @given(
-    imagen=arrays(np.uint8, st.tuples(st.integers(20, 80), st.integers(20, 80), st.just(3))),
+    imagen=arrays(np.uint8, st.tuples(st.integers(1, 80), st.integers(1, 80), st.just(3))),
     efecto=st.sampled_from(EFECTOS),
     datos=st.tuples(st.floats(0, 0.9), st.floats(0, 0.9), st.floats(0.05, 1), st.floats(0.05, 1)),
     intensidad=st.integers(1, 100),
-    semilla=st.integers(0, 2**32 - 1),
 )
 def test_propiedad_cualquier_mascara_valida(
-    imagen: np.ndarray, efecto: str, datos: tuple[float, float, float, float], intensidad: int, semilla: int
+    imagen: np.ndarray, efecto: str, datos: tuple[float, float, float, float], intensidad: int
 ) -> None:
     alto, ancho = imagen.shape[:2]
     x, y = int(datos[0] * ancho), int(datos[1] * alto)
     w = max(1, min(ancho - x, int(datos[2] * ancho)))
     h = max(1, min(alto - y, int(datos[3] * alto)))
     o = oculto(x, y, w, h, efecto, intensidad=intensidad)
-    salida, regiones = efectos.aplicar(imagen, [o], np.random.default_rng(semilla))
+    salida, regiones = efectos.aplicar(imagen, [o])
     assert salida.shape == imagen.shape
     x0, y0, x1, y1 = regiones[0]
-    otra = imagen.copy()
-    otra[y0:y1, x0:x1] = 255 - otra[y0:y1, x0:x1]
-    salida_otra, _ = efectos.aplicar(otra, [o], np.random.default_rng(semilla))
-    assert np.array_equal(salida, salida_otra)
     fuera = np.ones(imagen.shape[:2], dtype=bool)
     fuera[y0:y1, x0:x1] = False
     assert np.array_equal(salida[fuera], imagen[fuera])
+    if efecto == "solido":
+        assert salida[y0:y1, x0:x1].max() == 0

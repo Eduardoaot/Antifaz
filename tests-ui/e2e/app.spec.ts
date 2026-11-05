@@ -196,7 +196,8 @@ test('campo de intensidad: rechaza lo inválido y conserva el último valor', as
   }
   await campo.fill('20');
   await expect(campo).toHaveAttribute('aria-invalid', 'false');
-  await expect(pagina.getByText('Se verá más nítido, pero lo original ya se sobrescribió.')).toBeVisible();
+  await expect(pagina.getByText(/Con poca intensidad es más fácil reconocer/)).toBeVisible();
+  await expect(pagina.getByText(/usa Bloque sólido/)).toBeVisible();
   await campo.fill('1');
   await expect(campo).toHaveAttribute('aria-invalid', 'false');
   await campo.fill('100');

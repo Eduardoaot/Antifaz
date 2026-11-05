@@ -170,6 +170,7 @@ const plural = (n: number, uno: string, varios: string): string => `${n} ${n ===
 export function describirHallazgo(h: Hallazgo): string {
   switch (h.regla_id) {
     case 'CAR-01':
+      if (h.requiere_revision) return `Podría ser una cara, ${h.posicion ?? 'en la imagen'}. No estamos seguros: revísala.`;
       return `Se detectó una cara ${h.posicion ?? 'en la imagen'}.`;
     case 'MEN-01':
       return reglaDe('MEN-01').texto_aviso ?? 'Podría haber menores en la foto';
@@ -183,11 +184,17 @@ export function describirHallazgo(h: Hallazgo): string {
 /** Resumen en texto de un archivo, para quien no puede ver la imagen. */
 export function resumenTexto(nombre: string, analisis: Analisis, r: Revision): string {
   const partes = [`${nombre}.`, `${tituloVeredicto(veredicto(analisis))}.`];
-  const caras = analisis.hallazgos.filter((h) => h.regla_id === 'CAR-01');
-  if (caras.length > 0) {
-    const ocultas = caras.filter((h) => r.decisiones[h.id] === 'ocultar').length;
-    partes.push(`${plural(caras.length, 'cara detectada', 'caras detectadas')}, ${ocultas} para ocultar.`);
-    partes.push(...caras.map(describirHallazgo));
+  const zonas = analisis.hallazgos.filter((h) => h.regla_id === 'CAR-01');
+  if (zonas.length > 0) {
+    const seguras = zonas.filter((h) => !h.requiere_revision).length;
+    const posibles = zonas.length - seguras;
+    const ocultas = zonas.filter((h) => r.decisiones[h.id] === 'ocultar').length;
+    const conteo = [
+      ...(seguras > 0 ? [plural(seguras, 'cara detectada', 'caras detectadas')] : []),
+      ...(posibles > 0 ? [plural(posibles, 'posible cara', 'posibles caras')] : []),
+    ];
+    partes.push(`${conteo.join(' y ')}, ${ocultas} para ocultar.`);
+    partes.push(...zonas.map(describirHallazgo));
   }
   for (const h of analisis.hallazgos) {
     if (h.regla_id === 'CAR-01') continue;

@@ -20,13 +20,7 @@ def test_efecto_desconocido_no_cae_en_sin_efecto() -> None:
     salida = np.zeros((10, 10, 3), dtype=np.uint8)
     malo: Any = "ninguno"
     with pytest.raises(AssertionError):
-        efectos._aplicar_efecto(salida, malo, 0, 0, 5, 5, 80, np.random.default_rng(0))
-
-
-def test_sin_generador_usa_uno_propio() -> None:
-    a = np.zeros((50, 50, 3), dtype=np.uint8)
-    salida, _ = efectos.aplicar(a, [oculto(5, 5, 10, 10, "pixelado")])
-    assert salida.shape == a.shape
+        efectos._aplicar_efecto(salida, salida, malo, 0, 0, 5, 5, 80)
 
 
 def test_codificar_formato_desconocido() -> None:

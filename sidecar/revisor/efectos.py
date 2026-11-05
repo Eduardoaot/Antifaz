@@ -1,7 +1,8 @@
-"""Ocultamiento irreversible: lo original se sobrescribe ANTES de aplicar cualquier efecto.
+"""Efectos para ocultar zonas.
 
-El difuminado y el pixelado solo no son irreversibles (ver docs/INVESTIGACION.md), así que aquí
-nunca se calculan a partir del contenido original. La zona de salida no depende de lo que había.
+Decisión del responsable (2026-11-06): el difuminado y el pixelado usan los colores de la imagen,
+porque se ven naturales, aunque técnicas de reconstrucción podrían recuperar parte del contenido
+(ver docs/INVESTIGACION.md). Solo el bloque sólido no depende de lo que había debajo.
 """
 
 from __future__ import annotations
@@ -11,15 +12,12 @@ from collections.abc import Sequence
 from typing import assert_never
 
 import cv2
-import numpy as np
 
 from .cargador import Pixeles
 from .errores import Codigo, ErrorRevisor
 from .esquemas import Ocultamiento, TipoEfecto
 
 COLOR_SOLIDO = (0, 0, 0)
-RUIDO_MIN = 96
-RUIDO_MAX = 160
 SIGMA_MIN = 25.0
 SIGMA_MAX = 1000.0
 SIGMA_REDUCIDO = 16.0
@@ -43,27 +41,20 @@ def region_dilatada(o: Ocultamiento, alto: int, ancho: int) -> tuple[int, int, i
     )
 
 
-def _ruido(rng: np.random.Generator, alto: int, ancho: int) -> Pixeles:
-    return rng.integers(RUIDO_MIN, RUIDO_MAX, size=(alto, ancho, 3), dtype=np.uint8)
-
-
-def _difuminar(
-    salida: Pixeles, x0: int, y0: int, x1: int, y1: int, intensidad: int, rng: np.random.Generator
-) -> None:
+def _difuminar(salida: Pixeles, fuente: Pixeles, x0: int, y0: int, x1: int, y1: int, intensidad: int) -> None:
     lado = min(x1 - x0, y1 - y0)
     base = max(SIGMA_MIN, lado * 0.25)
     sigma = min(SIGMA_MAX, max(SIGMA_MIN, base * intensidad / INTENSIDAD_REFERENCIA))
-    # Primero se sobrescribe. Los vecinos de fuera solo aportan la transición del borde.
-    salida[y0:y1, x0:x1, :3] = _ruido(rng, y1 - y0, x1 - x0)
+    # Los vecinos de fuera entran al cálculo para que el borde se funda con la foto.
     relleno = math.ceil(sigma * 3)
-    alto, ancho = salida.shape[:2]
+    alto, ancho = fuente.shape[:2]
     cx0, cy0, cx1, cy1 = (
         max(0, x0 - relleno),
         max(0, y0 - relleno),
         min(ancho, x1 + relleno),
         min(alto, y1 + relleno),
     )
-    recorte = salida[cy0:cy1, cx0:cx1, :3]
+    recorte = fuente[cy0:cy1, cx0:cx1, :3]
     factor = max(1, math.ceil(sigma / SIGMA_REDUCIDO))
     chico = cv2.resize(
         recorte,
@@ -75,35 +66,33 @@ def _difuminar(
     salida[y0:y1, x0:x1, :3] = borroso[y0 - cy0 : y1 - cy0, x0 - cx0 : x1 - cx0]
 
 
-def _pixelar(
-    salida: Pixeles, x0: int, y0: int, x1: int, y1: int, intensidad: int, rng: np.random.Generator
-) -> None:
+def _pixelar(salida: Pixeles, fuente: Pixeles, x0: int, y0: int, x1: int, y1: int, intensidad: int) -> None:
     alto, ancho = y1 - y0, x1 - x0
     base = max(16.0, min(alto, ancho) * 0.10)
     bloque = int(min(PIXEL_MAX, max(PIXEL_MIN, base * intensidad / INTENSIDAD_REFERENCIA)))
-    filas, columnas = max(1, math.ceil(alto / bloque)), max(1, math.ceil(ancho / bloque))
-    # Los colores de los bloques son aleatorios: no salen del contenido original.
-    colores = _ruido(rng, filas, columnas)
-    salida[y0:y1, x0:x1, :3] = np.repeat(np.repeat(colores, bloque, axis=0), bloque, axis=1)[:alto, :ancho]
+    filas, columnas = max(1, round(alto / bloque)), max(1, round(ancho / bloque))
+    # Cada bloque toma el color promedio de lo que cubre.
+    colores = cv2.resize(fuente[y0:y1, x0:x1, :3], (columnas, filas), interpolation=cv2.INTER_AREA)
+    salida[y0:y1, x0:x1, :3] = cv2.resize(colores, (ancho, alto), interpolation=cv2.INTER_NEAREST)
 
 
 def _aplicar_efecto(
     salida: Pixeles,
+    fuente: Pixeles,
     efecto: TipoEfecto,
     x0: int,
     y0: int,
     x1: int,
     y1: int,
     intensidad: int,
-    rng: np.random.Generator,
 ) -> None:
     match efecto:
         case "solido":
             salida[y0:y1, x0:x1, :3] = COLOR_SOLIDO
         case "difuminado":
-            _difuminar(salida, x0, y0, x1, y1, intensidad, rng)
+            _difuminar(salida, fuente, x0, y0, x1, y1, intensidad)
         case "pixelado":
-            _pixelar(salida, x0, y0, x1, y1, intensidad, rng)
+            _pixelar(salida, fuente, x0, y0, x1, y1, intensidad)
         case _ as inalcanzable:
             assert_never(inalcanzable)
     if salida.shape[2] == 4:
@@ -120,17 +109,18 @@ def limpiar_transparentes(pixeles: Pixeles) -> None:
 
 
 def aplicar(
-    pixeles: Pixeles, ocultamientos: Sequence[Ocultamiento], rng: np.random.Generator | None = None
+    pixeles: Pixeles, ocultamientos: Sequence[Ocultamiento]
 ) -> tuple[Pixeles, list[tuple[int, int, int, int]]]:
     """Devuelve una copia con las zonas ocultas y sus regiones finales. No modifica la entrada."""
-    generador = rng if rng is not None else np.random.default_rng()
     alto, ancho = pixeles.shape[:2]
     regiones = [region_dilatada(o, alto, ancho) for o in ocultamientos]
-    salida = pixeles.copy()
-    # Primero se sobrescriben todas las zonas: un difuminado no debe tomar color de otra sin ocultar.
-    for x0, y0, x1, y1 in regiones:
-        salida[y0:y1, x0:x1, :3] = COLOR_SOLIDO
+    # Los bloques sólidos van primero: un difuminado vecino no debe tomar color de lo que tapan.
+    fuente = pixeles.copy()
     for o, (x0, y0, x1, y1) in zip(ocultamientos, regiones, strict=True):
-        _aplicar_efecto(salida, o.efecto, x0, y0, x1, y1, o.intensidad, generador)
+        if o.efecto == "solido":
+            fuente[y0:y1, x0:x1, :3] = COLOR_SOLIDO
+    salida = fuente.copy()
+    for o, (x0, y0, x1, y1) in zip(ocultamientos, regiones, strict=True):
+        _aplicar_efecto(salida, fuente, o.efecto, x0, y0, x1, y1, o.intensidad)
     limpiar_transparentes(salida)
     return salida, regiones

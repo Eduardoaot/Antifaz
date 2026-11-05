@@ -47,7 +47,7 @@ class Analizar(Estricto):
     tipo: Literal["analizar"]
     imagen_id: Annotated[str, Field(min_length=1, max_length=64)]
     umbral_confianza: Annotated[float, Field(ge=0, le=1)] = 0.25
-    umbral_revision: Annotated[float, Field(ge=0, le=1)] = 0.5
+    umbral_revision: Annotated[float, Field(ge=0, le=1)] = 0.6
     multiplicador_cara: Annotated[float, Field(ge=1.0, le=3.0)] = 1.3
 
     @model_validator(mode="after")

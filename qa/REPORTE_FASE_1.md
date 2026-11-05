@@ -113,7 +113,9 @@ Sin medir: arranque de la app y pico de memoria. Por eso esos presupuestos no ha
 
 ## Decisión de producto para revisar
 
-El "difuminado" se ve como una mancha gris, no como un blur clásico. Es a propósito: lo original se sobrescribe antes, y por eso no se puede recuperar. Si se quiere otro aspecto, se puede cambiar el color o la textura, sin usar el contenido original.
+**Resuelta el 6 de noviembre de 2026, tras probar la app.** El responsable decidió que el difuminado y el pixelado usen los colores de la imagen, aceptando que se podría reconstruir parte del contenido. La app lo avisa junto al control de intensidad. El bloque sólido sigue siendo irreversible y es el default para texto, códigos y documentos.
+
+**Falso positivo reportado:** la imagen de un reloj dio 2 caras. No se pudo reproducir: el reloj de scikit-image y 60 relojes sintéticos no dieron ninguna detección. Se agregaron dos niveles de confianza (ver `docs/INVESTIGACION.md`): por debajo de 0.6 la app dice "podría ser una cara" y no pregunta por menores. **Falta comprobarlo con la foto original del reloj.**
 
 ## Fuera de alcance de esta revisión
 
