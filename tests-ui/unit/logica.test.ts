@@ -204,6 +204,14 @@ describe('texto para lector de pantalla', () => {
     expect(texto).not.toMatch(/\d+\s*años/);
   });
 
+  it('una posible cara se dice con duda y se cuenta aparte', () => {
+    const dudosa: Hallazgo = { ...cara('d', 50), requiere_revision: true, confianza: 0.3 };
+    expect(describirHallazgo(dudosa)).toBe('Podría ser una cara, al centro. No estamos seguros: revísala.');
+    expect(describirHallazgo({ ...dudosa, posicion: null })).toContain('en la imagen');
+    expect(resumenTexto('f', analisis([dudosa]), REVISION_INICIAL)).toContain('1 posible cara, 0 para ocultar');
+    expect(resumenTexto('f', analisis([cara('a'), dudosa, { ...dudosa, id: 'e' }]), REVISION_INICIAL)).toContain('1 cara detectada y 2 posibles caras, 0 para ocultar');
+  });
+
   it('usa plural y describe sin posición', () => {
     expect(resumenTexto('f', analisis([cara('a'), cara('b')]), REVISION_INICIAL)).toContain('2 caras detectadas, 0 para ocultar');
     expect(describirHallazgo({ ...cara('a'), posicion: null })).toBe('Se detectó una cara en la imagen.');

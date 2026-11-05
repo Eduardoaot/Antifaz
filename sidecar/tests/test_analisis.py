@@ -18,7 +18,7 @@ ASTRONAUTA = DATOS / "astronauta.jpg"
 
 
 def _analizar(ruta: Path, modelos: Path = MODELOS) -> dict[str, Any]:
-    return analisis.analizar(cargador.abrir(str(ruta)), modelos, 0.25, 0.5, 1.3)
+    return analisis.analizar(cargador.abrir(str(ruta)), modelos, 0.25, 0.6, 1.3)
 
 
 def _reglas(resultado: dict[str, Any]) -> list[str]:
@@ -132,6 +132,28 @@ def test_fail_closed_exif_ilegible(tmp_path: Path, monkeypatch: pytest.MonkeyPat
     assert imagen.metadatos_legibles is False
     resultado = analisis.analizar(imagen, MODELOS, 0.25, 0.5, 1.3)
     assert "metadatos" in resultado["cobertura"]["motivos"]
+
+
+def _caras_falsas(monkeypatch: pytest.MonkeyPatch, *confianzas: float) -> None:
+    def falso(_self: object, _pixeles: object, _umbral: float) -> list[caras.Cara]:
+        return [caras.Cara(10 * i, 10, 8, 8, c) for i, c in enumerate(confianzas)]
+
+    monkeypatch.setattr(DetectorCaras, "detectar", falso)
+
+
+def test_posible_cara_se_avisa_pero_no_pregunta_por_menores(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Un reloj o una textura pueden parecer cara: se avisa con duda y sin preguntar por menores."""
+    _caras_falsas(monkeypatch, 0.3, 0.58)
+    resultado = _analizar(guardar(tmp_path / "a.png", imagen_prueba(100, 100)))
+    assert _reglas(resultado) == ["CAR-01", "CAR-01"]
+    assert all(h["requiere_revision"] for h in resultado["hallazgos"])
+
+
+def test_una_cara_segura_si_pregunta_por_menores(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _caras_falsas(monkeypatch, 0.3, 0.6)
+    resultado = _analizar(guardar(tmp_path / "a.png", imagen_prueba(100, 100)))
+    assert _reglas(resultado).count("MEN-01") == 1
+    assert [h["requiere_revision"] for h in resultado["hallazgos"] if h["regla_id"] == "CAR-01"] == [True, False]
 
 
 def test_baja_confianza_se_marca_para_revision() -> None:

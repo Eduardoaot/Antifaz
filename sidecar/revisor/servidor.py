@@ -16,7 +16,6 @@ import uuid
 from pathlib import Path
 from typing import Any, BinaryIO, NoReturn, assert_never
 
-import numpy as np
 from PIL import Image
 from pydantic import ValidationError
 
@@ -117,7 +116,7 @@ class Sesion:
                 ), None
             case Previsualizar():
                 imagen = self._imagen(comando.imagen_id)
-                pixeles, _ = efectos.aplicar(imagen.pixeles, comando.ocultamientos, np.random.default_rng(0))
+                pixeles, _ = efectos.aplicar(imagen.pixeles, comando.ocultamientos)
                 return {"mime": "image/png" if imagen.tiene_alfa else "image/jpeg"}, self._vista(
                     pixeles, comando.lado_max
                 )

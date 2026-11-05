@@ -25,7 +25,8 @@ Electron + React/TypeScript (strict) + sidecar Python 3.12 con uv.
 - **Datos sensibles:** caché cifrada con llave solo en memoria. Embeddings solo en RAM salvo que el usuario guarde. La recuperación guarda ediciones, sin píxeles.
 - **Exportación fail-closed:** verificación contra lista blanca antes de escribir, archivo temporal y renombrado atómico. Las imágenes se recodifican desde píxeles y sus bytes se revisan con `metadatos.py`. En video se usarán ffprobe y exiftool.
 - **Huella:** cada archivo tiene un SHA-256. Las decisiones solo valen para esos mismos bytes: si cambia, no se aplican ni se exporta.
-- **Ocultamiento:** texto, códigos, documentos y matrículas con relleno sólido. Los efectos de caras se aplican sobre contenido ya sobrescrito. El blur o pixelado solo no cuenta como irreversible.
+- **Ocultamiento:** texto, códigos, documentos y matrículas con relleno sólido por defecto. Difuminado y pixelado usan los colores de la imagen por decisión del responsable (2026-11-06), así que **no son irreversibles** y la app lo avisa. Solo el bloque sólido lo es. No se debe decir que un difuminado es irrecuperable.
+- **Caras:** dos niveles. Con confianza de 0.6 o más es "cara" y pregunta por menores. Por debajo es "podría ser una cara", sin esa pregunta.
 
 ## Reglas de validación
 

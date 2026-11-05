@@ -102,7 +102,8 @@ def analizar(
                     }
                 )
             revisadas.extend(REGLAS_DE_CARAS)
-            if caras:
+            # Una posible cara no basta para preguntar por menores: un reloj no lo amerita.
+            if any(c.confianza >= umbral_revision for c in caras):
                 hallazgos.append(
                     {
                         "id": "menores",

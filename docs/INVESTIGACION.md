@@ -34,7 +34,22 @@ El blur y el pixelado no bastan:
 - [Hill et al.](https://petsymposium.org/popets/2016/popets-2016-0047.php): recuperaron texto y concluyen que mosaico y desenfoque no son viables para redactar.
 - [Depix](https://codeberg.org/spipm/Depixelization_poc): recupera texto pixelado bajo ciertas condiciones.
 
-Valores por defecto (propuesta propia, no derivada de estudios): relleno sólido en texto, códigos, documentos y matrículas; dilatar max(8 px, 10% del lado corto); caras ×1.3; sobrescribir antes de aplicar el efecto; σ = max(25 px, 25% del lado corto); ampliar 5 frames antes y después de cada pista.
+**Decisión del responsable (6 de noviembre de 2026):** el difuminado y el pixelado usan los colores de la imagen, porque la versión anterior, sobre contenido ya sobrescrito, se veía como una mancha gris. Acepta que con estas técnicas se podría reconstruir parte del contenido. Por eso la app lo avisa, y solo el bloque sólido se presenta como la máxima protección.
+
+Valores por defecto (propuesta propia, no derivada de estudios): relleno sólido en texto, códigos, documentos y matrículas; difuminado en caras; dilatar max(8 px, 10% del lado corto); caras ×1.3; σ = max(25 px, 25% del lado corto); ampliar 5 frames antes y después de cada pista.
+
+## Confianza del detector de caras
+
+Medido el 6 de noviembre de 2026 con YuNet, en una muestra pequeña que no se versiona. **No sustituye a un dataset de evaluación.**
+
+| Muestra | Confianza |
+|---|---|
+| Imágenes sin caras de scikit-image: galaxias, café, gato, luna | 0.25 a 0.58 |
+| Reloj de scikit-image y 60 relojes sintéticos | Sin detecciones |
+| La misma cara real: oscura, desenfocada, girada, con ruido, tapada a medias, de 32 px o más | 0.68 a 0.94 |
+| La misma cara a 24 px | 0.31 |
+
+De ahí salen los dos niveles: 0.6 o más es "cara", y de 0.25 a 0.6 es "podría ser una cara". No se sube el umbral de 0.25 para no perder caras diminutas.
 
 ## Metadatos
 

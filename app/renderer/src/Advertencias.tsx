@@ -101,7 +101,6 @@ export function Advertencias({ hallazgos, revision, alCambiar, alOcultarTodo, al
                 {h.caja !== null && <span className="numero">Zona {numero}</span>}
               </p>
               <p>{describirHallazgo(h)}</p>
-              {h.requiere_revision && h.caja !== null && <p className="suave">Tenemos dudas con esta. Revísala con cuidado.</p>}
 
               {regla.requiere_confirmacion === true && (
                 <fieldset className="pregunta">
@@ -165,8 +164,8 @@ export function Advertencias({ hallazgos, revision, alCambiar, alOcultarTodo, al
           />
           <p id="ayuda-intensidad" className={leida.ok ? 'suave' : 'error-campo'} role={leida.ok ? undefined : 'alert'}>
             {!leida.ok && 'Escribe un número entero del 1 al 100. Se conserva el último valor válido.'}
-            {baja && 'Se verá más nítido, pero lo original ya se sobrescribió.'}
-            {leida.ok && !baja && 'Solo cambia cómo se ve. Lo original se sobrescribe siempre.'}
+            {baja && 'Con poca intensidad es más fácil reconocer lo que hay debajo. '}
+            {leida.ok && 'El difuminado y el pixelado conservan los colores de tu foto, y con herramientas especiales alguien podría reconstruir parte. Para la máxima protección, usa Bloque sólido.'}
           </p>
         </div>
       )}

@@ -293,7 +293,7 @@ Al ejecutar un caso, el Estado pasa a `automatizado` o `manual`, con enlace a su
 | SEG-007 | 1 | Sin miniatura EXIF | Revisar imagen con miniatura sin ocultar | Sin miniatura ni imagen embebida | automatizado: sidecar/tests/test_exportar.py, tests-ui/e2e/app.spec.ts |
 | SEG-008 | 3 | Sin GPS en contenedores MP4 y MOV | Revisar con `ffprobe` y `exiftool` un video con GPS | Nada, incluidos `udta` y streams de datos | pendiente |
 | SEG-009 | 1 | Sin nombre del dispositivo | Revisar foto y video con marca y modelo | Nada | automatizado: sidecar/tests/test_exportar.py, tests-ui/e2e/app.spec.ts |
-| SEG-010 | 1 | Irreversibilidad | Intentar recuperar: correlación con el original y reconstrucción sencilla en sólido, difuminado y pixelado | Dos entradas distintas en la zona dan la misma salida; no se recupera nada | automatizado: sidecar/tests/test_efectos.py, test_exportar.py |
+| SEG-010 | 1 | Irreversibilidad | Sólido: dos entradas distintas en la zona. Difuminado y pixelado: una cara real y detalle fino | Sólido: misma salida, no se recupera nada. Difuminado y pixelado: **no son irreversibles por decisión del responsable**; la cara deja de detectarse, el detalle fino se pierde y la app avisa | automatizado: sidecar/tests/test_efectos.py, test_exportar.py. No incluye un ataque de reconstrucción contra difuminado o pixelado |
 | SEG-011 | 6 | El reporte no tiene datos sensibles | Generar el reporte y buscar texto OCR, rutas y recortes | Nada | pendiente |
 | SEG-012 | 6 | "Reportar un problema" sin datos sensibles | Generar el archivo y revisarlo | Sin imágenes; logs anonimizados; solo sale si lo mandas tú | pendiente |
 | SEG-013 | 4 | Embeddings fuera del disco | Cerrar proyecto sin elegir guardar y buscar restos | Nada en disco | pendiente |
