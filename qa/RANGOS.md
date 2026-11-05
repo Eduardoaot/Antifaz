@@ -71,6 +71,7 @@ Cada parámetro de este archivo tiene pruebas parametrizadas de mínimo-1, míni
 |---|---|---|---|---|---|
 | `deteccion.umbral_confianza` | decimal | 0 | 1 | 0.25 (propuesta, favorece recall) | Estándar |
 | `deteccion.umbral_revision` | decimal | 0 | 1 | 0.6 (medido en una muestra chica) | Estándar. Debe ser mayor o igual que `umbral_confianza`, o se rechaza. Por debajo se dice "podría ser una cara" y no se pregunta por menores |
+| `caras.umbral_confirmar` | decimal | n/a | n/a | 0.6 (medido en una muestra chica) | Constante interna. Una detección dudosa por debajo de este valor se descarta. Si no se puede confirmar, se conserva |
 | `contenido.umbral_escena` | decimal | n/a | n/a | 0.35 (medido en una muestra chica) | Constante interna. Por encima se avisa sobre toda la imagen |
 | `contenido.umbral_zonas` | decimal | n/a | n/a | 0.25 (propuesta, favorece recall) | Constante interna. Por debajo de `umbral_revision` se marca con duda |
 | `ocr.umbral_texto` | decimal | 0 | 1 | 0.3 (propuesta) | Estándar |

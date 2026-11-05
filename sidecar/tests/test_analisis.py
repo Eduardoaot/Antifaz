@@ -9,7 +9,7 @@ import numpy as np
 import pytest
 from PIL import Image
 
-from revisor import analisis, caras, cargador
+from revisor import analisis, caras, cargador, contenido
 from revisor.caras import DetectorCaras, ModeloNoDisponible
 
 from .conftest import DATOS, MODELOS, exif_con_gps, guardar, imagen_prueba
@@ -134,6 +134,62 @@ def test_fail_closed_exif_ilegible(tmp_path: Path, monkeypatch: pytest.MonkeyPat
     assert "metadatos" in resultado["cobertura"]["motivos"]
 
 
+def _confirmar_con(monkeypatch: pytest.MonkeyPatch, probabilidad: float) -> list[float]:
+    llamadas: list[float] = []
+
+    class Falso:
+        def probabilidad_cara(self, _p: object, _x: int, _y: int, _a: int, _h: int) -> float:
+            llamadas.append(probabilidad)
+            return probabilidad
+
+        def escena(self, _p: object) -> dict[str, float]:
+            return {"ARM-01": 0.0, "EXT-01": 0.0, "DES-01": 0.0, "SUG-01": 0.0}
+
+        def zonas(self, _p: object, _u: float) -> list[object]:
+            return []
+
+    monkeypatch.setattr(contenido, "revisor_de", lambda _c: Falso())
+    return llamadas
+
+
+def test_reloj_una_falsa_alarma_dudosa_se_descarta(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _caras_falsas(monkeypatch, 0.42, 0.3)
+    _confirmar_con(monkeypatch, 0.06)
+    assert _analizar(guardar(tmp_path / "a.png", imagen_prueba(100, 100)))["hallazgos"] == []
+
+
+def test_una_cara_dudosa_de_verdad_se_conserva(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _caras_falsas(monkeypatch, 0.3)
+    _confirmar_con(monkeypatch, 0.6)
+    assert _reglas(_analizar(guardar(tmp_path / "a.png", imagen_prueba(100, 100)))) == ["CAR-01"]
+
+
+def test_una_cara_segura_nunca_se_consulta_ni_se_descarta(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _caras_falsas(monkeypatch, 0.9)
+    llamadas = _confirmar_con(monkeypatch, 0.0)
+    assert "CAR-01" in _reglas(_analizar(guardar(tmp_path / "a.png", imagen_prueba(100, 100))))
+    assert llamadas == []
+
+
+def test_si_no_se_puede_confirmar_se_conserva_el_aviso(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _caras_falsas(monkeypatch, 0.3)
+
+    def falla(_c: Path) -> None:
+        raise ModeloNoDisponible("falta")
+
+    monkeypatch.setattr(contenido, "revisor_de", falla)
+    resultado = _analizar(guardar(tmp_path / "a.png", imagen_prueba(100, 100)))
+    assert "CAR-01" in _reglas(resultado)
+    assert resultado["cobertura"]["completa"] is False
+
+
+@pytest.mark.parametrize("lado", [24, 32, 50])
+def test_modelo_real_conserva_caras_chicas(tmp_path: Path, lado: int) -> None:
+    lienzo = Image.new("RGB", (640, 480), (200, 200, 200))
+    lienzo.paste(Image.open(ASTRONAUTA).convert("RGB").crop((100, 0, 350, 250)).resize((lado, lado)), (200, 150))
+    assert _reglas(_analizar(guardar(tmp_path / "a.png", lienzo))).count("CAR-01") == 1
+
+
 def _caras_falsas(monkeypatch: pytest.MonkeyPatch, *confianzas: float) -> None:
     def falso(_self: object, _pixeles: object, _umbral: float) -> list[caras.Cara]:
         return [caras.Cara(10 * i, 10, 8, 8, c) for i, c in enumerate(confianzas)]
@@ -144,6 +200,7 @@ def _caras_falsas(monkeypatch: pytest.MonkeyPatch, *confianzas: float) -> None:
 def test_posible_cara_se_avisa_pero_no_pregunta_por_menores(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Un reloj o una textura pueden parecer cara: se avisa con duda y sin preguntar por menores."""
     _caras_falsas(monkeypatch, 0.3, 0.58)
+    _confirmar_con(monkeypatch, 0.9)
     resultado = _analizar(guardar(tmp_path / "a.png", imagen_prueba(100, 100)))
     assert _reglas(resultado) == ["CAR-01", "CAR-01"]
     assert all(h["requiere_revision"] for h in resultado["hallazgos"])
@@ -151,6 +208,7 @@ def test_posible_cara_se_avisa_pero_no_pregunta_por_menores(tmp_path: Path, monk
 
 def test_una_cara_segura_si_pregunta_por_menores(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _caras_falsas(monkeypatch, 0.3, 0.6)
+    _confirmar_con(monkeypatch, 0.9)
     resultado = _analizar(guardar(tmp_path / "a.png", imagen_prueba(100, 100)))
     assert _reglas(resultado).count("MEN-01") == 1
     assert [h["requiere_revision"] for h in resultado["hallazgos"] if h["regla_id"] == "CAR-01"] == [True, False]
