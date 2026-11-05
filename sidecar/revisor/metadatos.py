@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import NoReturn
+
 from .errores import Codigo, ErrorRevisor
 
 # Marcadores de JPEG sin datos de longitud.
@@ -11,7 +13,7 @@ _PNG_FIRMA = b"\x89PNG\r\n\x1a\n"
 _PNG_PERMITIDOS = {b"IHDR", b"PLTE", b"tRNS", b"IDAT", b"IEND"}
 
 
-def _rechazar(detalle: str) -> None:
+def _rechazar(detalle: str) -> NoReturn:
     raise ErrorRevisor(Codigo.EXPORTACION_NO_VERIFICADA, detalle)
 
 
@@ -60,7 +62,6 @@ def _saltar_exploracion(datos: bytes, inicio: int) -> int:
             return i
         i += 1
     _rechazar("jpeg sin fin de exploración")
-    return i
 
 
 def verificar_png(datos: bytes) -> None:

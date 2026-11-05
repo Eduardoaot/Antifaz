@@ -1,0 +1,108 @@
+import { useEffect, useRef } from 'react';
+import { MARCA, type Fuente, type Regla } from '../../shared/catalogo';
+
+function useModal(alCerrar: () => void): React.RefObject<HTMLDialogElement | null> {
+  const referencia = useRef<HTMLDialogElement | null>(null);
+  useEffect(() => {
+    const dialogo = referencia.current;
+    // Un <dialog> modal atrapa el foco y lo devuelve al cerrar; Escape dispara 'close'.
+    if (dialogo !== null && !dialogo.open) dialogo.showModal();
+    return () => {
+      dialogo?.close();
+    };
+  }, []);
+  const ultimo = useRef(alCerrar);
+  useEffect(() => {
+    ultimo.current = alCerrar;
+  });
+  useEffect(() => {
+    const dialogo = referencia.current;
+    const manejar = (e: Event): void => {
+      e.preventDefault();
+      ultimo.current();
+    };
+    dialogo?.addEventListener('cancel', manejar);
+    return () => {
+      dialogo?.removeEventListener('cancel', manejar);
+    };
+  }, []);
+  return referencia;
+}
+
+interface ConfirmacionProps {
+  titulo: string;
+  texto: string;
+  aceptar: string;
+  cancelar: string;
+  alAceptar: () => void;
+  alCancelar: () => void;
+}
+
+export function Confirmacion({ titulo, texto, aceptar, cancelar, alAceptar, alCancelar }: ConfirmacionProps): React.JSX.Element {
+  const referencia = useModal(alCancelar);
+  return (
+    <dialog ref={referencia} aria-labelledby="titulo-confirmar" className="dialogo">
+      <h2 id="titulo-confirmar">{titulo}</h2>
+      <p>{texto}</p>
+      <div className="fila-botones">
+        <button type="button" className="boton" autoFocus onClick={alCancelar}>{cancelar}</button>
+        <button type="button" className="boton primario" onClick={alAceptar}>{aceptar}</button>
+      </div>
+    </dialog>
+  );
+}
+
+function textoVigencia(f: Fuente): string {
+  if (f.vigente === null) return 'Vigencia sin confirmar';
+  return f.vigente ? 'Vigente' : 'Ya no vigente: se usa solo como referencia';
+}
+
+function textoAlcance(f: Fuente): string {
+  switch (f.alcance) {
+    case 'mexico_federal':
+      return 'México';
+    case 'mexico_local':
+      return 'México (local)';
+    case 'internacional':
+      return 'Otro país';
+    case 'plataforma':
+      return 'Política de plataforma';
+    default: {
+      const inalcanzable: never = f.alcance;
+      throw new Error(`Alcance desconocido: ${String(inalcanzable)}`);
+    }
+  }
+}
+
+export function DialogoPorQue({ regla, alCerrar }: { regla: Regla; alCerrar: () => void }): React.JSX.Element {
+  const referencia = useModal(alCerrar);
+  return (
+    <dialog ref={referencia} aria-labelledby="titulo-porque" className="dialogo ancho">
+      <h2 id="titulo-porque">¿Por qué {MARCA.nombre} te avisa de esto?</h2>
+      <p>{regla.por_que}</p>
+      {regla.estado === 'pendiente_de_verificar' && (
+        <p className="nota"><strong>Aún no tenemos una fuente oficial directa.</strong> {regla.nota}</p>
+      )}
+      {regla.estado === 'verificada' && regla.nota !== undefined && <p className="nota">{regla.nota}</p>}
+      {regla.fuentes.length > 0 && <h3>Fuentes</h3>}
+      <ul className="fuentes">
+        {regla.fuentes.map((f) => (
+          <li key={`${f.url}-${f.resumen}`}>
+            <strong>{f.institucion}.</strong> {f.documento}{f.referencia === undefined ? '' : ` (${f.referencia})`}.
+            <br />
+            {f.resumen}
+            <br />
+            <span className="suave">{textoAlcance(f)} · {textoVigencia(f)} · Consultada el {f.fecha_consulta}</span>
+            <br />
+            <button type="button" className="enlace" onClick={() => { void window.revisor.abrirFuente(f.url); }}>
+              Abrir en el navegador<span className="solo-lector">: {f.documento}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+      <div className="fila-botones">
+        <button type="button" className="boton primario" autoFocus onClick={alCerrar}>Entendido</button>
+      </div>
+    </dialog>
+  );
+}

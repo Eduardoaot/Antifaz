@@ -1,0 +1,66 @@
+name: CI
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: '0 8 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - uses: astral-sh/setup-uv@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Herramientas y catálogo
+        run: |
+          python -m venv .venv
+          .venv\Scripts\pip install -q -r tools\requirements.txt
+          .venv\Scripts\python tools\descargar_modelos.py
+          .venv\Scripts\python tools\validar_catalogo.py
+          .venv\Scripts\python -m unittest tools\test_validar_catalogo.py
+          .venv\Scripts\python tools\revisar_contraste.py
+          .venv\Scripts\python tools\revisar_nombre.py
+
+      - name: Sidecar
+        working-directory: sidecar
+        run: |
+          uv sync --python 3.12
+          .venv\Scripts\ruff check revisor
+          .venv\Scripts\pyright
+          .venv\Scripts\python -m pytest --cov=revisor --cov-branch --cov-report=term-missing
+
+      - name: Interfaz
+        run: |
+          npm ci
+          npm run tipos
+          npm run lint
+          npm run cobertura
+
+      - name: E2E y accesibilidad
+        run: npm run e2e
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: capturas-e2e
+          path: |
+            test-results/
+            tests-ui/capturas/
+          if-no-files-found: ignore
+
+      - name: Fuzzing y propiedades largas (semanal)
+        if: github.event_name == 'schedule'
+        working-directory: sidecar
+        run: .venv\Scripts\python -m pytest --hypothesis-profile=largo

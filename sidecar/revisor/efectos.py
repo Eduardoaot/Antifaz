@@ -26,6 +26,8 @@ SIGMA_REDUCIDO = 16.0
 PIXEL_MIN = 8
 PIXEL_MAX = 256
 INTENSIDAD_REFERENCIA = 80
+# Por debajo no se ve, pero el color se recupera con solo subir el alfa.
+ALFA_INVISIBLE = 8
 
 
 def region_dilatada(o: Ocultamiento, alto: int, ancho: int) -> tuple[int, int, int, int]:
@@ -63,16 +65,13 @@ def _difuminar(
     )
     recorte = salida[cy0:cy1, cx0:cx1, :3]
     factor = max(1, math.ceil(sigma / SIGMA_REDUCIDO))
-    if factor > 1:
-        chico = cv2.resize(
-            recorte,
-            (max(1, recorte.shape[1] // factor), max(1, recorte.shape[0] // factor)),
-            interpolation=cv2.INTER_AREA,
-        )
-        borroso = cv2.GaussianBlur(chico, (0, 0), sigma / factor)
-        borroso = cv2.resize(borroso, (recorte.shape[1], recorte.shape[0]), interpolation=cv2.INTER_LINEAR)
-    else:
-        borroso = cv2.GaussianBlur(recorte, (0, 0), sigma)
+    chico = cv2.resize(
+        recorte,
+        (max(1, recorte.shape[1] // factor), max(1, recorte.shape[0] // factor)),
+        interpolation=cv2.INTER_AREA,
+    )
+    borroso = cv2.GaussianBlur(chico, (0, 0), sigma / factor)
+    borroso = cv2.resize(borroso, (recorte.shape[1], recorte.shape[0]), interpolation=cv2.INTER_LINEAR)
     salida[y0:y1, x0:x1, :3] = borroso[y0 - cy0 : y1 - cy0, x0 - cx0 : x1 - cx0]
 
 
@@ -113,9 +112,11 @@ def _aplicar_efecto(
 
 
 def limpiar_transparentes(pixeles: Pixeles) -> None:
-    """Un píxel con alfa 0 sigue guardando color. Se borra para que no viaje oculto en el archivo."""
+    """Un píxel transparente sigue guardando color. Se borra para que no viaje oculto en el archivo."""
     if pixeles.shape[2] == 4:
-        pixeles[pixeles[:, :, 3] == 0, :3] = 0
+        invisibles = pixeles[:, :, 3] < ALFA_INVISIBLE
+        pixeles[invisibles, :3] = 0
+        pixeles[invisibles, 3] = 0
 
 
 def aplicar(

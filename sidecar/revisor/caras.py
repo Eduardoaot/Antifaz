@@ -47,10 +47,21 @@ def _iou(a: Cara, b: Cara) -> float:
     return interseccion / union if union > 0 else 0.0
 
 
+def _union(a: Cara, b: Cara) -> Cara:
+    x0, y0 = min(a.x, b.x), min(a.y, b.y)
+    x1, y1 = max(a.x + a.ancho, b.x + b.ancho), max(a.y + a.alto, b.y + b.alto)
+    return Cara(x0, y0, x1 - x0, y1 - y0, max(a.confianza, b.confianza))
+
+
 def _sin_duplicados(caras: list[Cara]) -> list[Cara]:
     resultado: list[Cara] = []
     for cara in sorted(caras, key=lambda c: c.confianza, reverse=True):
-        if all(_iou(cara, otra) < IOU_DUPLICADO for otra in resultado):
+        for i, otra in enumerate(resultado):
+            if _iou(cara, otra) >= IOU_DUPLICADO:
+                # Ante la duda, ocultar de más: una detección parcial no debe encoger la caja.
+                resultado[i] = _union(otra, cara)
+                break
+        else:
             resultado.append(cara)
     return resultado
 
