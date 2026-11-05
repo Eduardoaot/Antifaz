@@ -9,7 +9,7 @@ import numpy as np
 import pytest
 from PIL import Image
 
-from revisor import analisis, caras, cargador, contenido
+from revisor import analisis, caras, cargador, contenido, objetos
 from revisor.caras import DetectorCaras, ModeloNoDisponible
 
 from .conftest import DATOS, MODELOS, exif_con_gps, guardar, imagen_prueba
@@ -148,7 +148,12 @@ def _confirmar_con(monkeypatch: pytest.MonkeyPatch, probabilidad: float) -> list
         def zonas(self, _p: object, _u: float) -> list[object]:
             return []
 
+    class SinObjetos:
+        def buscar(self, _p: object) -> list[object]:
+            return []
+
     monkeypatch.setattr(contenido, "revisor_de", lambda _c: Falso())
+    monkeypatch.setattr(objetos, "detector_de", lambda _c: SinObjetos())
     return llamadas
 
 

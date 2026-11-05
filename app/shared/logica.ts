@@ -10,14 +10,31 @@ import {
   type Motivo,
   type Ocultamiento,
 } from './contrato';
+import { leerEnRango } from './numeros';
 
 export const HISTORIAL_PASOS = 100;
+
+export type Herramienta = 'ninguna' | 'clic' | 'rectangulo';
+
+export interface Caja {
+  x: number;
+  y: number;
+  ancho: number;
+  alto: number;
+}
+
+export interface ZonaManual extends Caja {
+  id: string;
+  efecto: Efecto;
+  mascara_id: string | null;
+}
 
 export interface Revision {
   decisiones: Readonly<Record<string, Decision>>;
   efectos: Readonly<Record<string, Efecto>>;
   intensidad: number;
   hayMenores: boolean | null;
+  manuales: readonly ZonaManual[];
 }
 
 export const REVISION_INICIAL: Revision = {
@@ -25,6 +42,7 @@ export const REVISION_INICIAL: Revision = {
   efectos: {},
   intensidad: LIMITES.intensidad.porDefecto,
   hayMenores: null,
+  manuales: [],
 };
 
 export interface Historial {
@@ -107,6 +125,21 @@ export function construirOcultamientos(r: Revision, hallazgos: readonly Hallazgo
       intensidad: r.intensidad,
       dilatacion_px: LIMITES.dilatacionPx.porDefecto,
       dilatacion_pct: LIMITES.dilatacionPct.porDefecto,
+      mascara_id: null,
+    });
+  }
+  for (const z of r.manuales) {
+    salida.push({
+      x: z.x,
+      y: z.y,
+      ancho: z.ancho,
+      alto: z.alto,
+      efecto: z.efecto,
+      intensidad: r.intensidad,
+      dilatacion_px: LIMITES.dilatacionPx.porDefecto,
+      // Una zona dibujada a mano ya es lo que se pidió: solo lleva el margen mínimo.
+      dilatacion_pct: z.mascara_id === null ? 0 : LIMITES.dilatacionPct.porDefecto,
+      mascara_id: z.mascara_id,
     });
   }
   return salida;
@@ -127,6 +160,10 @@ const NOMBRE_REVISADO: Readonly<Record<string, string>> = {
   'EXT-01': 'símbolos extremistas',
   'CON-01': 'datos en texto legible (contacto, documentos, finanzas, salud y viajes)',
   'COD-01': 'códigos QR y de barras',
+  'MAT-01': 'placas',
+  'PAN-01': 'pantallas',
+  'VAL-02': 'joyas',
+  'UBI-04': 'letreros',
 };
 
 /** Dice qué se revisó de verdad en esta foto, no lo que la app sabría revisar. */
@@ -177,6 +214,10 @@ export function textoMotivo(motivo: Motivo): string {
       return 'La detección de caras falló, así que no revisamos si hay personas.';
     case 'contenido_no_disponible':
       return 'Faltan los modelos de contenido, así que no revisamos desnudez, contenido sugerente, armas ni extremismo.';
+    case 'objetos_no_disponible':
+      return 'Falta el detector de objetos, así que no revisamos placas, pantallas, joyas ni letreros.';
+    case 'objetos_fallo':
+      return 'El detector de objetos falló, así que no revisamos placas, pantallas, joyas ni letreros.';
     case 'texto_fallo':
       return 'No pudimos leer el texto de la imagen, así que no revisamos teléfonos, correos ni documentos.';
     case 'codigos_fallo':
@@ -265,6 +306,104 @@ export function textoConfirmacion(faltan: number, parcial: boolean): string {
   return partes.join(' ');
 }
 
+export const efectoManual = (z: ZonaManual): Efecto => z.efecto;
+
+export function agregarManual(r: Revision, id: string, caja: Caja, mascaraId: string | null): Revision {
+  return { ...r, manuales: [...r.manuales, { ...caja, id, efecto: 'solido', mascara_id: mascaraId }] };
+}
+
+export function quitarManual(r: Revision, id: string): Revision {
+  return { ...r, manuales: r.manuales.filter((z) => z.id !== id) };
+}
+
+export function efectoDeManual(r: Revision, id: string, efecto: Efecto): Revision {
+  return { ...r, manuales: r.manuales.map((z) => (z.id === id ? { ...z, efecto } : z)) };
+}
+
+export const cubreTodo = (c: Caja, ancho: number, alto: number): boolean =>
+  c.x === 0 && c.y === 0 && c.ancho >= ancho && c.alto >= alto;
+
+interface Marco {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
+/** Pasa un punto de la pantalla a la imagen. Devuelve null si cae fuera, salvo que se pida ajustarlo al borde. */
+export function aPuntoDeImagen(
+  clienteX: number,
+  clienteY: number,
+  marco: Marco,
+  ancho: number,
+  alto: number,
+  ajustar = false,
+): { x: number; y: number } | null {
+  if (marco.width <= 0 || marco.height <= 0) return null;
+  const x = Math.floor(((clienteX - marco.left) / marco.width) * ancho);
+  const y = Math.floor(((clienteY - marco.top) / marco.height) * alto);
+  if (ajustar) return { x: Math.min(ancho - 1, Math.max(0, x)), y: Math.min(alto - 1, Math.max(0, y)) };
+  return x >= 0 && y >= 0 && x < ancho && y < alto ? { x, y } : null;
+}
+
+/** Rectángulo entre dos puntos, sin importar en qué dirección se arrastró. Un clic sin arrastrar no cuenta. */
+export function cajaEntre(a: { x: number; y: number }, b: { x: number; y: number }): Caja | null {
+  const ancho = Math.abs(a.x - b.x) + 1;
+  const alto = Math.abs(a.y - b.y) + 1;
+  if (ancho < 2 || alto < 2) return null;
+  return { x: Math.min(a.x, b.x), y: Math.min(a.y, b.y), ancho, alto };
+}
+
+export type CajaLeida = { ok: true; caja: Caja } | { ok: false; mensaje: string };
+export type PuntoLeido = { ok: true; x: number; y: number } | { ok: false; mensaje: string };
+
+export function leerPunto(textoX: string, textoY: string, ancho: number, alto: number): PuntoLeido {
+  const x = leerEnRango(textoX, 0, ancho - 1);
+  const y = leerEnRango(textoY, 0, alto - 1);
+  if (!x.ok || !y.ok) return { ok: false, mensaje: `Escribe X de 0 a ${ancho - 1} y Y de 0 a ${alto - 1}.` };
+  return { ok: true, x: x.valor, y: y.valor };
+}
+
+export function leerCaja(v: { x: string; y: string; ancho: string; alto: string }, ancho: number, alto: number): CajaLeida {
+  const punto = leerPunto(v.x, v.y, ancho, alto);
+  if (!punto.ok) return punto;
+  const w = leerEnRango(v.ancho, 1, ancho);
+  const h = leerEnRango(v.alto, 1, alto);
+  if (!w.ok || !h.ok) return { ok: false, mensaje: `Escribe un ancho de 1 a ${ancho} y un alto de 1 a ${alto}.` };
+  if (punto.x + w.valor > ancho || punto.y + h.valor > alto) return { ok: false, mensaje: 'Esa zona se sale de la imagen. Ajusta los valores.' };
+  return { ok: true, caja: { x: punto.x, y: punto.y, ancho: w.valor, alto: h.valor } };
+}
+
+const TITULO_CATEGORIA: Readonly<Record<string, string>> = {
+  caras_terceros: 'Personas',
+  posibles_menores: 'Personas',
+  desnudez: 'Contenido íntimo o sugerente',
+  contenido_sugerente: 'Contenido íntimo o sugerente',
+  armas: 'Armas y grupos armados',
+  extremismo: 'Armas y grupos armados',
+  documentos_identidad: 'Documentos y datos',
+  informacion_financiera: 'Documentos y datos',
+  contacto_personal: 'Documentos y datos',
+  informacion_medica: 'Documentos y datos',
+  boletos_viajes: 'Viajes y ubicación',
+  ubicacion: 'Viajes y ubicación',
+  matriculas: 'Viajes y ubicación',
+  objetos_valor: 'Objetos y pantallas',
+  pantallas: 'Objetos y pantallas',
+  codigos: 'Objetos y pantallas',
+};
+
+/** Reglas agrupadas por tema, para la Guía de privacidad. */
+export function agruparReglas(): { titulo: string; reglas: Regla[] }[] {
+  const grupos = new Map<string, Regla[]>();
+  for (const regla of catalogo.reglas) {
+    const titulo = TITULO_CATEGORIA[regla.categoria];
+    if (titulo === undefined) throw new Error(`Categoría sin título: ${regla.categoria}`);
+    grupos.set(titulo, [...(grupos.get(titulo) ?? []), regla]);
+  }
+  return [...grupos].map(([titulo, reglas]) => ({ titulo, reglas }));
+}
+
 export function aEdicion(archivoId: string, r: Revision): Edicion {
   return {
     archivoId,
@@ -272,11 +411,12 @@ export function aEdicion(archivoId: string, r: Revision): Edicion {
     efectos: { ...r.efectos },
     intensidad: r.intensidad,
     hayMenores: r.hayMenores,
+    manuales: r.manuales.map((z) => ({ ...z })),
   };
 }
 
 export function desdeEdicion(e: Edicion): Revision {
-  return { decisiones: e.decisiones, efectos: e.efectos, intensidad: e.intensidad, hayMenores: e.hayMenores };
+  return { decisiones: e.decisiones, efectos: e.efectos, intensidad: e.intensidad, hayMenores: e.hayMenores, manuales: e.manuales };
 }
 
 export function hayCambios(r: Revision): boolean {
@@ -284,6 +424,7 @@ export function hayCambios(r: Revision): boolean {
     Object.keys(r.decisiones).length > 0 ||
     Object.keys(r.efectos).length > 0 ||
     r.hayMenores !== null ||
+    r.manuales.length > 0 ||
     r.intensidad !== LIMITES.intensidad.porDefecto
   );
 }

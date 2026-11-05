@@ -53,6 +53,32 @@ Agregada a pedido del responsable el 6 de noviembre de 2026; no estaba en el bri
 
 **Fuentes de Meta:** las políticas sobre organizaciones peligrosas y bienes restringidos llegan truncadas a la lectura automática, así que el responsable pegó su texto desde el navegador. La primera respalda EXT-01. La segunda regula vender y promover armas, pero no prohíbe mostrarlas, por lo que ARM-01 sigue pendiente.
 
+## Detector de objetos
+
+Elegido [OWL-ViT cuantizado](https://huggingface.co/Xenova/owlvit-base-patch32) ([Apache-2.0](https://huggingface.co/google/owlvit-base-patch32)): 155 MB y 0.7 s en este CPU. OWLv2 detectó mejor las armas (0.65 frente a 0.33), pero tarda 8 s por imagen.
+
+**Medido con 197 fotos de Wikimedia Commons**, 8 por tema y con etiquetas por búsqueda, así que algunas pueden no contener el objeto. No se versionan. Encontradas en su tema y falsas alarmas en 93 fotos normales, con el umbral elegido:
+
+| Clase | Umbral | Encuentra | Falsas |
+|---|---|---|---|
+| Placas | 0.1 | 75% | 1% |
+| Celulares | 0.2 | 88% | 1% |
+| Monitores | 0.2 | 75% | 0% |
+| TV | 0.2 | 50% | 0% |
+| Tarjetas | 0.15 | 62% | 1% |
+| Joyas | 0.15 | 88% | 1% |
+| Letreros | 0.1 | 50% | 4% |
+| Rifles y soldados | 0.3 | 75% | 4% |
+| Pistolas | 0.3 | 75% | 4% |
+| Banderas | 0.2 | 88% | 0% |
+
+**No se incluyen:** gafetes (12%), llaves (0%) y números de casa (0%), porque casi no se detectan. Esas reglas siguen como no revisadas. El efectivo no se midió.
+
+**Falsas alarmas corregidas con esta medición:**
+- **Desnudez:** marcaba celulares, comida, monitores y tarjetas, con confianza hasta 0.66 y escena hasta 0.10. Ahora, por debajo de 0.7, la zona solo cuenta si la escena la respalda. **No se midió cuántos desnudos reales se escaparían:** a propósito no se descargaron imágenes de ese tipo.
+- **Extremismo:** 5 de 8 fotos de protestas salían marcadas (de 0.42 a 0.50). El corte subió a 0.6, y una bandera solo cuenta si la escena ya parece extremista. Una foto de esa muestra dio 0.98 y no se abrió para revisarla.
+- **Armas:** las pistolas de juguete dan aviso (5 de 8). Se deja así, porque el aviso dice "podría".
+
 ## Confianza del detector de caras
 
 Medido el 6 de noviembre de 2026 con YuNet, en una muestra pequeña que no se versiona. **No sustituye a un dataset de evaluación.**

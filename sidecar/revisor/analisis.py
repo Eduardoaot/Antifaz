@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from . import codigos, contenido, texto
+from . import codigos, contenido, objetos, texto
 from .caras import Cara, DetectorCaras, ModeloNoDisponible
 from .cargador import ImagenCargada
 
@@ -17,6 +17,11 @@ REGLA_DE_METADATOS = "UBI-01"
 REGLAS_DE_CONTENIDO = ("ARM-01", "EXT-01", "DES-01", "SUG-01")
 # Medido en una muestra chica: imágenes comunes hasta 0.19, ejemplos de riesgo desde 0.71.
 UMBRAL_ESCENA = 0.35
+# Las protestas con banderas comunes dieron hasta 0.50, y los ejemplos reales desde 0.72.
+UMBRAL_ESCENA_EXTREMISMO = 0.6
+# Falsas alarmas de desnudez: confianza hasta 0.66 con escena hasta 0.10 (celulares, comida, monitores).
+DESNUDEZ_SEGURA = 0.7
+ESCENA_RESPALDA_DESNUDEZ = 0.1
 UMBRAL_ZONAS = 0.25
 # Medido en una muestra chica: falsas alarmas hasta 0.49, caras reales dudosas desde 0.82.
 UMBRAL_CONFIRMAR_CARA = 0.6
@@ -52,6 +57,16 @@ def _ampliar(
     }
 
 
+def _umbral_escena(regla: str) -> float:
+    return UMBRAL_ESCENA_EXTREMISMO if regla == "EXT-01" else UMBRAL_ESCENA
+
+
+def _zona_creible(zona: contenido.Zona, escena: dict[str, float]) -> bool:
+    if zona.regla_id != "DES-01" or zona.confianza >= DESNUDEZ_SEGURA:
+        return True
+    return escena["DES-01"] + escena["SUG-01"] >= ESCENA_RESPALDA_DESNUDEZ
+
+
 def _confirmar_dudosas(
     caras: list[Cara], imagen: ImagenCargada, carpeta_modelos: Any, umbral_revision: float
 ) -> list[Cara]:
@@ -75,6 +90,44 @@ def _confirmar_dudosas(
         return caras
 
 
+def _revisar_objetos(
+    imagen: ImagenCargada,
+    carpeta_modelos: Any,
+    umbral_revision: float,
+    escena: dict[str, float],
+    hallazgos: list[dict[str, object]],
+    motivos: list[str],
+    revisadas: list[str],
+) -> set[str]:
+    """Devuelve las reglas que ya tienen zona, para no repetir su aviso general."""
+    try:
+        encontrados = objetos.detector_de(carpeta_modelos).buscar(imagen.pixeles)
+    except ModeloNoDisponible as e:
+        registro.error("Detector de objetos no disponible: %s", e)
+        motivos.append("objetos_no_disponible")
+        return set()
+    except Exception as e:  # noqa: BLE001 - parcial, nunca limpio
+        registro.error("Falló el detector de objetos: %s", type(e).__name__)
+        motivos.append("objetos_fallo")
+        return set()
+    revisadas.extend(objetos.REGLAS_DE_OBJETOS)
+    # Una bandera no significa nada por sí sola: solo cuenta si la escena ya parece extremista.
+    extremista = escena["EXT-01"] >= UMBRAL_ESCENA_EXTREMISMO
+    validos = [o for o in encontrados if o.regla_id != "EXT-01" or extremista]
+    for i, o in enumerate(validos):
+        hallazgos.append(
+            {
+                "id": f"objeto-{i}",
+                "regla_id": o.regla_id,
+                "caja": {"x": o.x, "y": o.y, "ancho": o.ancho, "alto": o.alto},
+                "confianza": round(o.confianza, 3),
+                "requiere_revision": o.confianza < umbral_revision,
+                "posicion": describir_posicion(o.x, o.y, o.ancho, o.alto, imagen.ancho, imagen.alto),
+            }
+        )
+    return {o.regla_id for o in validos}
+
+
 def _revisar_contenido(
     imagen: ImagenCargada,
     carpeta_modelos: Any,
@@ -96,6 +149,7 @@ def _revisar_contenido(
         motivos.append("contenido_fallo")
         return
     revisadas.extend(REGLAS_DE_CONTENIDO)
+    zonas = [z for z in zonas if _zona_creible(z, escena)]
     for i, zona in enumerate(zonas):
         hallazgos.append(
             {
@@ -109,10 +163,12 @@ def _revisar_contenido(
                 ),
             }
         )
-    con_zona = {zona.regla_id for zona in zonas}
+    con_zona = {zona.regla_id for zona in zonas} | _revisar_objetos(
+        imagen, carpeta_modelos, umbral_revision, escena, hallazgos, motivos, revisadas
+    )
     for regla in REGLAS_DE_CONTENIDO:
         # Si ya se sabe dónde está, el aviso por zona lo cubre.
-        if escena[regla] >= UMBRAL_ESCENA and regla not in con_zona:
+        if escena[regla] >= _umbral_escena(regla) and regla not in con_zona:
             hallazgos.append(
                 {
                     "id": f"escena-{regla}",

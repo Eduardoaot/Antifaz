@@ -137,7 +137,7 @@ class Zona:
     confianza: float
 
 
-def _leer_verificado(ruta: Path, esperado: str) -> bytes:
+def leer_verificado(ruta: Path, esperado: str) -> bytes:
     try:
         contenido = ruta.read_bytes()
     except OSError as e:
@@ -147,7 +147,7 @@ def _leer_verificado(ruta: Path, esperado: str) -> bytes:
     return contenido
 
 
-def _sesion(contenido: bytes) -> ort.InferenceSession:
+def nueva_sesion(contenido: bytes) -> ort.InferenceSession:
     opciones = ort.SessionOptions()
     opciones.log_severity_level = 3
     return ort.InferenceSession(contenido, opciones, providers=["CPUExecutionProvider"])
@@ -186,10 +186,10 @@ def decodificar_zonas(salida: Any, ancho: int, alto: int, umbral: float) -> list
 class RevisorContenido:
     def __init__(self, carpeta: Path) -> None:
         tokenizador = Tokenizer.from_str(
-            _leer_verificado(carpeta / ARCHIVO_TOKENIZADOR, SHA256_TOKENIZADOR).decode("utf-8")
+            leer_verificado(carpeta / ARCHIVO_TOKENIZADOR, SHA256_TOKENIZADOR).decode("utf-8")
         )
-        self._clip = _sesion(_leer_verificado(carpeta / ARCHIVO_CLIP, SHA256_CLIP))
-        self._nudenet = _sesion(_leer_verificado(carpeta / ARCHIVO_NUDENET, SHA256_NUDENET))
+        self._clip = nueva_sesion(leer_verificado(carpeta / ARCHIVO_CLIP, SHA256_CLIP))
+        self._nudenet = nueva_sesion(leer_verificado(carpeta / ARCHIVO_NUDENET, SHA256_NUDENET))
         tokenizador.enable_padding(pad_id=RELLENO_TEXTO, length=LARGO_TEXTO)
         tokenizador.enable_truncation(LARGO_TEXTO)
         self._frases = [f for grupo in FRASES_RIESGO.values() for f in grupo] + list(FRASES_NEUTRAS)

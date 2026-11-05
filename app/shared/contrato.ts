@@ -32,6 +32,7 @@ export const esquemaOcultamiento = z.strictObject({
   intensidad: enteroEnRango(LIMITES.intensidad.min, LIMITES.intensidad.max),
   dilatacion_px: enteroEnRango(LIMITES.dilatacionPx.min, LIMITES.dilatacionPx.max),
   dilatacion_pct: z.number().min(LIMITES.dilatacionPct.min).max(LIMITES.dilatacionPct.max),
+  mascara_id: z.string().min(1).max(64).nullable(),
 });
 export type Ocultamiento = z.infer<typeof esquemaOcultamiento>;
 
@@ -51,7 +52,7 @@ export const esquemaHallazgo = z.strictObject({
 });
 export type Hallazgo = z.infer<typeof esquemaHallazgo>;
 
-export const esquemaMotivo = z.enum(['metadatos', 'demasiado_pequena', 'modelo_no_disponible', 'deteccion_fallo', 'contenido_no_disponible', 'contenido_fallo', 'texto_fallo', 'codigos_fallo']);
+export const esquemaMotivo = z.enum(['metadatos', 'demasiado_pequena', 'modelo_no_disponible', 'deteccion_fallo', 'contenido_no_disponible', 'contenido_fallo', 'texto_fallo', 'codigos_fallo', 'objetos_no_disponible', 'objetos_fallo']);
 export type Motivo = z.infer<typeof esquemaMotivo>;
 
 export const esquemaAnalisis = z.strictObject({
@@ -72,6 +73,12 @@ export const esquemaImagenAbierta = z.strictObject({
   tiene_alfa: z.boolean(),
   huella: z.string().length(64),
 });
+
+export const esquemaSegmentado = z.strictObject({
+  mascara_id: z.string().min(1),
+  caja: z.strictObject({ x: z.number().int(), y: z.number().int(), ancho: z.number().int(), alto: z.number().int() }),
+});
+export type Segmentado = z.infer<typeof esquemaSegmentado>;
 
 export const esquemaExportado = z.strictObject({
   formato: z.string(),
@@ -113,12 +120,23 @@ export const esquemaDecision = z.enum(['ocultar', 'ignorar']);
 export type Decision = z.infer<typeof esquemaDecision>;
 
 /** Ediciones que sobreviven a un cierre de golpe. Nunca lleva píxeles ni rutas al renderer. */
+const esquemaManual = z.strictObject({
+  id: z.string().min(1).max(64),
+  x: enteroEnRango(0, LIMITES.ladoMax - 1),
+  y: enteroEnRango(0, LIMITES.ladoMax - 1),
+  ancho: enteroEnRango(1, LIMITES.ladoMax),
+  alto: enteroEnRango(1, LIMITES.ladoMax),
+  efecto: esquemaEfecto,
+  mascara_id: z.string().min(1).max(64).nullable(),
+});
+
 export const esquemaEdicion = z.strictObject({
   archivoId: esquemaArchivoId,
   decisiones: z.record(z.string(), esquemaDecision),
   efectos: z.record(z.string(), esquemaEfecto),
   intensidad: enteroEnRango(LIMITES.intensidad.min, LIMITES.intensidad.max),
   hayMenores: z.boolean().nullable(),
+  manuales: z.array(esquemaManual).max(LIMITES.ocultamientos).default([]),
 });
 export type Edicion = z.infer<typeof esquemaEdicion>;
 
@@ -142,6 +160,7 @@ export interface ApiRevisor {
   analizar(id: string): Promise<Resultado<Analisis>>;
   vista(id: string, ocultamientos: Ocultamiento[]): Promise<Resultado<Vista>>;
   exportar(id: string, ocultamientos: Ocultamiento[]): Promise<Resultado<Exportado | null>>;
+  segmentar(id: string, x: number, y: number): Promise<Resultado<Segmentado>>;
   cerrar(id: string): Promise<void>;
   cancelar(): Promise<void>;
   abrirFuente(url: string): Promise<void>;

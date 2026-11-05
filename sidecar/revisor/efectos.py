@@ -8,10 +8,12 @@ porque se ven naturales, aunque técnicas de reconstrucción podrían recuperar 
 from __future__ import annotations
 
 import math
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import assert_never
 
 import cv2
+import numpy as np
+from numpy.typing import NDArray
 
 from .cargador import Pixeles
 from .errores import Codigo, ErrorRevisor
@@ -108,19 +110,46 @@ def limpiar_transparentes(pixeles: Pixeles) -> None:
         pixeles[invisibles, 3] = 0
 
 
+def _silueta(
+    o: Ocultamiento,
+    region: tuple[int, int, int, int],
+    mascaras: Mapping[str, NDArray[np.bool_]],
+) -> NDArray[np.bool_] | None:
+    """Silueta con su margen, en coordenadas de la región. None significa ocultar toda la caja."""
+    mascara = mascaras.get(o.mascara_id) if o.mascara_id is not None else None
+    if mascara is None or mascara.shape != (o.alto, o.ancho):
+        return None
+    x0, y0, x1, y1 = region
+    lienzo = np.zeros((y1 - y0, x1 - x0), dtype=np.uint8)
+    lienzo[o.y - y0 : o.y - y0 + o.alto, o.x - x0 : o.x - x0 + o.ancho] = mascara.astype(np.uint8)
+    margen = max(o.dilatacion_px, math.ceil(min(o.ancho, o.alto) * o.dilatacion_pct / 100))
+    nucleo = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * margen + 1, 2 * margen + 1))
+    return cv2.dilate(lienzo, nucleo).astype(bool)
+
+
 def aplicar(
-    pixeles: Pixeles, ocultamientos: Sequence[Ocultamiento]
+    pixeles: Pixeles,
+    ocultamientos: Sequence[Ocultamiento],
+    mascaras: Mapping[str, NDArray[np.bool_]] | None = None,
 ) -> tuple[Pixeles, list[tuple[int, int, int, int]]]:
     """Devuelve una copia con las zonas ocultas y sus regiones finales. No modifica la entrada."""
+    siluetas = mascaras if mascaras is not None else {}
     alto, ancho = pixeles.shape[:2]
     regiones = [region_dilatada(o, alto, ancho) for o in ocultamientos]
     # Los bloques sólidos van primero: un difuminado vecino no debe tomar color de lo que tapan.
     fuente = pixeles.copy()
-    for o, (x0, y0, x1, y1) in zip(ocultamientos, regiones, strict=True):
+    recortes = [_silueta(o, r, siluetas) for o, r in zip(ocultamientos, regiones, strict=True)]
+    for o, (x0, y0, x1, y1), silueta in zip(ocultamientos, regiones, recortes, strict=True):
         if o.efecto == "solido":
-            fuente[y0:y1, x0:x1, :3] = COLOR_SOLIDO
+            if silueta is None:
+                fuente[y0:y1, x0:x1, :3] = COLOR_SOLIDO
+            else:
+                fuente[y0:y1, x0:x1, :3][silueta] = COLOR_SOLIDO
     salida = fuente.copy()
-    for o, (x0, y0, x1, y1) in zip(ocultamientos, regiones, strict=True):
+    for o, (x0, y0, x1, y1), silueta in zip(ocultamientos, regiones, recortes, strict=True):
+        previo = salida[y0:y1, x0:x1].copy()
         _aplicar_efecto(salida, fuente, o.efecto, x0, y0, x1, y1, o.intensidad)
+        if silueta is not None:
+            salida[y0:y1, x0:x1][~silueta] = previo[~silueta]
     limpiar_transparentes(salida)
     return salida, regiones

@@ -63,7 +63,8 @@ Cada parámetro de este archivo tiene pruebas parametrizadas de mínimo-1, míni
 | `mascara.cobertura` | decimal, % de la imagen | Más de 0 | 100 | Calculado | 0%: se rechaza con "La máscara está vacía". 100%: se permite tras confirmar |
 | `pincel.tamano_px` | entero, px | 1 | 512 | 32 | Estándar |
 | `rectangulo.x`, `rectangulo.y` | entero, px | 0 | Ancho-1, alto-1 | n/a | Estándar |
-| `rectangulo.ancho`, `rectangulo.alto` | entero, px | 1 | Hasta el borde de la imagen | n/a | Estándar. No se recorta en silencio |
+| `rectangulo.ancho`, `rectangulo.alto` | entero, px | 1 | Hasta el borde de la imagen | n/a | Estándar. No se recorta en silencio. Si cubre toda la imagen, se pide confirmar |
+| `silueta.margen` | Igual que `mascara.dilatacion_px` y `dilatacion_pct` | n/a | n/a | n/a | Si la silueta ya no está en memoria, se oculta toda su caja |
 
 ## Detección
 
@@ -72,7 +73,9 @@ Cada parámetro de este archivo tiene pruebas parametrizadas de mínimo-1, míni
 | `deteccion.umbral_confianza` | decimal | 0 | 1 | 0.25 (propuesta, favorece recall) | Estándar |
 | `deteccion.umbral_revision` | decimal | 0 | 1 | 0.6 (medido en una muestra chica) | Estándar. Debe ser mayor o igual que `umbral_confianza`, o se rechaza. Por debajo se dice "podría ser una cara" y no se pregunta por menores |
 | `caras.umbral_confirmar` | decimal | n/a | n/a | 0.6 (medido en una muestra chica) | Constante interna. Una detección dudosa por debajo de este valor se descarta. Si no se puede confirmar, se conserva |
-| `contenido.umbral_escena` | decimal | n/a | n/a | 0.35 (medido en una muestra chica) | Constante interna. Por encima se avisa sobre toda la imagen |
+| `contenido.umbral_escena` | decimal | n/a | n/a | 0.35; extremismo 0.6 (medido en una muestra chica) | Constante interna. Por encima se avisa sobre toda la imagen |
+| `contenido.desnudez_segura` | decimal | n/a | n/a | 0.7 (medido en una muestra chica) | Constante interna. Por debajo, la zona solo cuenta si la escena suma 0.1 o más en desnudez y sugerente |
+| `objetos.umbral` | decimal, por clase | n/a | n/a | Placa y letrero 0.1; joya y tarjeta 0.15; pantallas y bandera 0.2; armas 0.3 (medido en una muestra chica) | Constante interna |
 | `contenido.umbral_zonas` | decimal | n/a | n/a | 0.25 (propuesta, favorece recall) | Constante interna. Por debajo de `umbral_revision` se marca con duda |
 | `ocr.umbral_texto` | decimal | 0 | 1 | 0.3 (propuesta) | Estándar |
 | `clic.x`, `clic.y` | entero, px de la imagen original | 0 | Ancho-1, alto-1 | n/a | Fuera de la imagen: se ignora y se avisa "Ese punto queda fuera de la imagen". El sidecar lo rechaza |

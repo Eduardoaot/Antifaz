@@ -6,21 +6,31 @@ import {
   HISTORIAL_PASOS,
   REVISION_INICIAL,
   aEdicion,
+  aPuntoDeImagen,
+  agregarManual,
+  agruparReglas,
   aplicarCambio,
   aplicarDecisionesIniciales,
+  cajaEntre,
   construirOcultamientos,
+  cubreTodo,
   decidir,
   desdeEdicion,
   describirHallazgo,
   deshacer,
+  efectoDeManual,
+  efectoManual,
   efectoDe,
   elegirEfecto,
   hayCambios,
+  leerCaja,
+  leerPunto,
   nuevoHistorial,
   ocultarRiesgoAlto,
   ocultarTodo,
   ordenarHallazgos,
   pendientes,
+  quitarManual,
   rehacer,
   reglasNoRevisadas,
   soloAvisaSinZona,
@@ -185,7 +195,7 @@ describe('veredicto: una falla nunca parece limpia', () => {
     );
   });
 
-  it.each(['metadatos', 'demasiado_pequena', 'modelo_no_disponible', 'deteccion_fallo', 'contenido_no_disponible', 'contenido_fallo', 'texto_fallo', 'codigos_fallo'] as Motivo[])('motivo %s tiene texto', (m) => {
+  it.each(['metadatos', 'demasiado_pequena', 'modelo_no_disponible', 'deteccion_fallo', 'contenido_no_disponible', 'contenido_fallo', 'texto_fallo', 'codigos_fallo', 'objetos_no_disponible', 'objetos_fallo'] as Motivo[])('motivo %s tiene texto', (m) => {
     expect(textoMotivo(m).length).toBeGreaterThan(0);
   });
 
@@ -222,8 +232,9 @@ describe('texto para lector de pantalla', () => {
   });
 
   it('otras reglas usan el texto del catálogo', () => {
-    expect(describirHallazgo({ ...cara('a'), regla_id: 'MAT-01' })).toContain('Placas');
-    expect(describirHallazgo({ ...cara('a'), regla_id: 'MAT-01', posicion: null })).toBe('Placas de autos y motos.');
+    expect(describirHallazgo({ ...cara('a'), regla_id: 'MAT-01' })).toBe('Podría ser una matrícula al centro.');
+    expect(describirHallazgo({ ...cara('a'), regla_id: 'MAT-01', posicion: null })).toBe('Podría ser una matrícula.');
+    expect(describirHallazgo({ ...cara('a'), regla_id: 'UBI-02', posicion: null })).toBe('Fachadas de casas y números de domicilio.');
   });
 });
 
@@ -279,6 +290,116 @@ describe('revisión de contenido', () => {
     const parcial: Analisis = { hallazgos: [], cobertura: { completa: false, motivos: ['contenido_fallo'], reglas_revisadas: ['UBI-01'] } };
     expect(textoRevisado(parcial)).toContain('En esta foto revisamos: ubicación guardada en el archivo.');
     expect(textoRevisado({ ...parcial, cobertura: { ...parcial.cobertura, reglas_revisadas: [] } })).toContain('no pudimos revisar nada');
+  });
+});
+
+describe('zonas manuales', () => {
+  const caja = { x: 10, y: 20, ancho: 30, alto: 40 };
+
+  it('se agrega, cambia y quita, con bloque sólido por defecto', () => {
+    const r = agregarManual(REVISION_INICIAL, 'm', caja, null);
+    expect(efectoManual(r.manuales[0]!)).toBe('solido');
+    expect(efectoDeManual(r, 'm', 'pixelado').manuales[0]?.efecto).toBe('pixelado');
+    expect(efectoDeManual(r, 'otra', 'pixelado').manuales[0]?.efecto).toBe('solido');
+    expect(quitarManual(r, 'm').manuales).toEqual([]);
+    expect(hayCambios(r)).toBe(true);
+  });
+
+  it('llega al sidecar y cumple el contrato', () => {
+    const r = agregarManual(agregarManual(REVISION_INICIAL, 'a', caja, null), 'b', caja, 'mascara');
+    const lista = construirOcultamientos(r, []);
+    expect(lista.map((o) => o.mascara_id)).toEqual([null, 'mascara']);
+    expect(lista[0]?.dilatacion_pct).toBe(0);
+    expect(lista[1]?.dilatacion_pct).toBe(10);
+    expect(lista.every((o) => esquemaOcultamiento.safeParse(o).success)).toBe(true);
+  });
+
+  it('sobrevive a la recuperación', () => {
+    const r = agregarManual(REVISION_INICIAL, 'm', caja, 'x');
+    const e = aEdicion('6f9619ff-8b86-4011-b42d-00c04fc964ff', r);
+    expect(esquemaEdicion.parse(e).manuales).toHaveLength(1);
+    expect(desdeEdicion(e).manuales[0]?.mascara_id).toBe('x');
+    const { manuales: _m, ...vieja } = e;
+    expect(esquemaEdicion.parse(vieja).manuales).toEqual([]);
+  });
+
+  it('detecta una zona que cubre todo', () => {
+    expect(cubreTodo({ x: 0, y: 0, ancho: 100, alto: 50 }, 100, 50)).toBe(true);
+    expect(cubreTodo({ x: 1, y: 0, ancho: 99, alto: 50 }, 100, 50)).toBe(false);
+    expect(cubreTodo({ x: 0, y: 0, ancho: 99, alto: 50 }, 100, 50)).toBe(false);
+  });
+});
+
+describe('coordenadas', () => {
+  const marco = { left: 100, top: 50, width: 200, height: 100 };
+
+  it('convierte de pantalla a imagen', () => {
+    expect(aPuntoDeImagen(100, 50, marco, 1000, 500)).toEqual({ x: 0, y: 0 });
+    expect(aPuntoDeImagen(299, 149, marco, 1000, 500)).toEqual({ x: 995, y: 495 });
+  });
+
+  it.each([[99, 60], [100, 49], [300, 60], [150, 150]])('fuera de la imagen: %i, %i', (x, y) => {
+    expect(aPuntoDeImagen(x, y, marco, 1000, 500)).toBeNull();
+  });
+
+  it('al arrastrar afuera se ajusta al borde', () => {
+    expect(aPuntoDeImagen(9999, 9999, marco, 1000, 500, true)).toEqual({ x: 999, y: 499 });
+    expect(aPuntoDeImagen(-9999, -9999, marco, 1000, 500, true)).toEqual({ x: 0, y: 0 });
+  });
+
+  it('un marco sin tamaño no divide entre cero', () => {
+    expect(aPuntoDeImagen(1, 1, { left: 0, top: 0, width: 0, height: 0 }, 10, 10)).toBeNull();
+  });
+
+  it('propiedad: todo punto ajustado cae dentro de la imagen', () => {
+    fc.assert(
+      fc.property(fc.integer({ min: -5000, max: 5000 }), fc.integer({ min: -5000, max: 5000 }), fc.integer({ min: 1, max: 30000 }), fc.integer({ min: 1, max: 30000 }), (x, y, w, h) => {
+        const p = aPuntoDeImagen(x, y, marco, w, h, true);
+        return p !== null && p.x >= 0 && p.y >= 0 && p.x < w && p.y < h;
+      }),
+    );
+  });
+
+  it('el rectángulo no depende de la dirección del arrastre', () => {
+    const c = { x: 10, y: 10, ancho: 11, alto: 21 };
+    expect(cajaEntre({ x: 10, y: 10 }, { x: 20, y: 30 })).toEqual(c);
+    expect(cajaEntre({ x: 20, y: 30 }, { x: 10, y: 10 })).toEqual(c);
+    expect(cajaEntre({ x: 20, y: 10 }, { x: 10, y: 30 })).toEqual(c);
+  });
+
+  it('un clic sin arrastrar no crea una zona', () => {
+    expect(cajaEntre({ x: 5, y: 5 }, { x: 5, y: 5 })).toBeNull();
+    expect(cajaEntre({ x: 5, y: 5 }, { x: 5, y: 50 })).toBeNull();
+  });
+});
+
+describe('campos de coordenadas', () => {
+  const v = (x: string, y: string, ancho: string, alto: string) => ({ x, y, ancho, alto });
+
+  it('acepta los extremos', () => {
+    expect(leerCaja(v('0', '0', '100', '50'), 100, 50).ok).toBe(true);
+    expect(leerCaja(v('99', '49', '1', '1'), 100, 50).ok).toBe(true);
+    expect(leerPunto('99', '49', 100, 50)).toEqual({ ok: true, x: 99, y: 49 });
+  });
+
+  it.each([
+    ['-1', '0', '1', '1'], ['100', '0', '1', '1'], ['0', '50', '1', '1'], ['abc', '0', '1', '1'], ['', '0', '1', '1'], ['1e3', '0', '1', '1'], ['0,5', '0', '1', '1'],
+    ['0', '0', '0', '1'], ['0', '0', '1', '0'], ['0', '0', '101', '1'], ['0', '0', '1', '51'], ['99', '0', '2', '1'], ['0', '49', '1', '2'], ['0', '0', '999999', '1'],
+  ])('rechaza %s, %s, %s, %s sin recortar', (x, y, a, b) => {
+    expect(leerCaja(v(x, y, a, b), 100, 50).ok).toBe(false);
+  });
+
+  it('rechaza un punto inválido', () => {
+    expect(leerPunto('100', '0', 100, 50).ok).toBe(false);
+    expect(leerPunto('0', 'x', 100, 50).ok).toBe(false);
+  });
+});
+
+describe('Guía de privacidad', () => {
+  it('incluye todas las reglas del catálogo, una sola vez', () => {
+    const ids = agruparReglas().flatMap((g) => g.reglas.map((r) => r.id));
+    expect([...ids].sort()).toEqual(catalogo.reglas.map((r) => r.id).sort());
+    expect(new Set(ids).size).toBe(ids.length);
   });
 });
 

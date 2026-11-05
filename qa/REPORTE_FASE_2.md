@@ -14,8 +14,8 @@ A pedido del responsable, tras probar la app, se agregó revisión de contenido,
 |---|---|---|---|
 | Desnudez | NudeNet y CLIP | Sí, por zona. Se marca sola con bloque sólido | Verificada |
 | Contenido sugerente | NudeNet y CLIP | Sí, por zona | Pendiente |
-| Armas y militares | CLIP | No: solo avisa sobre la imagen completa | Pendiente: Meta no prohíbe mostrarlas por sí solo |
-| Símbolos extremistas | CLIP | No: solo avisa sobre la imagen completa | Verificada |
+| Armas y militares | OWL-ViT y CLIP | Por zona si ubica el arma; si no, solo avisa sobre la imagen | Pendiente: Meta no prohíbe mostrarlas por sí solo |
+| Símbolos extremistas | CLIP y OWL-ViT | La bandera por zona si la ubica; si no, solo avisa | Verificada |
 | Teléfonos, correos y direcciones | OCR y patrones | Sí | Verificada |
 | CURP, RFC y palabras de documentos | OCR y patrones | Sí | Verificada |
 | Tarjetas (Luhn), CLABE y palabras financieras | OCR y patrones | Sí | Verificada |
@@ -23,6 +23,12 @@ A pedido del responsable, tras probar la app, se agregó revisión de contenido,
 | Palabras de boletos | OCR y patrones | Sí | Verificada |
 | Pases de abordar | Formato BCBP del código | Sí | Verificada |
 | Códigos QR y de barras | zxing-cpp | Sí | Pendiente |
+| Placas | OWL-ViT | Sí | Pendiente |
+| Pantallas | OWL-ViT | Sí | Verificada |
+| Tarjetas | OWL-ViT y OCR | Sí | Verificada |
+| Joyas | OWL-ViT | Sí | Pendiente |
+| Letreros | OWL-ViT | Sí | Pendiente |
+| Cualquier cosa, a mano | Clic con SlimSAM, rectángulo o coordenadas | Sí | No aplica |
 
 El texto y el contenido de los códigos nunca se muestran, ni se guardan, ni van a los logs.
 
@@ -46,7 +52,9 @@ Estos números son de la última corrida completa, hecha después de todos los c
 
 ## Limitaciones conocidas
 
-- **Muestra muy chica.** Los umbrales de contenido salen de 21 imágenes. Faltan disfraces, juguetes, noticias, banderas comunes y personas en ropa de playa.
+- **Muestra chica.** Los umbrales salen de 197 fotos de Wikimedia Commons con etiquetas por búsqueda (ver `docs/INVESTIGACION.md`).
+- **Desnudez sin medir:** a propósito no se descargaron desnudos, así que no se sabe cuántos se escaparían con la regla nueva.
+- **Sin detectar:** gafetes, llaves y números de casa, porque el detector casi no los encuentra.
 - **Falsa alarma ya vista:** en el dibujo de ejemplo, una manga se marcó como "desnudez" con 0.4 de confianza.
 - **El OCR no leyó árabe,** y falta probarlo con ñ y acentos, fotos reales, texto rotado, en espejo o manuscrito.
 - **Un documento o una tarjeta sin texto legible puede pasar sin aviso.** La app lo dice.
@@ -58,13 +66,10 @@ Estos números son de la última corrida completa, hecha después de todos los c
 
 ## Pendiente de la Fase 2
 
-1. Detector visual: placas, pantallas, gafetes, llaves y joyas.
-2. Tapar armas y símbolos por zona.
-3. Selección por clic con SAM, pincel y rectángulo.
-4. Guía de privacidad.
-5. Dataset de evaluación y recall mínimo por categoría, que necesitan tu aprobación.
-6. Buscar una fuente oficial sobre fotos de armas o uniformes para ARM-01.
+1. Pincel para corregir una zona: aún no existe.
+2. Dataset de evaluación y recall mínimo por categoría, que necesitan tu aprobación.
+3. Buscar una fuente oficial sobre fotos de armas o uniformes para ARM-01.
 
 ## Licencias nuevas
 
-CLIP (MIT), NudeNet (AGPL-3.0 en su repo, compatible con este proyecto), RapidOCR (Apache-2.0), zxing-cpp (Apache-2.0).
+SlimSAM (Apache-2.0), OWL-ViT (Apache-2.0), CLIP (MIT), NudeNet (AGPL-3.0 en su repo, compatible con este proyecto), RapidOCR (Apache-2.0), zxing-cpp (Apache-2.0).

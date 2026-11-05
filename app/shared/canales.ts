@@ -5,6 +5,7 @@ export const CANALES = {
   analizar: 'imagen:analizar',
   vista: 'imagen:vista',
   exportar: 'imagen:exportar',
+  segmentar: 'imagen:segmentar',
   cerrar: 'imagen:cerrar',
   cancelar: 'imagen:cancelar',
   abrirFuente: 'fuente:abrir',

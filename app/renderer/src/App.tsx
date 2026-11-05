@@ -1,4 +1,4 @@
-import { FolderOpen, Redo2, Save, Undo2, X } from 'lucide-react';
+import { BookOpen, FolderOpen, Redo2, Save, Undo2, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import logoClaro from '../../../brand/logo/horizontal-claro.svg';
 import logoOscuro from '../../../brand/logo/horizontal-oscuro.svg';
@@ -6,25 +6,33 @@ import { AVISO_LEGAL, MARCA } from '../../shared/catalogo';
 import { esquemaTema, ERROR_INTERNO, type Analisis, type ArchivoAbierto, type ArchivoCargado, type ErrorApp, type Recuperable, type Tema } from '../../shared/contrato';
 import {
   aEdicion,
+  agregarManual,
   aplicarCambio,
   aplicarDecisionesIniciales,
   construirOcultamientos,
+  cubreTodo,
   desdeEdicion,
   deshacer,
+  efectoDeManual,
   hayCambios,
   nuevoHistorial,
   ocultarRiesgoAlto,
   ordenarHallazgos,
   ocultarTodo,
   pendientes,
+  quitarManual,
   rehacer,
   resumenTexto,
   textoConfirmacion,
+  type Caja,
+  type Herramienta,
   type Historial,
   type Revision,
 } from '../../shared/logica';
 import { Advertencias, Cobertura } from './Advertencias';
 import { Confirmacion } from './Dialogos';
+import { Guia } from './Guia';
+import { Manual } from './Manual';
 import { Visor } from './Visor';
 
 export type EstadoAnalisis =
@@ -60,6 +68,10 @@ export function App(): React.JSX.Element {
   // Hasta resolverlo no se guarda nada, para no borrar la recuperación que se está ofreciendo.
   const [recuperacionResuelta, setRecuperacionResuelta] = useState(false);
   const exportandoAhora = useRef(false);
+  const [vista, setVista] = useState<'revision' | 'guia'>('revision');
+  const [herramienta, setHerramienta] = useState<Herramienta>('ninguna');
+  const [buscando, setBuscando] = useState(false);
+  const [cajaTotal, setCajaTotal] = useState<Caja | null>(null);
   const colaOcupada = useRef(false);
   const seleccion = elegido ?? archivos[0]?.info.id ?? null;
 
@@ -197,6 +209,49 @@ export function App(): React.JSX.Element {
     else void exportarAhora();
   }, [actual, analisis, exportando, exportarAhora, hallazgos, revision]);
 
+  const agregarCaja = useCallback(
+    (caja: Caja) => {
+      if (actual === null) return;
+      const { id } = actual.info;
+      cambiarRevision(id, (r) => agregarManual(r, crypto.randomUUID(), caja, null));
+      setAnuncio('Agregamos tu zona para ocultarla.');
+    },
+    [actual, cambiarRevision],
+  );
+
+  const pedirCaja = useCallback(
+    (caja: Caja) => {
+      if (actual === null) return;
+      if (cubreTodo(caja, actual.info.ancho, actual.info.alto)) setCajaTotal(caja);
+      else agregarCaja(caja);
+    },
+    [actual, agregarCaja],
+  );
+
+  const buscarEnPunto = useCallback(
+    async (x: number, y: number) => {
+      if (actual === null || buscando) return;
+      const { id } = actual.info;
+      setBuscando(true);
+      setAnuncio('Buscando el objeto en ese punto. La primera vez tarda unos segundos.');
+      try {
+        const resultado = await api().segmentar(id, x, y);
+        if (resultado.ok) {
+          const { caja, mascara_id: mascaraId } = resultado.datos;
+          cambiarRevision(id, (r) => agregarManual(r, crypto.randomUUID(), caja, mascaraId));
+          setAnuncio('Seleccionamos ese objeto para ocultarlo. Revisa la vista previa.');
+        } else {
+          setAnuncio(resultado.error.mensaje);
+        }
+      } catch {
+        setAnuncio(ERROR_INTERNO.mensaje);
+      } finally {
+        setBuscando(false);
+      }
+    },
+    [actual, buscando, cambiarRevision],
+  );
+
   const cerrarArchivo = useCallback((id: string) => {
     if (exportandoAhora.current) return;
     void api().cerrar(id);
@@ -323,6 +378,9 @@ export function App(): React.JSX.Element {
           <button type="button" className="boton primario" onClick={() => { void abrir(); }}>
             <FolderOpen aria-hidden="true" /> Abrir fotos
           </button>
+          <button type="button" className="boton" aria-pressed={vista === 'guia'} onClick={() => { setVista((v) => (v === 'guia' ? 'revision' : 'guia')); }}>
+            <BookOpen aria-hidden="true" /> Guía de privacidad
+          </button>
           <button type="button" className="boton" disabled={!actual || exportando || actual.historial.pasado.length === 0} onClick={() => { moverHistorial(deshacer, 'Se deshizo el último cambio.'); }}>
             <Undo2 aria-hidden="true" /> Deshacer
           </button>
@@ -365,6 +423,7 @@ export function App(): React.JSX.Element {
         </ul>
       )}
 
+      {vista === 'guia' ? <Guia /> : (
       <div className="cuerpo">
         <nav className="lista-archivos" aria-label="Fotos abiertas">
           <h2>Fotos</h2>
@@ -397,7 +456,17 @@ export function App(): React.JSX.Element {
           ) : (
             <>
               <h1 className="titulo-foto">{actual.info.nombre}</h1>
-              <Visor key={actual.info.id} archivo={actual} hallazgos={hallazgos} ocultamientos={ocultamientos} revision={revision} />
+              <Visor
+                key={actual.info.id}
+                archivo={actual}
+                hallazgos={hallazgos}
+                ocultamientos={ocultamientos}
+                revision={revision}
+                herramienta={analisis === null || exportando ? 'ninguna' : herramienta}
+                alClic={(x, y) => { void buscarEnPunto(x, y); }}
+                alDibujar={pedirCaja}
+                alFuera={() => { setAnuncio('Ese punto queda fuera de la imagen.'); }}
+              />
             </>
           )}
         </main>
@@ -426,6 +495,19 @@ export function App(): React.JSX.Element {
                 alOcultarTodo={() => { cambiarRevision(actual.info.id, (r) => ocultarTodo(r, hallazgos)); setAnuncio('Marcamos para ocultar todo lo detectado.'); }}
                 alOcultarAlto={() => { cambiarRevision(actual.info.id, (r) => ocultarRiesgoAlto(r, hallazgos)); setAnuncio('Marcamos para ocultar lo de riesgo alto.'); }}
               />
+              <Manual
+                key={`manual-${actual.info.id}`}
+                ancho={actual.info.ancho}
+                alto={actual.info.alto}
+                herramienta={herramienta}
+                revision={revision}
+                ocupado={buscando}
+                alElegirHerramienta={setHerramienta}
+                alAgregarCaja={pedirCaja}
+                alBuscarEnPunto={(x, y) => { void buscarEnPunto(x, y); }}
+                alQuitar={(id) => { cambiarRevision(actual.info.id, (r) => quitarManual(r, id)); setAnuncio('Quitamos tu zona.'); }}
+                alCambiarEfecto={(id, efecto) => { cambiarRevision(actual.info.id, (r) => efectoDeManual(r, id, efecto)); }}
+              />
               </fieldset>
               <section aria-labelledby="titulo-resumen" className="resumen">
                 <h2 id="titulo-resumen">Resumen en texto</h2>
@@ -435,6 +517,7 @@ export function App(): React.JSX.Element {
           )}
         </aside>
       </div>
+      )}
 
       <footer className="pie"><p>{AVISO_LEGAL}</p></footer>
 
@@ -446,6 +529,16 @@ export function App(): React.JSX.Element {
           cancelar="Volver a revisar"
           alAceptar={() => { void exportarAhora(); }}
           alCancelar={() => { setConfirmarExport(null); }}
+        />
+      )}
+      {cajaTotal !== null && (
+        <Confirmacion
+          titulo="Esta zona cubre toda la imagen"
+          texto="Si la agregas, no se verá nada de la foto. ¿Quieres hacerlo?"
+          aceptar="Agregar de todos modos"
+          cancelar="Volver"
+          alAceptar={() => { agregarCaja(cajaTotal); setCajaTotal(null); }}
+          alCancelar={() => { setCajaTotal(null); }}
         />
       )}
       {recuperables.length > 0 && (

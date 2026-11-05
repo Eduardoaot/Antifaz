@@ -23,6 +23,8 @@ class Codigo(StrEnum):
     DESTINO_ES_ORIGEN = "DESTINO_ES_ORIGEN"
     IMAGEN_NO_ABIERTA = "IMAGEN_NO_ABIERTA"
     REGION_FUERA_DE_IMAGEN = "REGION_FUERA_DE_IMAGEN"
+    SIN_OBJETO = "SIN_OBJETO"
+    MODELO_NO_DISPONIBLE = "MODELO_NO_DISPONIBLE"
     EXPORTACION_NO_VERIFICADA = "EXPORTACION_NO_VERIFICADA"
     MEMORIA_INSUFICIENTE = "MEMORIA_INSUFICIENTE"
     INTERNO = "INTERNO"
@@ -52,6 +54,8 @@ MENSAJES: dict[Codigo, str] = {
     Codigo.DESTINO_ES_ORIGEN: "Para no perder tu original, guarda la copia con otro nombre o en otra carpeta.",
     Codigo.IMAGEN_NO_ABIERTA: "Esta imagen ya no está abierta. Vuelve a cargarla.",
     Codigo.REGION_FUERA_DE_IMAGEN: "Una de las zonas queda fuera de la imagen. Ajústala e intenta de nuevo.",
+    Codigo.SIN_OBJETO: "No encontramos un objeto en ese punto. Prueba en otro lugar o dibuja un rectángulo.",
+    Codigo.MODELO_NO_DISPONIBLE: "Falta el modelo para seleccionar con un clic. Puedes dibujar un rectángulo.",
     Codigo.EXPORTACION_NO_VERIFICADA: (
         "No pudimos comprobar que el archivo saliera limpio, así que no lo guardamos. Intenta de nuevo."
     ),
