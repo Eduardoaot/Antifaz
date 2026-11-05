@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from . import contenido
+from . import codigos, contenido, texto
 from .caras import DetectorCaras, ModeloNoDisponible
 from .cargador import ImagenCargada
 
@@ -18,6 +18,8 @@ REGLAS_DE_CONTENIDO = ("ARM-01", "EXT-01", "DES-01", "SUG-01")
 # Medido en una muestra chica: imágenes comunes hasta 0.19, ejemplos de riesgo desde 0.71.
 UMBRAL_ESCENA = 0.35
 UMBRAL_ZONAS = 0.25
+REGLAS_DE_TEXTO = ("CON-01", "DOC-01", "FIN-01", "MED-01", "VIA-01")
+REGLA_DE_CODIGOS = "COD-01"
 
 
 def describir_posicion(x: int, y: int, ancho: int, alto: int, ancho_img: int, alto_img: int) -> str:
@@ -98,6 +100,61 @@ def _revisar_contenido(
             )
 
 
+def _revisar_texto(
+    imagen: ImagenCargada,
+    umbral_revision: float,
+    hallazgos: list[dict[str, object]],
+    motivos: list[str],
+    revisadas: list[str],
+) -> None:
+    try:
+        zonas = texto.buscar(imagen.pixeles)
+    except Exception as e:  # noqa: BLE001 - parcial, nunca limpio. El mensaje podría traer texto de la imagen
+        registro.error("Falló el OCR: %s", type(e).__name__)
+        motivos.append("texto_fallo")
+        return
+    revisadas.extend(REGLAS_DE_TEXTO)
+    for i, zona in enumerate(zonas):
+        hallazgos.append(
+            {
+                "id": f"texto-{i}",
+                "regla_id": zona.regla_id,
+                "caja": {"x": zona.x, "y": zona.y, "ancho": zona.ancho, "alto": zona.alto},
+                "confianza": round(zona.confianza, 3),
+                "requiere_revision": zona.confianza < umbral_revision,
+                "posicion": describir_posicion(
+                    zona.x, zona.y, zona.ancho, zona.alto, imagen.ancho, imagen.alto
+                ),
+            }
+        )
+
+
+def _revisar_codigos(
+    imagen: ImagenCargada,
+    hallazgos: list[dict[str, object]],
+    motivos: list[str],
+    revisadas: list[str],
+) -> None:
+    try:
+        encontrados = codigos.buscar(imagen.pixeles)
+    except Exception as e:  # noqa: BLE001 - parcial, nunca limpio
+        registro.error("Falló la lectura de códigos: %s", type(e).__name__)
+        motivos.append("codigos_fallo")
+        return
+    revisadas.append(REGLA_DE_CODIGOS)
+    for i, c in enumerate(encontrados):
+        hallazgos.append(
+            {
+                "id": f"codigo-{i}",
+                "regla_id": c.regla_id,
+                "caja": {"x": c.x, "y": c.y, "ancho": c.ancho, "alto": c.alto},
+                "confianza": 1.0,
+                "requiere_revision": False,
+                "posicion": describir_posicion(c.x, c.y, c.ancho, c.alto, imagen.ancho, imagen.alto),
+            }
+        )
+
+
 def analizar(
     imagen: ImagenCargada,
     carpeta_modelos: Any,
@@ -171,6 +228,8 @@ def analizar(
                 )
     if not imagen.demasiado_pequena:
         _revisar_contenido(imagen, carpeta_modelos, umbral_revision, hallazgos, motivos, revisadas)
+        _revisar_texto(imagen, umbral_revision, hallazgos, motivos, revisadas)
+        _revisar_codigos(imagen, hallazgos, motivos, revisadas)
 
     # Una regla que no se pudo revisar debe seguir contando como pendiente.
     if imagen.metadatos_legibles:

@@ -51,7 +51,7 @@ export const esquemaHallazgo = z.strictObject({
 });
 export type Hallazgo = z.infer<typeof esquemaHallazgo>;
 
-export const esquemaMotivo = z.enum(['metadatos', 'demasiado_pequena', 'modelo_no_disponible', 'deteccion_fallo', 'contenido_no_disponible', 'contenido_fallo']);
+export const esquemaMotivo = z.enum(['metadatos', 'demasiado_pequena', 'modelo_no_disponible', 'deteccion_fallo', 'contenido_no_disponible', 'contenido_fallo', 'texto_fallo', 'codigos_fallo']);
 export type Motivo = z.infer<typeof esquemaMotivo>;
 
 export const esquemaAnalisis = z.strictObject({

@@ -114,7 +114,7 @@ test('foto sin nada: lo dice sin prometer de más', async () => {
   await abrir(sesion, [m('negra.png')]);
   await expect(veredicto(pagina)).toHaveText('No encontramos nada riesgoso en lo que revisamos', { timeout: 60_000 });
   await expect(pagina.getByText('La revisión es orientativa')).toBeVisible();
-  await expect(pagina.getByText(/Lo que todavía no revisamos \(15\)/)).toBeVisible();
+  await expect(pagina.getByText(/Lo que todavía no revisamos \(9\)/)).toBeVisible();
   await sinViolaciones(pagina);
 });
 
@@ -140,6 +140,29 @@ test.describe('contenido, con muestras locales', () => {
     await expect(veredicto(sesion.pagina)).toBeVisible({ timeout: 60_000 });
     for (const regla of ['ARM-01', 'EXT-01', 'DES-01', 'SUG-01']) await expect(sesion.pagina.locator(`[data-regla="${regla}"]`)).toHaveCount(0);
   });
+});
+
+test('texto y código: los encuentra, los tapa y el dato no sale en la copia', async () => {
+  sesion = await lanzar();
+  const { pagina, app } = sesion;
+  await abrir(sesion, [m('datos.png')]);
+  await expect(veredicto(pagina)).toHaveText('Revisa estas advertencias', { timeout: 90_000 });
+  await expect(pagina.locator('[data-regla="CON-01"]').first()).toContainText('Podría ser un dato de contacto');
+  await expect(pagina.locator('[data-regla="COD-01"]').first()).toBeVisible();
+  // El texto leído no se muestra en pantalla ni en el resumen.
+  await expect(pagina.getByText('8123')).toHaveCount(0);
+  await sinViolaciones(pagina);
+  await pagina.getByRole('button', { name: 'Ocultar todo lo detectado' }).click();
+  const salida = join(mkdtempSync(join(tmpdir(), 'revisor-salida-')), 'limpia.png');
+  await simularGuardar(app, salida);
+  await pagina.getByRole('button', { name: 'Exportar copia' }).click();
+  await expect(pagina.getByTestId('anuncio')).toContainText('sin metadatos', { timeout: 60_000 });
+  const lectura = execFileSync(
+    join(RAIZ, 'sidecar', '.venv', 'Scripts', 'python.exe'),
+    ['-c', 'import sys;from revisor import cargador,texto,codigos;i=cargador.abrir(sys.argv[1]);print(len(texto.buscar(i.pixeles)),len(codigos.buscar(i.pixeles)))', salida],
+    { cwd: join(RAIZ, 'sidecar') },
+  ).toString().trim();
+  expect(lectura, 'el dato o el código siguen legibles en la copia').toBe('0 0');
 });
 
 test('imagen diminuta: nunca se presenta como limpia', async () => {
