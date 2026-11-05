@@ -7,6 +7,7 @@ import {
   REVISION_INICIAL,
   aEdicion,
   aplicarCambio,
+  aplicarDecisionesIniciales,
   construirOcultamientos,
   decidir,
   desdeEdicion,
@@ -18,9 +19,12 @@ import {
   nuevoHistorial,
   ocultarRiesgoAlto,
   ocultarTodo,
+  ordenarHallazgos,
   pendientes,
   rehacer,
   reglasNoRevisadas,
+  soloAvisaSinZona,
+  textoRevisado,
   responderMenores,
   resumenTexto,
   textoConfirmacion,
@@ -181,7 +185,7 @@ describe('veredicto: una falla nunca parece limpia', () => {
     );
   });
 
-  it.each(['metadatos', 'demasiado_pequena', 'modelo_no_disponible', 'deteccion_fallo'] as Motivo[])('motivo %s tiene texto', (m) => {
+  it.each(['metadatos', 'demasiado_pequena', 'modelo_no_disponible', 'deteccion_fallo', 'contenido_no_disponible', 'contenido_fallo'] as Motivo[])('motivo %s tiene texto', (m) => {
     expect(textoMotivo(m).length).toBeGreaterThan(0);
   });
 
@@ -220,6 +224,55 @@ describe('texto para lector de pantalla', () => {
   it('otras reglas usan el texto del catálogo', () => {
     expect(describirHallazgo({ ...cara('a'), regla_id: 'MAT-01' })).toContain('Placas');
     expect(describirHallazgo({ ...cara('a'), regla_id: 'MAT-01', posicion: null })).toBe('Placas de autos y motos.');
+  });
+});
+
+describe('revisión de contenido', () => {
+  const desnudez: Hallazgo = { ...cara('z'), regla_id: 'DES-01' };
+  const sugerente: Hallazgo = { ...cara('s'), regla_id: 'SUG-01' };
+  const arma: Hallazgo = { id: 'a', regla_id: 'ARM-01', caja: null, confianza: 0.8, requiere_revision: true, posicion: null };
+
+  it('la desnudez se marca sola, con bloque sólido, y lo demás espera tu decisión', () => {
+    const r = aplicarDecisionesIniciales(REVISION_INICIAL, [desnudez, sugerente, arma, cara('c')]);
+    expect(r.decisiones).toEqual({ z: 'ocultar' });
+    expect(efectoDe(r, desnudez)).toBe('solido');
+    expect(construirOcultamientos(r, [desnudez])).toHaveLength(1);
+  });
+
+  it('no pisa lo que ya decidiste y no crea cambios si no hay nada', () => {
+    const r = decidir(REVISION_INICIAL, 'z', 'ignorar');
+    expect(aplicarDecisionesIniciales(r, [desnudez])).toBe(r);
+    expect(aplicarDecisionesIniciales(REVISION_INICIAL, [cara('c')])).toBe(REVISION_INICIAL);
+    expect(aplicarDecisionesIniciales(REVISION_INICIAL, [{ ...desnudez, caja: null }])).toBe(REVISION_INICIAL);
+  });
+
+  it('los avisos dicen podría, nunca afirman', () => {
+    expect(describirHallazgo(arma)).toBe('Podría mostrar armas o personas armadas.');
+    expect(describirHallazgo({ ...desnudez, posicion: 'al centro' })).toBe('Podría verse desnudez al centro.');
+    expect(describirHallazgo({ ...arma, regla_id: 'EXT-01' })).toMatch(/^Podría mostrar símbolos/);
+  });
+
+  it('lo más grave va primero y lo dudoso después de lo seguro', () => {
+    const dudosa: Hallazgo = { ...cara('d'), confianza: 0.3, requiere_revision: true };
+    const orden = ordenarHallazgos([dudosa, cara('c'), { ...arma, regla_id: 'EXT-01' }, sugerente]).map((h) => h.id);
+    expect(orden[0]).toBe('a');
+    expect(orden.indexOf('c')).toBeLessThan(orden.indexOf('d'));
+    const entrada = [cara('c')];
+    expect(ordenarHallazgos(entrada)).not.toBe(entrada);
+  });
+
+  it('dice qué se puede tapar y qué no', () => {
+    expect(soloAvisaSinZona(arma)).toBe(true);
+    expect(soloAvisaSinZona(desnudez)).toBe(false);
+    expect(soloAvisaSinZona(gps)).toBe(false);
+    expect(soloAvisaSinZona(menores)).toBe(false);
+  });
+
+  it('nombra solo lo que sí se revisó', () => {
+    expect(textoRevisado(analisis([]))).toContain('caras, ubicación guardada en el archivo');
+    const parcial: Analisis = { hallazgos: [], cobertura: { completa: false, motivos: ['contenido_fallo'], reglas_revisadas: ['UBI-01'] } };
+    expect(textoRevisado(parcial)).toContain('En esta foto revisamos: ubicación guardada en el archivo.');
+    expect(textoRevisado({ ...parcial, cobertura: { ...parcial.cobertura, reglas_revisadas: [] } })).toContain('no pudimos revisar nada');
   });
 });
 

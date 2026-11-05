@@ -40,7 +40,7 @@
       "properties": {
         "id": { "type": "string", "pattern": "^[A-Z]{3}-\\d{2}$" },
         "categoria": {
-          "enum": ["caras_terceros", "posibles_menores", "documentos_identidad", "informacion_financiera", "boletos_viajes", "ubicacion", "matriculas", "objetos_valor", "pantallas", "contacto_personal", "informacion_medica", "codigos"]
+          "enum": ["caras_terceros", "posibles_menores", "documentos_identidad", "informacion_financiera", "boletos_viajes", "ubicacion", "matriculas", "objetos_valor", "pantallas", "contacto_personal", "informacion_medica", "codigos", "desnudez", "contenido_sugerente", "armas", "extremismo"]
         },
         "que_detecta": { "type": "string", "minLength": 1 },
         "nivel_riesgo": { "enum": ["alto", "medio", "bajo"] },

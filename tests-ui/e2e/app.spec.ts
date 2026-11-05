@@ -118,6 +118,30 @@ test('foto sin nada: lo dice sin prometer de más', async () => {
   await sinViolaciones(pagina);
 });
 
+// Muestras sensibles fuera del repo: se corre en local con REVISOR_MUESTRAS apuntando a la carpeta.
+const sensibles = process.env.REVISOR_MUESTRAS;
+test.describe('contenido, con muestras locales', () => {
+  test.skip(sensibles === undefined || sensibles === '', 'sin muestras locales');
+  for (const [archivo, regla] of [['3.jpg', 'EXT-01'], ['6.jpg', 'EXT-01'], ['5.jpg', 'DES-01']] as const) {
+    test(`${archivo} avisa ${regla}`, async () => {
+      sesion = await lanzar();
+      const { pagina } = sesion;
+      await abrir(sesion, [join(sensibles ?? '', archivo)]);
+      await expect(veredicto(pagina)).toBeVisible({ timeout: 60_000 });
+      await expect(pagina.locator(`[data-regla="${regla}"]`).first()).toContainText('Podría');
+      await sinViolaciones(pagina);
+      await pagina.screenshot({ path: join(CAPTURAS, `contenido-${archivo}.png`) });
+    });
+  }
+
+  test('foto común: la playa no genera avisos de contenido', async () => {
+    sesion = await lanzar();
+    await abrir(sesion, [join(sensibles ?? '', '4.jpg')]);
+    await expect(veredicto(sesion.pagina)).toBeVisible({ timeout: 60_000 });
+    for (const regla of ['ARM-01', 'EXT-01', 'DES-01', 'SUG-01']) await expect(sesion.pagina.locator(`[data-regla="${regla}"]`)).toHaveCount(0);
+  });
+});
+
 test('imagen diminuta: nunca se presenta como limpia', async () => {
   sesion = await lanzar();
   const { pagina } = sesion;

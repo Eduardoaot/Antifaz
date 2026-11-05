@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from . import contenido
 from .caras import DetectorCaras, ModeloNoDisponible
 from .cargador import ImagenCargada
 
@@ -13,6 +14,10 @@ registro = logging.getLogger(__name__)
 # Lo que esta versión sabe revisar. La UI compara contra el catálogo para decir qué falta.
 REGLAS_DE_CARAS = ("CAR-01", "MEN-01")
 REGLA_DE_METADATOS = "UBI-01"
+REGLAS_DE_CONTENIDO = ("ARM-01", "EXT-01", "DES-01", "SUG-01")
+# Medido en una muestra chica: imágenes comunes hasta 0.19, ejemplos de riesgo desde 0.71.
+UMBRAL_ESCENA = 0.35
+UMBRAL_ZONAS = 0.25
 
 
 def describir_posicion(x: int, y: int, ancho: int, alto: int, ancho_img: int, alto_img: int) -> str:
@@ -41,6 +46,56 @@ def _ampliar(
         "ancho": min(img_ancho - x0, nuevo_ancho),
         "alto": min(img_alto - y0, nuevo_alto),
     }
+
+
+def _revisar_contenido(
+    imagen: ImagenCargada,
+    carpeta_modelos: Any,
+    umbral_revision: float,
+    hallazgos: list[dict[str, object]],
+    motivos: list[str],
+    revisadas: list[str],
+) -> None:
+    try:
+        revisor = contenido.revisor_de(carpeta_modelos)
+        escena = revisor.escena(imagen.pixeles)
+        zonas = revisor.zonas(imagen.pixeles, UMBRAL_ZONAS)
+    except ModeloNoDisponible as e:
+        registro.error("Modelos de contenido no disponibles: %s", e)
+        motivos.append("contenido_no_disponible")
+        return
+    except Exception as e:  # noqa: BLE001 - la falla se informa como análisis parcial, nunca como limpio
+        registro.error("Falló la revisión de contenido: %s", type(e).__name__)
+        motivos.append("contenido_fallo")
+        return
+    revisadas.extend(REGLAS_DE_CONTENIDO)
+    for i, zona in enumerate(zonas):
+        hallazgos.append(
+            {
+                "id": f"zona-{i}",
+                "regla_id": zona.regla_id,
+                "caja": {"x": zona.x, "y": zona.y, "ancho": zona.ancho, "alto": zona.alto},
+                "confianza": round(zona.confianza, 3),
+                "requiere_revision": zona.confianza < umbral_revision,
+                "posicion": describir_posicion(
+                    zona.x, zona.y, zona.ancho, zona.alto, imagen.ancho, imagen.alto
+                ),
+            }
+        )
+    con_zona = {zona.regla_id for zona in zonas}
+    for regla in REGLAS_DE_CONTENIDO:
+        # Si ya se sabe dónde está, el aviso por zona lo cubre.
+        if escena[regla] >= UMBRAL_ESCENA and regla not in con_zona:
+            hallazgos.append(
+                {
+                    "id": f"escena-{regla}",
+                    "regla_id": regla,
+                    "caja": None,
+                    "confianza": round(escena[regla], 3),
+                    "requiere_revision": True,
+                    "posicion": None,
+                }
+            )
 
 
 def analizar(
@@ -114,6 +169,9 @@ def analizar(
                         "posicion": None,
                     }
                 )
+    if not imagen.demasiado_pequena:
+        _revisar_contenido(imagen, carpeta_modelos, umbral_revision, hallazgos, motivos, revisadas)
+
     # Una regla que no se pudo revisar debe seguir contando como pendiente.
     if imagen.metadatos_legibles:
         revisadas.append(REGLA_DE_METADATOS)

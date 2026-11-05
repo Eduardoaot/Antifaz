@@ -39,7 +39,7 @@ def test_arc001_004_sin_nada(tmp_path: Path, imagen: Image.Image) -> None:
     resultado = _analizar(guardar(tmp_path / "a.png", imagen))
     assert resultado["hallazgos"] == []
     assert resultado["cobertura"]["completa"] is True
-    assert resultado["cobertura"]["reglas_revisadas"] == ["CAR-01", "MEN-01", "UBI-01"]
+    assert {"CAR-01", "MEN-01", "UBI-01", "ARM-01", "EXT-01", "DES-01", "SUG-01"} == set(resultado["cobertura"]["reglas_revisadas"])
 
 
 def test_arc005_cielo_sin_nada(tmp_path: Path) -> None:

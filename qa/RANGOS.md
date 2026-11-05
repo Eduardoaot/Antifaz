@@ -71,6 +71,8 @@ Cada parámetro de este archivo tiene pruebas parametrizadas de mínimo-1, míni
 |---|---|---|---|---|---|
 | `deteccion.umbral_confianza` | decimal | 0 | 1 | 0.25 (propuesta, favorece recall) | Estándar |
 | `deteccion.umbral_revision` | decimal | 0 | 1 | 0.6 (medido en una muestra chica) | Estándar. Debe ser mayor o igual que `umbral_confianza`, o se rechaza. Por debajo se dice "podría ser una cara" y no se pregunta por menores |
+| `contenido.umbral_escena` | decimal | n/a | n/a | 0.35 (medido en una muestra chica) | Constante interna. Por encima se avisa sobre toda la imagen |
+| `contenido.umbral_zonas` | decimal | n/a | n/a | 0.25 (propuesta, favorece recall) | Constante interna. Por debajo de `umbral_revision` se marca con duda |
 | `ocr.umbral_texto` | decimal | 0 | 1 | 0.3 (propuesta) | Estándar |
 | `clic.x`, `clic.y` | entero, px de la imagen original | 0 | Ancho-1, alto-1 | n/a | Fuera de la imagen: se ignora y se avisa "Ese punto queda fuera de la imagen". El sidecar lo rechaza |
 

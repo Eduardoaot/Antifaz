@@ -1,4 +1,4 @@
-import { AlertCircle, AlertTriangle, Baby, Eye, EyeOff, Info, MapPin, Users } from 'lucide-react';
+import { AlertCircle, AlertTriangle, Baby, Crosshair, Eye, EyeOff, Flag, Info, MapPin, Shirt, Users } from 'lucide-react';
 import { useState } from 'react';
 import { etiquetaNivel, reglaDe, type Nivel, type Regla } from '../../shared/catalogo';
 import { esquemaEfecto, LIMITES, type Analisis, type Hallazgo } from '../../shared/contrato';
@@ -9,7 +9,9 @@ import {
   elegirEfecto,
   reglasNoRevisadas,
   responderMenores,
+  soloAvisaSinZona,
   textoMotivo,
+  textoRevisado,
   tituloVeredicto,
   veredicto,
   type Revision,
@@ -40,6 +42,13 @@ function IconoCategoria({ regla }: { regla: Regla }): React.JSX.Element | null {
       return <Baby aria-hidden="true" />;
     case 'ubicacion':
       return <MapPin aria-hidden="true" />;
+    case 'desnudez':
+    case 'contenido_sugerente':
+      return <Shirt aria-hidden="true" />;
+    case 'armas':
+      return <Crosshair aria-hidden="true" />;
+    case 'extremismo':
+      return <Flag aria-hidden="true" />;
     default:
       return null;
   }
@@ -52,7 +61,7 @@ export function Cobertura({ analisis }: { analisis: Analisis }): React.JSX.Eleme
     <section aria-labelledby="titulo-veredicto" className={v === 'parcial' ? 'caja-parcial' : 'caja-veredicto'}>
       <h2 id="titulo-veredicto" data-testid="veredicto">{tituloVeredicto(v)}</h2>
       {analisis.cobertura.motivos.map((m) => <p key={m}>{textoMotivo(m)}</p>)}
-      <p className="suave">La revisión es orientativa. Por ahora solo revisamos caras y ubicación guardada en el archivo.</p>
+      <p className="suave">{textoRevisado(analisis)}</p>
       <details>
         <summary>Lo que todavía no revisamos ({noRevisadas.length})</summary>
         <ul>{noRevisadas.map((r) => <li key={r.id}>{r.que_detecta}</li>)}</ul>
@@ -111,6 +120,8 @@ export function Advertencias({ hallazgos, revision, alCambiar, alOcultarTodo, al
               )}
 
               {h.regla_id === 'UBI-01' && <p className="suave">Se borra al exportar, sin que hagas nada.</p>}
+              {soloAvisaSinZona(h) && <p className="suave">Todavía no podemos taparlo por zona. Si no quieres mostrarlo, recorta la foto o no la publiques.</p>}
+              {h.regla_id === 'DES-01' && h.caja !== null && <p className="suave">La marcamos para ocultarla. Instagram podría limitar la foto aunque esté tapada.</p>}
 
               {h.caja !== null && (
                 <div className="controles">

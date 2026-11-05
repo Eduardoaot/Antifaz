@@ -7,12 +7,14 @@ import { esquemaTema, ERROR_INTERNO, type Analisis, type ArchivoAbierto, type Ar
 import {
   aEdicion,
   aplicarCambio,
+  aplicarDecisionesIniciales,
   construirOcultamientos,
   desdeEdicion,
   deshacer,
   hayCambios,
   nuevoHistorial,
   ocultarRiesgoAlto,
+  ordenarHallazgos,
   ocultarTodo,
   pendientes,
   rehacer,
@@ -63,7 +65,7 @@ export function App(): React.JSX.Element {
 
   const actual = useMemo(() => archivos.find((a) => a.info.id === seleccion) ?? null, [archivos, seleccion]);
   const analisis = actual?.estado.tipo === 'listo' ? actual.estado.analisis : null;
-  const hallazgos = useMemo(() => analisis?.hallazgos ?? [], [analisis]);
+  const hallazgos = useMemo(() => ordenarHallazgos(analisis?.hallazgos ?? []), [analisis]);
   const revision = actual?.historial.actual ?? null;
   const ocultamientos = useMemo(
     () => (revision === null ? [] : construirOcultamientos(revision, hallazgos)),
@@ -93,7 +95,12 @@ export function App(): React.JSX.Element {
         // Una falla aquí no debe dejar la foto en "Revisando…" ni detener a las demás.
         const resultado = await api().analizar(id).catch(() => ({ ok: false, error: ERROR_INTERNO }) as const);
         if (resultado.ok) {
-          actualizar(id, (a) => ({ ...a, estado: { tipo: 'listo', analisis: resultado.datos } }));
+          // No gasta un paso del historial: deshacer no debe destapar lo que la app marcó sola.
+          actualizar(id, (a) => ({
+            ...a,
+            estado: { tipo: 'listo', analisis: resultado.datos },
+            historial: { ...a.historial, actual: aplicarDecisionesIniciales(a.historial.actual, resultado.datos.hallazgos) },
+          }));
           setAnuncio(resumenTexto(nombre, resultado.datos, siguiente.historial.actual));
         } else {
           actualizar(id, (a) => ({ ...a, estado: { tipo: 'error', error: resultado.error } }));

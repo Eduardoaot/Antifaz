@@ -12,6 +12,7 @@ out/
 *.onnx
 *.pt
 *.safetensors
+sidecar/modelos/
 tests-ui/capturas/
 test-results/
 coverage/
