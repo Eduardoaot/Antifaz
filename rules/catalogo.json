@@ -1,6 +1,6 @@
 {
-  "version": "0.2.0",
-  "fecha_actualizacion": "2026-11-03",
+  "version": "0.3.0",
+  "fecha_actualizacion": "2026-11-06",
   "aviso": "{app} es una herramienta orientativa y no constituye asesoría legal.",
   "marco_general": [
     {
@@ -729,6 +729,120 @@
       "aplica_a": "ambos",
       "estado": "pendiente_de_verificar",
       "nota": "Sin fuente oficial sobre publicar códigos en general. El caso de pases de abordar está en VIA-01. El aviso de GN-CERT trata de escanear QR, no de publicarlos, y no respalda esta regla."
+    },
+    {
+      "id": "DES-01",
+      "categoria": "desnudez",
+      "que_detecta": "Posible desnudez, en fotos o en dibujos",
+      "nivel_riesgo": "alto",
+      "por_que": "Podría verse desnudez, y una vez publicada es muy difícil de borrar. Si es de otra persona necesitas su permiso, así que la marcamos para taparla.",
+      "fuentes": [
+        {
+          "institucion": "Congreso de la Unión (Cámara de Diputados)",
+          "documento": "Ley General de Acceso de las Mujeres a una Vida Libre de Violencia",
+          "url": "https://www.diputados.gob.mx/LeyesBiblio/pdf/LGAMVLV.pdf",
+          "fecha_consulta": "2026-11-06",
+          "vigente": true,
+          "resumen": "Define violencia digital: difundir sin consentimiento imágenes reales o simuladas de contenido íntimo sexual, si causan daño.",
+          "alcance": "mexico_federal",
+          "tipo": "ley",
+          "respaldo": "directo",
+          "verificacion": "abierta",
+          "referencia": "Art. 20 Quáter",
+          "fecha_documento": "Última reforma DOF 15-01-2026"
+        },
+        {
+          "institucion": "Meta / Instagram",
+          "documento": "Normas Comunitarias: Desnudos y actividad sexual de adultos",
+          "url": "https://transparency.meta.com/es-la/policies/community-standards/adult-nudity-sexual-activity/",
+          "fecha_consulta": "2026-11-06",
+          "vigente": true,
+          "resumen": "No permite genitales visibles, incluso con superposiciones digitales, y restringe los semidesnudos cubiertos solo por una superposición.",
+          "alcance": "plataforma",
+          "tipo": "politica_plataforma",
+          "respaldo": "directo",
+          "verificacion": "abierta"
+        }
+      ],
+      "aplica_a": "ambos",
+      "estado": "verificada",
+      "nota": "Tapar no garantiza que Meta acepte la foto: su política también contempla las superposiciones digitales. La ley se refiere a difundir sin consentimiento.",
+      "texto_aviso": "Podría verse desnudez"
+    },
+    {
+      "id": "SUG-01",
+      "categoria": "contenido_sugerente",
+      "que_detecta": "Contenido que podría ser sexualmente sugerente, en fotos o en dibujos",
+      "nivel_riesgo": "medio",
+      "por_que": "Esta imagen podría considerarse sugerente, e Instagram podría limitarla. Tú decides si quieres que todos la vean.",
+      "fuentes": [
+        {
+          "institucion": "Meta / Instagram",
+          "documento": "Normas Comunitarias: Desnudos y actividad sexual de adultos",
+          "url": "https://transparency.meta.com/es-la/policies/community-standards/adult-nudity-sexual-activity/",
+          "fecha_consulta": "2026-11-06",
+          "vigente": true,
+          "resumen": "Restringe a mayores de 18 algunos contenidos afines, como los semidesnudos. No usa el término sugerente.",
+          "alcance": "plataforma",
+          "tipo": "politica_plataforma",
+          "respaldo": "parcial",
+          "verificacion": "abierta"
+        }
+      ],
+      "aplica_a": "ambos",
+      "estado": "pendiente_de_verificar",
+      "nota": "Sin fuente directa sobre contenido sugerente: Meta regula categorías afines, y que algo sea sugerente depende del criterio de cada persona.",
+      "texto_aviso": "Podría ser contenido sugerente"
+    },
+    {
+      "id": "ARM-01",
+      "categoria": "armas",
+      "que_detecta": "Posibles armas o personas armadas o con uniforme militar",
+      "nivel_riesgo": "alto",
+      "por_que": "Esta imagen podría mostrar armas o personas armadas. Podría traerte problemas con la plataforma o ponerte en riesgo a ti o a quienes aparecen.",
+      "fuentes": [
+        {
+          "institucion": "Meta / Instagram",
+          "documento": "Normas Comunitarias: Bienes y servicios restringidos",
+          "url": "https://transparency.meta.com/es-la/policies/community-standards/restricted-goods-services/",
+          "fecha_consulta": "2026-11-06",
+          "vigente": true,
+          "resumen": "Página localizada. Su texto no se pudo leer de forma automática, así que aún no se cita su contenido.",
+          "alcance": "plataforma",
+          "tipo": "politica_plataforma",
+          "respaldo": "contexto",
+          "verificacion": "pendiente"
+        }
+      ],
+      "aplica_a": "ambos",
+      "estado": "pendiente_de_verificar",
+      "nota": "La política de Meta no se pudo leer de forma automática: falta cotejarla. Puede avisar de más con disfraces, juguetes o fotos de noticias. Por ahora avisa sobre toda la imagen, sin tapar por zona.",
+      "texto_aviso": "Podría mostrar armas o personas armadas"
+    },
+    {
+      "id": "EXT-01",
+      "categoria": "extremismo",
+      "que_detecta": "Posibles símbolos de grupos armados o extremistas",
+      "nivel_riesgo": "alto",
+      "por_que": "Esta imagen podría mostrar símbolos de un grupo armado o extremista. Sin contexto podría malinterpretarse o traerte problemas con la plataforma.",
+      "fuentes": [
+        {
+          "institucion": "Meta / Instagram",
+          "documento": "Normas Comunitarias: Personas y organizaciones peligrosas",
+          "url": "https://transparency.meta.com/es-la/policies/community-standards/dangerous-individuals-organizations/",
+          "fecha_consulta": "2026-11-06",
+          "vigente": true,
+          "resumen": "Página localizada. Su texto no se pudo leer de forma automática, así que aún no se cita su contenido.",
+          "alcance": "plataforma",
+          "tipo": "politica_plataforma",
+          "respaldo": "contexto",
+          "verificacion": "pendiente"
+        }
+      ],
+      "aplica_a": "ambos",
+      "estado": "pendiente_de_verificar",
+      "nota": "La política de Meta no se pudo leer de forma automática: falta cotejarla. Es orientativo: nunca afirma que la foto sea de un grupo concreto, y puede fallar con banderas comunes o noticias.",
+      "texto_aviso": "Podría mostrar símbolos de un grupo armado o extremista"
     }
   ]
 }

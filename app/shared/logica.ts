@@ -112,6 +112,41 @@ export function construirOcultamientos(r: Revision, hallazgos: readonly Hallazgo
   return salida;
 }
 
+/** Lo más delicado se marca solo. Sin deshacer lo que ya se decidió, por ejemplo al recuperar. */
+export function aplicarDecisionesIniciales(r: Revision, hallazgos: readonly Hallazgo[]): Revision {
+  const nuevas = hallazgos.filter((h) => h.regla_id === 'DES-01' && esVisual(h) && r.decisiones[h.id] === undefined);
+  return nuevas.length === 0 ? r : ocultarVarios(r, nuevas);
+}
+
+const NOMBRE_REVISADO: Readonly<Record<string, string>> = {
+  'CAR-01': 'caras',
+  'UBI-01': 'ubicación guardada en el archivo',
+  'DES-01': 'desnudez',
+  'SUG-01': 'contenido sugerente',
+  'ARM-01': 'armas',
+  'EXT-01': 'símbolos extremistas',
+};
+
+/** Dice qué se revisó de verdad en esta foto, no lo que la app sabría revisar. */
+export function textoRevisado(analisis: Analisis): string {
+  const nombres = analisis.cobertura.reglas_revisadas.flatMap((id) => NOMBRE_REVISADO[id] ?? []);
+  if (nombres.length === 0) return 'La revisión es orientativa. En esta foto no pudimos revisar nada.';
+  return `La revisión es orientativa. En esta foto revisamos: ${nombres.join(', ')}.`;
+}
+
+const PESO_NIVEL: Readonly<Record<string, number>> = { alto: 0, medio: 1, bajo: 2 };
+
+/** Lo más grave primero, y lo seguro antes que lo dudoso. El orden también numera las zonas. */
+export function ordenarHallazgos(hallazgos: readonly Hallazgo[]): Hallazgo[] {
+  const peso = (h: Hallazgo): number => PESO_NIVEL[reglaDe(h.regla_id).nivel_riesgo] ?? 3;
+  return [...hallazgos].sort((a, b) => peso(a) - peso(b) || b.confianza - a.confianza);
+}
+
+/** Sin zona no se puede tapar todavía: se dice para que la persona pueda recortar. */
+export function soloAvisaSinZona(h: Hallazgo): boolean {
+  return h.caja === null && !['MEN-01', 'UBI-01'].includes(h.regla_id);
+}
+
 /** Lo que aún pide una decisión: zonas sin resolver y la pregunta de menores. */
 export function pendientes(r: Revision, hallazgos: readonly Hallazgo[]): Hallazgo[] {
   return hallazgos.filter((h) => {
@@ -135,6 +170,10 @@ export function textoMotivo(motivo: Motivo): string {
       return 'Falta el modelo para detectar caras, así que no revisamos si hay personas.';
     case 'deteccion_fallo':
       return 'La detección de caras falló, así que no revisamos si hay personas.';
+    case 'contenido_no_disponible':
+      return 'Faltan los modelos de contenido, así que no revisamos desnudez, contenido sugerente, armas ni extremismo.';
+    case 'contenido_fallo':
+      return 'La revisión de contenido falló, así que no revisamos desnudez, contenido sugerente, armas ni extremismo.';
     default: {
       const inalcanzable: never = motivo;
       throw new Error(`Motivo desconocido: ${String(inalcanzable)}`);
@@ -176,8 +215,10 @@ export function describirHallazgo(h: Hallazgo): string {
       return reglaDe('MEN-01').texto_aviso ?? 'Podría haber menores en la foto';
     case 'UBI-01':
       return 'Este archivo guarda el lugar donde se tomó.';
-    default:
-      return `${reglaDe(h.regla_id).que_detecta}${h.posicion === null ? '' : ` ${h.posicion}`}.`;
+    default: {
+      const regla = reglaDe(h.regla_id);
+      return `${regla.texto_aviso ?? regla.que_detecta}${h.posicion === null ? '' : ` ${h.posicion}`}.`;
+    }
   }
 }
 

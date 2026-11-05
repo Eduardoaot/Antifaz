@@ -38,6 +38,21 @@ El blur y el pixelado no bastan:
 
 Valores por defecto (propuesta propia, no derivada de estudios): relleno sólido en texto, códigos, documentos y matrículas; difuminado en caras; dilatar max(8 px, 10% del lado corto); caras ×1.3; σ = max(25 px, 25% del lado corto); ampliar 5 frames antes y después de cada pista.
 
+## Revisión de contenido
+
+Agregada a pedido del responsable el 6 de noviembre de 2026; no estaba en el brief original.
+
+| Modelo | Uso | Licencia | Tamaño | Tiempo en este CPU |
+|---|---|---|---|---|
+| [CLIP ViT-B/32 cuantizado](https://huggingface.co/Xenova/clip-vit-base-patch32) | De qué trata la imagen | [MIT](https://github.com/openai/CLIP) | 154 MB | 0.5 s |
+| [NudeNet 320n](https://pypi.org/project/nudenet/) | Zonas de desnudez | AGPL-3.0 en [el repo](https://github.com/notAI-tech/NudeNet); PyPI dice MIT | 12 MB | 0.03 s |
+
+**Medido con 21 imágenes, por lo que solo sirve de punto de partida:** imágenes comunes hasta 0.19 en cualquier grupo de riesgo; ejemplos del responsable de 0.71 a 0.90. Por eso el umbral de escena es 0.35. Faltan disfraces, juguetes, noticias, banderas comunes y personas en ropa de playa.
+
+**Limitaciones:** CLIP no da ubicación, así que armas y extremismo solo avisan sobre la imagen completa. NudeNet revisa la imagen a 320 px, así que puede perder personas pequeñas en fotos grandes.
+
+**Fuentes sin leer:** las políticas de Meta sobre organizaciones peligrosas y bienes restringidos llegan truncadas a la lectura automática. Una persona debe abrirlas: ARM-01 y EXT-01 quedan pendientes hasta entonces.
+
 ## Confianza del detector de caras
 
 Medido el 6 de noviembre de 2026 con YuNet, en una muestra pequeña que no se versiona. **No sustituye a un dataset de evaluación.**
