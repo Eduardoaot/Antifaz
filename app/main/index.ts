@@ -499,6 +499,18 @@ function registrarCanalesVideo(): void {
   });
 }
 
+/**
+ * Crea la llave de safeStorage al arrancar. Chromium la guarda en disco unos segundos después de
+ * crearla: si se creara al guardar la primera decisión y la app se cerrara de golpe en ese momento,
+ * la recuperación quedaría cifrada con una llave perdida y no se podría leer.
+ */
+function prepararCifrado(): void {
+  void safeStorage.encryptStringAsync('preparar').catch((e: unknown) => {
+    recuperacionSegura = false;
+    registrar(`No se pudo preparar el cifrado: ${e instanceof Error ? e.name : 'desconocido'}`);
+  });
+}
+
 function endurecerSesion(): void {
   // Segunda capa además de la CSP: solo sale lo empaquetado con la app.
   session.defaultSession.webRequest.onBeforeRequest((detalles, responder) => {
@@ -598,6 +610,7 @@ if (!app.requestSingleInstanceLock()) {
     app.quit();
   });
   void app.whenReady().then(() => {
+    prepararCifrado();
     aplicarTema(leerTema());
     endurecerSesion();
     registrarCanales();

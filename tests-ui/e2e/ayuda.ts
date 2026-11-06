@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { _electron, type ElectronApplication, type Page } from '@playwright/test';
@@ -50,14 +50,69 @@ export interface Sesion {
   datos: string;
 }
 
+/** Sin ventana en este tiempo, la app no arrancó (por ejemplo, otra instancia tiene el candado). */
+const ESPERA_VENTANA_MS = 20_000;
+const ESPERA_CIERRE_MS = 15_000;
+
 export async function lanzar(datos?: string, args: string[] = []): Promise<Sesion> {
   const carpeta = datos ?? mkdtempSync(join(tmpdir(), 'revisor-datos-'));
   mkdirSync(carpeta, { recursive: true });
   // Playwright fuerza el tema claro si no se le dice lo contrario: el modo oscuro no se probaría.
   const app = await _electron.launch({ args: [RAIZ, ...args], env: entorno(carpeta), colorScheme: null });
-  const pagina = await app.firstWindow();
-  await pagina.waitForLoadState('domcontentloaded');
-  return { app, pagina, datos: carpeta };
+  try {
+    // Con límite: si la app se cierra sin abrir ventana, se lanza un error que `reintentar` atrapa,
+    // en vez de esperar hasta que se acabe el tiempo de la prueba.
+    const pagina = await app.firstWindow({ timeout: ESPERA_VENTANA_MS });
+    await pagina.waitForLoadState('domcontentloaded');
+    return { app, pagina, datos: carpeta };
+  } catch (e) {
+    await cerrar(app);
+    throw e;
+  }
+}
+
+/** PID del proceso principal, o null si ya no existe. */
+function pidDe(app: ElectronApplication): number | null {
+  const pid = app.process().pid;
+  return pid === undefined ? null : pid;
+}
+
+function vivo(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Cierre forzado de verdad: termina la app y todos sus procesos hijos (GPU, renderer y sidecar),
+ * y espera a que no quede ninguno. Matar solo el principal deja hijos que retienen el candado de
+ * instancia única un rato, y en un equipo lento la siguiente app se cerraba sin abrir ventana.
+ */
+export async function matarArbol(app: ElectronApplication): Promise<void> {
+  const pid = pidDe(app);
+  if (pid !== null && vivo(pid)) {
+    try {
+      execFileSync('taskkill', ['/PID', String(pid), '/T', '/F'], { stdio: 'ignore' });
+    } catch (e) {
+      // taskkill falla si el proceso terminó justo antes, que es lo que se quería. Si sigue vivo, no.
+      if (vivo(pid)) throw e;
+    }
+  }
+  const limite = Date.now() + ESPERA_CIERRE_MS;
+  while (pid !== null && vivo(pid) && Date.now() < limite) await new Promise((r) => setTimeout(r, 200));
+  await Promise.race([app.close().catch(() => undefined), new Promise((r) => setTimeout(r, 2000))]);
+}
+
+/** Cierra la app con límite de tiempo; si no responde, la termina con todos sus procesos. */
+export async function cerrar(app: ElectronApplication): Promise<void> {
+  const cerro = await Promise.race([
+    app.close().then(() => true, () => true),
+    new Promise<boolean>((r) => setTimeout(() => { r(false); }, ESPERA_CIERRE_MS)),
+  ]);
+  if (!cerro) await matarArbol(app);
 }
 
 /** Los diálogos nativos no se pueden manejar desde Playwright: se simulan en main. */
@@ -85,4 +140,14 @@ export async function abrir(sesion: Sesion, rutas: string[]): Promise<void> {
 
 export function guardarTexto(ruta: string, texto: string): void {
   writeFileSync(ruta, texto);
+}
+
+/**
+ * ¿Ya está en disco la llave con la que safeStorage cifra la recuperación? Chromium la escribe en
+ * "Local State" unos segundos después de crearla. Un cierre forzado antes de eso, en un perfil nuevo,
+ * deja la recuperación ilegible (limitación documentada en qa/REPORTE_FASE_1.md).
+ */
+export function llaveGuardada(datos: string): boolean {
+  const ruta = join(datos, 'Local State');
+  return existsSync(ruta) && readFileSync(ruta, 'utf-8').includes('"os_crypt"');
 }
