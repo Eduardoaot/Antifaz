@@ -98,7 +98,12 @@ input[aria-invalid='true'] { border: 2px solid var(--riesgo-alto); }
 .marca { position: absolute; border: 2px solid #fff; outline: 2px solid #000; pointer-events: none; }
 .marca.ignorar { border-style: dotted; }
 .lienzo { touch-action: none; }
-.herramienta-clic, .herramienta-rectangulo { cursor: crosshair; }
+.herramienta-clic, .herramienta-rectangulo, .herramienta-pincel { cursor: crosshair; }
+/* Invierte los colores de debajo: el trazo se ve sobre fotos claras y oscuras. */
+.trazo { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; mix-blend-mode: difference; }
+.trazo polyline { stroke: #fff; }
+.campo-pincel { display: grid; gap: 0.25rem; }
+.campo-pincel input { width: 100%; }
 .marca.sin-decidir { border-style: dashed; }
 .marca span { position: absolute; left: -2px; top: -2px; padding: 0 0.3rem; background: #000; color: #fff; font-size: 0.8125rem; font-weight: 700; }
 
@@ -169,6 +174,8 @@ summary { cursor: pointer; min-height: 1.75rem; }
   .advertencia { border-left-color: CanvasText; }
   .nivel { background: none; color: CanvasText; }
   .marca { border-color: Highlight; outline-color: CanvasText; }
+  .trazo { mix-blend-mode: normal; }
+  .trazo polyline { stroke: Highlight; }
 }
 
 @media (prefers-reduced-motion: reduce) {

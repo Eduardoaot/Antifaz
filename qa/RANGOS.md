@@ -61,7 +61,8 @@ Cada parámetro de este archivo tiene pruebas parametrizadas de mínimo-1, míni
 | `mascara.dilatacion_pct` | decimal, % del lado corto | 0 | 50 | 10 | Estándar. Se usa el mayor entre este valor y `dilatacion_px` |
 | `mascara.multiplicador_cara` | decimal | 1.0 | 3.0 | 1.3 | Estándar |
 | `mascara.cobertura` | decimal, % de la imagen | Más de 0 | 100 | Calculado | 0%: se rechaza con "La máscara está vacía". 100%: se permite tras confirmar |
-| `pincel.tamano_px` | entero, px | 1 | 512 | 32 | Estándar |
+| `pincel.tamano_px` | entero, px de la foto original | 1 | 512 | 32 | Estándar. En la UI es un slider, que no puede salirse del rango. Un tamaño par da un píxel de más, nunca de menos |
+| `pincel.puntos` | entero, puntos por trazo | 1 | 5000 (propuesta) | n/a | La UI omite los puntos a menos de un cuarto del tamaño del anterior. Al llegar al límite toma la primera parte y avisa "Tu trazo era muy largo". El sidecar rechaza más puntos o un punto fuera de la imagen |
 | `rectangulo.x`, `rectangulo.y` | entero, px | 0 | Ancho-1, alto-1 | n/a | Estándar |
 | `rectangulo.ancho`, `rectangulo.alto` | entero, px | 1 | Hasta el borde de la imagen | n/a | Estándar. No se recorta en silencio. Si cubre toda la imagen, se pide confirmar |
 | `silueta.margen` | Igual que `mascara.dilatacion_px` y `dilatacion_pct` | n/a | n/a | n/a | Si la silueta ya no está en memoria, se oculta toda su caja |
@@ -84,7 +85,7 @@ Cada parámetro de este archivo tiene pruebas parametrizadas de mínimo-1, míni
 
 | Parámetro | Tipo | Mín | Máx | Default | Ante un valor inválido |
 |---|---|---|---|---|---|
-| `lote.archivos` | entero | 1 | 500 | n/a | Se aceptan los primeros 500 solo si tú lo confirmas; nunca se descartan en silencio |
+| `lote.archivos` | entero, fotos abiertas a la vez | 1 | 500 | n/a | Cuenta las ya abiertas, porque la recuperación guarda hasta 500. Si no caben todas, se pregunta si abrir las primeras; las que quedan fuera se dicen en un solo aviso. Nunca se descartan en silencio |
 | `archivo.tamano_bytes` (imagen) | entero | 1 | 1 GiB (propuesta) | n/a | 0 bytes: "Este archivo está vacío". Rechazo por archivo; el lote sigue |
 | `archivo.tamano_bytes` (video) | entero | 1 | 20 GiB (propuesta) | n/a | Igual que imagen |
 | `imagen.megapixeles` | decimal, MP | Más de 0 | 200 (propuesta) | n/a | Rechazo antes de decodificar, como protección contra bombas de descompresión |

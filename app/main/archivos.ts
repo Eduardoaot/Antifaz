@@ -34,10 +34,54 @@ interface Registro {
 
 type Pedir = (comando: Record<string, unknown>) => Promise<RespuestaSidecar>;
 
+const claveDeRuta = (ruta: string): string => normalize(ruta).toLowerCase();
+
+export interface PlanLote {
+  /** Rutas a abrir, en el orden elegido: las ya abiertas y las nuevas que caben. */
+  abrir: string[];
+  /** Cuántas nuevas cabrían. */
+  nuevas: number;
+  /** Cuántas nuevas no caben. Nunca se descartan sin decirlo. */
+  sobran: number;
+}
+
+/**
+ * Reparte una selección entre lo que cabe y lo que no. El límite es de fotos abiertas a la vez,
+ * no por selección: con más, la recuperación no se podría guardar. Una foto que ya está abierta
+ * no ocupa otro lugar, y una ruta repetida en la selección cuenta una vez.
+ */
+export function planearLote(rutas: readonly string[], estaAbierta: (ruta: string) => boolean, lugares: number): PlanLote {
+  const plan: PlanLote = { abrir: [], nuevas: 0, sobran: 0 };
+  // Una ruta repetida corre la misma suerte que la primera vez que apareció.
+  const cabe = new Map<string, boolean>();
+  for (const ruta of rutas) {
+    const clave = claveDeRuta(ruta);
+    let entra = cabe.get(clave);
+    if (entra === undefined) {
+      entra = estaAbierta(ruta) || plan.nuevas < Math.max(0, lugares);
+      if (entra && !estaAbierta(ruta)) plan.nuevas += 1;
+      cabe.set(clave, entra);
+    }
+    if (entra) plan.abrir.push(ruta);
+    else plan.sobran += 1;
+  }
+  return plan;
+}
+
 export class Archivos {
   private registros = new Map<string, Registro>();
 
   constructor(private readonly pedir: Pedir) {}
+
+  get cantidad(): number {
+    return this.registros.size;
+  }
+
+  estaAbierta(ruta: string): boolean {
+    const clave = claveDeRuta(ruta);
+    for (const registro of this.registros.values()) if (claveDeRuta(registro.ruta) === clave) return true;
+    return false;
+  }
 
   private async abrirEnSidecar(ruta: string): Promise<Resultado<{ sidecarId: string; huella: string; archivo: Omit<ArchivoAbierto, 'id' | 'duplicado'> }>> {
     const { resultado } = await this.pedir({ tipo: 'abrir_imagen', ruta });
@@ -54,9 +98,9 @@ export class Archivos {
   }
 
   async abrir(ruta: string): Promise<ArchivoCargado> {
-    const clave = normalize(ruta).toLowerCase();
+    const clave = claveDeRuta(ruta);
     for (const registro of this.registros.values()) {
-      if (normalize(registro.ruta).toLowerCase() === clave) {
+      if (claveDeRuta(registro.ruta) === clave) {
         return { ok: true, archivo: { ...registro.archivo, duplicado: true } };
       }
     }
