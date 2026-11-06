@@ -98,17 +98,29 @@ Cada parámetro de este archivo tiene pruebas parametrizadas de mínimo-1, míni
 
 | Parámetro | Tipo | Mín | Máx | Default | Ante un valor inválido |
 |---|---|---|---|---|---|
-| `video.duracion_s` | decimal, s | Más de 0 (1 frame es válido) | 7200 (propuesta) | n/a | Por encima: rechazo explicado |
-| `video.duracion_aviso_s` | entero, s | 1 | 7200 | 180 (propuesta) | Por encima se muestra el tiempo estimado y se pide confirmar |
+| `video.duracion_s` | decimal, s | Más de 0 (1 frame es válido) | 3 (beta; decisión del responsable, 2026-11-06), más un frame de tolerancia con tope de 0.05 s | n/a | Por encima: rechazo explicado. Antes la propuesta era 7200. La tolerancia acepta clips de 3.003 s (29.97 fps), también por decisión del responsable |
+| `video.duracion_aviso_s` | entero, s | 1 | `video.duracion_s` máx. | 3 (beta: igual al máximo, así que no se pide confirmar) | Por encima se muestra el tiempo estimado y se pide confirmar |
 | `video.lado_px` | entero, px | 16 (propuesta) | 8192 (propuesta, cubre 8K) | n/a | Rechazo por archivo |
 | `video.fps` | decimal, fps | Más de 0 | 240 (propuesta) | n/a | Rechazo por archivo. El frame rate variable es válido |
+
+Implementado en `sidecar/revisor/video.py`, que lee la salida de ffprobe. También se rechazan, con `VIDEO_NO_SOPORTADO`, más de una pista de video y una rotación que no sea múltiplo de 90°. Un video de duración 0 con un frame vale y su duración es la de ese frame.
+
+## Herramientas de video
+
+FFmpeg 9.0.2 y exiftool 13.61, con hash fijado en `sidecar/revisor/herramientas.py`. Si el hash no coincide, no se ejecutan (`HERRAMIENTA_NO_DISPONIBLE`).
+
+| Parámetro | Tipo | Mín | Máx | Default | Ante un valor inválido |
+|---|---|---|---|---|---|
+| `herramienta.tiempo_max_s` | decimal, s | 1 | 21600 (6 h, propuesta) | Según la llamada | `VALIDACION` y no se ejecuta. Al agotarse: `HERRAMIENTA_FALLO`, sin archivo final |
+| `ffprobe.tiempo_max_s` | decimal, s | n/a | n/a | 60 (propuesta) | Fijo en código |
+| `herramienta.salida_bytes` | entero, bytes | 0 | 64 MiB (propuesta) | n/a | `HERRAMIENTA_FALLO` |
 
 ## Procesamiento de video
 
 | Parámetro | Tipo | Mín | Máx | Default | Ante un valor inválido |
 |---|---|---|---|---|---|
-| `proxy.lado_corto_px` | entero, px | 240 (propuesta) | 720 (propuesta) | 480 (propuesta) | Estándar |
-| `tracking.fps` | decimal, fps | 1 (propuesta) | 30 (propuesta) | 10 (propuesta) | Estándar. Entre frames rastreados se interpola y se amplía la máscara |
+| `proxy.lado_corto_px` | entero, px | 240 (propuesta) | 720 (propuesta) | 480 (medido: EdgeTAM tarda 1.85 s por frame en el i5) | Estándar |
+| `tracking.fps` | decimal, fps | 1 (propuesta) | 30 (propuesta) | 24 (beta; decisión del responsable, 2026-11-06) | Estándar. Entre frames rastreados se interpola y se amplía la máscara. Si el video tiene menos fps, se rastrea cada frame |
 | `bloque.frames` | entero, frames | 30 (propuesta) | 3000 (propuesta) | 300 (propuesta) | Estándar |
 | `pista.margen_frames` | entero, frames | 0 | 120 (propuesta) | 5 | Estándar. Oculta antes y después de cada pista |
 | `pista.inicio_ms` | entero, ms | 0 | Menor que `fin_ms` | 0 | Estándar. `inicio` mayor o igual que `fin`: se rechaza |
@@ -154,5 +166,6 @@ Los límites de Instagram cambian, y sus propias fuentes se contradicen (4:5 o 3
 | Máscara | No vacía. Si cubre el 100%, se pide confirmar |
 | `umbral_confianza` y `umbral_revision` | Revisión mayor o igual que confianza |
 | `duracion_aviso_s` y `duracion_s` | El aviso no supera el máximo |
+| `tracking.fps` y `video.fps` | Se rastrea a `min(tracking.fps, video.fps)`: nunca más frames de los que tiene el video |
 | `proxy` y video original | El proxy nunca es mayor que el original; si el original es menor, se usa su tamaño |
 | Tamaño de la región y `pixel_px` | Si el bloque es mayor que la región, la región queda como un solo bloque de relleno |

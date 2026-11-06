@@ -23,12 +23,14 @@ Electron + React/TypeScript (strict) + sidecar Python 3.12 con uv.
 - **Modelos:** ver la tabla en `docs/INVESTIGACION.md`. Los pesos se descargan aparte, con hash, y nunca durante un análisis. No se versionan.
 - **Cero tráfico:** CSP, bloqueo en la sesión de Electron, auditoría de sockets en Python y test con captura.
 - **Datos sensibles:** caché cifrada con llave solo en memoria. Embeddings solo en RAM salvo que el usuario guarde. La recuperación guarda ediciones, sin píxeles.
-- **Exportación fail-closed:** verificación contra lista blanca antes de escribir, archivo temporal y renombrado atómico. Las imágenes se recodifican desde píxeles y sus bytes se revisan con `metadatos.py`. En video se usarán ffprobe y exiftool.
+- **Exportación fail-closed:** verificación contra lista blanca antes de escribir, archivo temporal y renombrado atómico. Las imágenes se recodifican desde píxeles y sus bytes se revisan con `metadatos.py`. En video, `metadatos_video.py` revisa las cajas del MP4 y después se pasará exiftool.
+- **Herramientas de video:** FFmpeg y exiftool con hash fijado en `herramientas.py`; si no coincide, no se ejecutan. Siempre sin shell, con `file:` y `-protocol_whitelist file`, entorno mínimo y tiempo máximo. Su salida de error nunca va al log.
 - **Huella:** cada archivo tiene un SHA-256. Las decisiones solo valen para esos mismos bytes: si cambia, no se aplican ni se exporta.
 - **Ocultamiento:** texto, códigos, documentos y matrículas con relleno sólido por defecto. Difuminado y pixelado usan los colores de la imagen por decisión del responsable (2026-11-06), así que **no son irreversibles** y la app lo avisa. Solo el bloque sólido lo es. No se debe decir que un difuminado es irrecuperable.
 - **Contenido:** CLIP avisa sobre la imagen completa (armas, extremismo, desnudez, sugerente), y NudeNet da zonas de desnudez y de contenido sugerente. Siempre se dice "podría", nunca se afirma. La desnudez se marca sola para ocultar con bloque sólido, y la persona decide. Las muestras sensibles nunca se versionan.
 - **Texto y códigos:** RapidOCR y zxing-cpp en local. El contenido leído nunca se muestra, ni se guarda, ni va a los logs: solo se usa para clasificar.
 - **Selección manual:** SlimSAM por clic, rectángulo y pincel, con alternativa por coordenadas para usar sin mouse. El sidecar convierte cada trazo en silueta. El pincel solo agrega zonas: quitar parte de una silueta podría destapar algo. Las siluetas viven en memoria: si se pierden, se oculta toda la caja.
+- **Video (beta):** hasta 3 s, más un frame de tolerancia con tope de 0.05 s, y seguimiento a 24 fps con EdgeTAM sobre un proxy de 480 px. Decisión del responsable (2026-11-06). Los frames sin ocultar solo pasan por tuberías, nunca por el disco.
 - **Caras:** dos niveles. Con confianza de 0.6 o más es "cara" y pregunta por menores. Por debajo es "podría ser una cara", sin esa pregunta.
 
 ## Reglas de validación
@@ -57,7 +59,7 @@ Detalle en `qa/PLAN_QA.md`, `qa/RANGOS.md` y `qa/MATRIZ_PRUEBAS.md`.
 # App
 npm install
 cd sidecar && uv sync --python 3.12 && cd ..
-.venv\Scripts\python tools\descargar_modelos.py
+.venv\Scripts\python tools\descargar_modelos.py   # modelos, FFmpeg y exiftool; --zips CARPETA si una réplica falla
 npm run iniciar
 
 # Pruebas

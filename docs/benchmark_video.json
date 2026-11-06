@@ -1,0 +1,87 @@
+{
+  "equipo": {
+    "cpu": "Intel64 Family 6 Model 142 Stepping 12, GenuineIntel",
+    "nucleos_fisicos": 4,
+    "nucleos_logicos": 8,
+    "ram_gb": 15.8,
+    "hilos_usados": 4,
+    "segundos_de_video": 3.0,
+    "fps_video": 24,
+    "modelos": {
+      "sam2.1-tiny": [
+        "facebook/sam2.1-hiera-tiny",
+        "de431c4043854a71d8101e17995dfe596bf101a5"
+      ],
+      "edgetam": [
+        "yonigozlan/EdgeTAM-hf",
+        "c266ce53b3fc00f0f495b583f6a116c4e57f53bb"
+      ]
+    }
+  },
+  "resultados": [
+    {
+      "metodo": "sam2.1-tiny",
+      "fps_tracking": 24,
+      "lado_proxy": 480,
+      "hilos": 4,
+      "frames_video": 72,
+      "frames_rastreados": 72,
+      "s_por_frame_rastreado": 6.7449,
+      "minutos_por_minuto_de_video": 161.88,
+      "segundos_por_video": 485.6,
+      "memoria_pico_mb": 2792.0,
+      "frames_con_algo_visible_pct": 0.0,
+      "peor_frame_visible_pct": 0.0,
+      "cobertura_media_pct": 100.0,
+      "cara_elegida_en_frame0_pct": 60.2
+    },
+    {
+      "metodo": "edgetam",
+      "fps_tracking": 24,
+      "lado_proxy": 480,
+      "hilos": 4,
+      "frames_video": 72,
+      "frames_rastreados": 72,
+      "s_por_frame_rastreado": 1.8508,
+      "minutos_por_minuto_de_video": 44.42,
+      "segundos_por_video": 133.3,
+      "memoria_pico_mb": 2568.0,
+      "frames_con_algo_visible_pct": 0.0,
+      "peor_frame_visible_pct": 0.0,
+      "cobertura_media_pct": 100.0,
+      "cara_elegida_en_frame0_pct": 99.0
+    },
+    {
+      "metodo": "csrt",
+      "fps_tracking": 24,
+      "lado_proxy": 480,
+      "hilos": 4,
+      "frames_video": 72,
+      "frames_rastreados": 72,
+      "s_por_frame_rastreado": 0.0365,
+      "minutos_por_minuto_de_video": 0.88,
+      "segundos_por_video": 2.6,
+      "memoria_pico_mb": 391.0,
+      "frames_con_algo_visible_pct": 0.0,
+      "peor_frame_visible_pct": 0.0,
+      "cobertura_media_pct": 100.0,
+      "cara_elegida_en_frame0_pct": 100.0
+    },
+    {
+      "metodo": "yunet",
+      "fps_tracking": 24,
+      "lado_proxy": 480,
+      "hilos": 4,
+      "frames_video": 72,
+      "frames_rastreados": 72,
+      "s_por_frame_rastreado": 0.0333,
+      "minutos_por_minuto_de_video": 0.8,
+      "segundos_por_video": 2.4,
+      "memoria_pico_mb": 381.0,
+      "frames_con_algo_visible_pct": 27.8,
+      "peor_frame_visible_pct": 100.0,
+      "cobertura_media_pct": 72.22,
+      "cara_elegida_en_frame0_pct": 95.4
+    }
+  ]
+}
