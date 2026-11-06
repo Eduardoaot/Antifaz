@@ -1,4 +1,4 @@
-"""Limpia cachés y archivos generados de Antifaz para liberar espacio. Idea original de Ricardo.
+"""Limpia cachés y archivos generados del proyecto para liberar espacio. Idea original de Ricardo.
 
 Uso:
     npm run limpiar                      # cachés y compilados; se regeneran solos
