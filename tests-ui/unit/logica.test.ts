@@ -1,13 +1,16 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { catalogo, etiquetaNivel, reglaDe, urlsDeFuentes, type Nivel } from '../../app/shared/catalogo';
-import { esquemaEdicion, esquemaOcultamiento, type Analisis, type Hallazgo, type Motivo } from '../../app/shared/contrato';
+import { esquemaEdicion, esquemaOcultamiento, esquemaTrazo, LIMITES, type Analisis, type Hallazgo, type Motivo, type Punto } from '../../app/shared/contrato';
 import {
   HISTORIAL_PASOS,
   REVISION_INICIAL,
   aEdicion,
   aPuntoDeImagen,
   agregarManual,
+  agregarPuntoTrazo,
+  textoOrigen,
+  trazoLleno,
   agruparReglas,
   aplicarCambio,
   aplicarDecisionesIniciales,
@@ -323,6 +326,31 @@ describe('zonas manuales', () => {
     expect(esquemaEdicion.parse(vieja).manuales).toEqual([]);
   });
 
+  it('el origen sale de la máscara si no se dice, y se nombra en pantalla', () => {
+    expect(agregarManual(REVISION_INICIAL, 'a', caja, null).manuales[0]?.origen).toBe('rectangulo');
+    expect(agregarManual(REVISION_INICIAL, 'a', caja, 'm').manuales[0]?.origen).toBe('silueta');
+    expect(agregarManual(REVISION_INICIAL, 'a', caja, 'm', 'pincel').manuales[0]?.origen).toBe('pincel');
+    expect(['rectangulo', 'silueta', 'pincel'].map((o) => textoOrigen(o as 'pincel'))).toEqual(['rectángulo', 'silueta', 'trazo a mano']);
+    expect(() => textoOrigen('otro' as 'pincel')).toThrow();
+  });
+
+  it('un trazo lleva su silueta y solo el margen mínimo: es lo que se pintó', () => {
+    const r = agregarManual(REVISION_INICIAL, 'p', caja, 'trazo', 'pincel');
+    const [o] = construirOcultamientos(r, []);
+    expect(o?.mascara_id).toBe('trazo');
+    expect(o?.dilatacion_pct).toBe(0);
+    expect(o?.dilatacion_px).toBe(LIMITES.dilatacionPx.porDefecto);
+  });
+
+  it('el origen sobrevive a la recuperación, y una recuperación vieja sin origen lo deduce', () => {
+    const r = agregarManual(agregarManual(REVISION_INICIAL, 'p', caja, 'trazo', 'pincel'), 'q', caja, 'sam');
+    const e = esquemaEdicion.parse(aEdicion('6f9619ff-8b86-4011-b42d-00c04fc964ff', r));
+    expect(desdeEdicion(e)).toEqual(r);
+    const vieja = { ...e, manuales: e.manuales.map(({ origen: _o, ...resto }) => resto) };
+    expect(desdeEdicion(esquemaEdicion.parse(vieja)).manuales.map((z) => z.origen)).toEqual(['silueta', 'silueta']);
+    expect(esquemaEdicion.safeParse({ ...e, manuales: [{ ...e.manuales[0], origen: 'otro' }] }).success).toBe(false);
+  });
+
   it('detecta una zona que cubre todo', () => {
     expect(cubreTodo({ x: 0, y: 0, ancho: 100, alto: 50 }, 100, 50)).toBe(true);
     expect(cubreTodo({ x: 1, y: 0, ancho: 99, alto: 50 }, 100, 50)).toBe(false);
@@ -370,6 +398,65 @@ describe('coordenadas', () => {
   it('un clic sin arrastrar no crea una zona', () => {
     expect(cajaEntre({ x: 5, y: 5 }, { x: 5, y: 5 })).toBeNull();
     expect(cajaEntre({ x: 5, y: 5 }, { x: 5, y: 50 })).toBeNull();
+  });
+});
+
+describe('pincel', () => {
+  const p = (x: number, y: number): Punto => ({ x, y });
+
+  it('omite los puntos que casi no se movieron', () => {
+    const t = agregarPuntoTrazo([p(0, 0)], p(3, 0), 32);
+    expect(t).toEqual([p(0, 0)]);
+    expect(agregarPuntoTrazo(t, p(8, 0), 32)).toEqual([p(0, 0), p(8, 0)]);
+    // Con tamaño 1 basta moverse un píxel.
+    expect(agregarPuntoTrazo([p(0, 0)], p(1, 0), 1)).toHaveLength(2);
+    expect(agregarPuntoTrazo([p(0, 0)], p(0, 0), 1)).toHaveLength(1);
+    expect(agregarPuntoTrazo([], p(5, 5), 32)).toEqual([p(5, 5)]);
+  });
+
+  it('no pasa del límite de puntos y lo avisa', () => {
+    const lleno = Array.from({ length: LIMITES.puntosTrazo }, (_, i) => p(i, 0));
+    expect(trazoLleno(lleno)).toBe(true);
+    expect(trazoLleno(lleno.slice(1))).toBe(false);
+    expect(agregarPuntoTrazo(lleno, p(99999, 0), 1)).toBe(lleno);
+  });
+
+  it('propiedad: el trazo siempre cumple el contrato con el sidecar', () => {
+    fc.assert(
+      fc.property(
+        fc.array(fc.record({ x: fc.integer({ min: 0, max: 29999 }), y: fc.integer({ min: 0, max: 29999 }) }), { minLength: 1, maxLength: 300 }),
+        fc.integer({ min: LIMITES.pincel.min, max: LIMITES.pincel.max }),
+        (puntos, tamano) => {
+          const trazo = puntos.reduce<readonly Punto[]>((t, q) => agregarPuntoTrazo(t, q, tamano), []);
+          return esquemaTrazo.safeParse({ puntos: trazo, tamano }).success;
+        },
+      ),
+    );
+  });
+
+  it.each([
+    [{ puntos: [], tamano: 32 }],
+    [{ puntos: [{ x: 0, y: 0 }], tamano: 0 }],
+    [{ puntos: [{ x: 0, y: 0 }], tamano: 513 }],
+    [{ puntos: [{ x: 0, y: 0 }], tamano: 1.5 }],
+    [{ puntos: [{ x: 0, y: 0 }], tamano: Number.NaN }],
+    [{ puntos: [{ x: 0, y: 0 }], tamano: Number.POSITIVE_INFINITY }],
+    [{ puntos: [{ x: 0, y: 0 }], tamano: null }],
+    [{ puntos: [{ x: 0, y: 0 }] }],
+    [{ puntos: null, tamano: 32 }],
+    [{ puntos: [{ x: 0, y: 0 }], tamano: '32' }],
+    [{ puntos: [{ x: -1, y: 0 }], tamano: 32 }],
+    [{ puntos: [{ x: 30000, y: 0 }], tamano: 32 }],
+    [{ puntos: [{ x: 0 }], tamano: 32 }],
+    [{ puntos: [{ x: 0, y: 0, z: 0 }], tamano: 32 }],
+    [{ puntos: Array.from({ length: LIMITES.puntosTrazo + 1 }, () => ({ x: 0, y: 0 })), tamano: 32 }],
+  ])('el contrato rechaza un trazo inválido: %#', (trazo) => {
+    expect(esquemaTrazo.safeParse(trazo).success).toBe(false);
+  });
+
+  it('el contrato acepta los límites exactos', () => {
+    expect(esquemaTrazo.safeParse({ puntos: [{ x: 0, y: 0 }], tamano: 1 }).success).toBe(true);
+    expect(esquemaTrazo.safeParse({ puntos: [{ x: 29999, y: 29999 }], tamano: 512 }).success).toBe(true);
   });
 });
 

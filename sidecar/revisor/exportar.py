@@ -6,6 +6,8 @@ import errno
 import io
 import logging
 import os
+import re
+import time
 import uuid
 from collections.abc import Mapping, Sequence
 from pathlib import PurePath
@@ -23,6 +25,8 @@ from .rutas import misma_ruta, ruta_larga
 registro = logging.getLogger(__name__)
 
 EXTENSIONES = {".jpg": "JPEG", ".jpeg": "JPEG", ".png": "PNG"}
+PATRON_PARCIAL = re.compile(r"\.[0-9a-f]{32}\.parcial")
+ANTIGUEDAD_PARCIAL_S = 60
 # Diferencia media admitida entre lo pedido y lo escrito en JPEG, que comprime con pérdida.
 TOLERANCIA_JPEG = 24.0
 
@@ -78,6 +82,35 @@ def _error_de_sistema(e: OSError) -> ErrorRevisor:
     return ErrorRevisor(Codigo.RUTA_INVALIDA, f"errno {e.errno}")
 
 
+def limpiar_parciales(carpeta: str, ahora: float | None = None) -> int:
+    """Borra temporales que dejó una exportación interrumpida, por ejemplo por un cierre forzado.
+
+    Solo toca archivos con el nombre exacto que crea `_escribir_atomico` y con más de un minuto,
+    para no borrar uno que se esté escribiendo. Devuelve cuántos borró.
+    """
+    limite = (time.time() if ahora is None else ahora) - ANTIGUEDAD_PARCIAL_S
+    borrados = 0
+    try:
+        entradas = list(os.scandir(carpeta))
+    except OSError as e:
+        registro.warning("No se pudo revisar la carpeta de destino: errno %s", e.errno)
+        return 0
+    for entrada in entradas:
+        if not PATRON_PARCIAL.fullmatch(entrada.name):
+            continue
+        try:
+            if not entrada.is_file(follow_symlinks=False):
+                continue
+            if entrada.stat(follow_symlinks=False).st_mtime < limite:
+                os.remove(entrada.path)
+                borrados += 1
+        except OSError as e:
+            registro.warning("No se pudo borrar un temporal viejo: errno %s", e.errno)
+    if borrados:
+        registro.info("Se borraron %d temporales de una exportación interrumpida", borrados)
+    return borrados
+
+
 def _escribir_atomico(destino: str, datos: bytes) -> None:
     carpeta = os.path.dirname(destino)
     # Un nombre que no parece terminado, por si la app muere antes del renombrado.
@@ -130,5 +163,6 @@ def exportar(
         _verificar_contenido(datos, formato, esperado, regiones)
     except MemoryError as e:
         raise ErrorRevisor(Codigo.MEMORIA_INSUFICIENTE) from e
+    limpiar_parciales(os.path.dirname(destino))
     _escribir_atomico(destino, datos)
     return {"formato": formato, "bytes": len(datos), "zonas_ocultas": len(regiones)}

@@ -163,6 +163,15 @@ test('texto y código: los encuentra, los tapa y el dato no sale en la copia', a
     { cwd: join(RAIZ, 'sidecar') },
   ).toString().trim();
   expect(lectura, 'el dato o el código siguen legibles en la copia').toBe('0 0');
+
+  // ERR-004: lo que se leyó con OCR o del código no llega a los logs.
+  const logs = join(sesion.datos, 'logs');
+  const archivosLog = readdirSync(logs);
+  expect(archivosLog.length, 'sin logs no se prueba nada').toBeGreaterThan(0);
+  for (const archivo of archivosLog) {
+    const texto = readFileSync(join(logs, archivo), 'utf-8');
+    for (const leido of ['8123', '4567', 'persona@', 'ejemplo.com', 'Tel:']) expect(texto.includes(leido), `${archivo}: ${leido}`).toBe(false);
+  }
 });
 
 test('Guía de privacidad: se consulta sin ninguna foto', async () => {
@@ -171,9 +180,9 @@ test('Guía de privacidad: se consulta sin ninguna foto', async () => {
   await pagina.getByRole('button', { name: 'Guía de privacidad' }).click();
   await expect(pagina.getByRole('heading', { name: 'Guía de privacidad', level: 1 })).toBeVisible();
   await expect(pagina.getByRole('heading', { name: 'Armas y grupos armados' })).toBeVisible();
-  await expect(pagina.getByText('Placas de autos y motos')).toBeVisible();
+  await expect(pagina.getByText('Placas de autos y motos', { exact: true })).toBeVisible();
   await sinViolaciones(pagina);
-  await pagina.getByRole('button', { name: /^Ver fuentes: Placas/ }).click();
+  await pagina.getByRole('button', { name: /^Ver fuentes\s*:\s*Placas/ }).click();
   await expect(pagina.getByRole('dialog')).toContainText('Aún no tenemos una fuente oficial directa');
   await sinViolaciones(pagina);
   await pagina.keyboard.press('Escape');
@@ -197,16 +206,16 @@ test('rectángulo con el mouse: tapa esa zona en la copia, y se puede deshacer',
   await expect(veredicto(pagina)).toBeVisible({ timeout: 60_000 });
   await pagina.getByRole('button', { name: 'Dibujar rectángulo' }).click();
   await arrastrar(pagina, [0.2, 0.2], [0.5, 0.5]);
-  await expect(pagina.getByText('Tu zona 1')).toBeVisible();
+  await expect(pagina.getByText('Tu zona 1', { exact: true })).toBeVisible();
   await sinViolaciones(pagina);
   await pagina.keyboard.press('Control+z');
-  await expect(pagina.getByText('Tu zona 1')).toHaveCount(0);
+  await expect(pagina.getByText('Tu zona 1', { exact: true })).toHaveCount(0);
   await pagina.keyboard.press('Control+y');
-  await expect(pagina.getByText('Tu zona 1')).toBeVisible();
+  await expect(pagina.getByText('Tu zona 1', { exact: true })).toBeVisible();
   await arrastrar(pagina, [0.7, 0.7], [0.7, 0.7]);
-  await expect(pagina.getByText('Tu zona 2')).toHaveCount(0);
+  await expect(pagina.getByText('Tu zona 2', { exact: true })).toHaveCount(0);
   await pagina.getByRole('button', { name: /^Quitar/ }).click();
-  await expect(pagina.getByText('Tu zona 1')).toHaveCount(0);
+  await expect(pagina.getByText('Tu zona 1', { exact: true })).toHaveCount(0);
   await arrastrar(pagina, [0.2, 0.2], [0.5, 0.5]);
   const salida = join(mkdtempSync(join(tmpdir(), 'revisor-salida-')), 'rect.png');
   await simularGuardar(app, salida);
@@ -234,10 +243,17 @@ test('coordenadas sin mouse: valida, avisa si cubre todo y agrega', async () => 
   await llenar('0', '0', '640', '480');
   await expect(pagina.getByRole('dialog')).toContainText('cubre toda la imagen');
   await pagina.getByRole('button', { name: 'Volver', exact: true }).click();
-  await expect(pagina.getByText('Tu zona 1')).toHaveCount(0);
+  await expect(pagina.getByText('Tu zona 1', { exact: true })).toHaveCount(0);
   await llenar('10', '10', '100', '100');
-  await expect(pagina.getByText('Tu zona 1')).toBeVisible();
+  await expect(pagina.getByText('Tu zona 1', { exact: true })).toBeVisible();
   await expect(pagina.getByText('(rectángulo)')).toBeVisible();
+
+  // INT-012: buscar un objeto fuera de la imagen no crea nada y lo explica.
+  await pagina.getByLabel('X', { exact: true }).fill('640');
+  await pagina.getByLabel('Y', { exact: true }).fill('0');
+  await pagina.getByRole('button', { name: 'Buscar objeto en X, Y' }).click();
+  await expect(pagina.getByRole('alert').filter({ hasText: 'Escribe X de 0 a 639' })).toBeVisible();
+  await expect(pagina.getByText('Tu zona 2', { exact: true })).toHaveCount(0);
 });
 
 test('clic en un objeto: SAM da la silueta y la cara deja de verse en la copia', async () => {
@@ -265,6 +281,48 @@ test('clic en un objeto: SAM da la silueta y la cara deja de verse en la copia',
     { cwd: join(RAIZ, 'sidecar') },
   ).toString().trim().split(/\s+/).at(-1);
   expect(lectura, 'la cara sigue reconocible').toBe('0');
+});
+
+test('pincel: el trazo se oculta en la copia, solo donde se pintó, y se puede deshacer', async () => {
+  sesion = await lanzar();
+  const { pagina, app } = sesion;
+  await abrir(sesion, [m('gps.jpg')]);
+  await expect(veredicto(pagina)).toBeVisible({ timeout: 60_000 });
+  await pagina.getByRole('button', { name: 'Pintar con pincel' }).click();
+  const tamano = pagina.getByLabel(/^Tamaño del pincel/);
+  await expect(tamano).toHaveValue('32');
+  await tamano.fill('48');
+  await expect(pagina.getByText('Tamaño del pincel: 48 px de la foto')).toBeVisible();
+  await sinViolaciones(pagina);
+
+  const lienzo = await pagina.getByTestId('lienzo').boundingBox();
+  if (lienzo === null) throw new Error('sin lienzo');
+  await pagina.mouse.move(lienzo.x + lienzo.width * 0.2, lienzo.y + lienzo.height * 0.5);
+  await pagina.mouse.down();
+  await pagina.mouse.move(lienzo.x + lienzo.width * 0.8, lienzo.y + lienzo.height * 0.5, { steps: 12 });
+  await pagina.screenshot({ path: join(CAPTURAS, 'pincel-trazando.png') });
+  await pagina.mouse.up();
+  await expect(pagina.getByText('(trazo a mano)')).toBeVisible({ timeout: 30_000 });
+  await expect(pagina.getByTestId('anuncio')).toContainText('Agregamos tu trazo');
+  await pagina.keyboard.press('Control+z');
+  await expect(pagina.getByText('(trazo a mano)')).toHaveCount(0);
+  await pagina.keyboard.press('Control+y');
+  await expect(pagina.getByText('(trazo a mano)')).toBeVisible();
+  await pagina.waitForTimeout(500);
+  await pagina.screenshot({ path: join(CAPTURAS, 'pincel.png') });
+  await sinViolaciones(pagina);
+
+  const salida = join(mkdtempSync(join(tmpdir(), 'revisor-salida-')), 'pincel.png');
+  await simularGuardar(app, salida);
+  await pagina.getByRole('button', { name: 'Exportar copia' }).click();
+  await expect(pagina.getByTestId('anuncio')).toContainText('con 1 zona oculta', { timeout: 60_000 });
+  const colores = execFileSync(
+    join(RAIZ, 'sidecar', '.venv', 'Scripts', 'python.exe'),
+    ['-c', 'import sys;from PIL import Image;i=Image.open(sys.argv[1]).convert("RGB");print(*[i.getpixel(p) for p in ((320,240),(150,240),(320,100),(320,400),(40,240))],sep="|")', salida],
+  ).toString().trim().split('|');
+  const negro = '(0, 0, 0)';
+  expect(colores.slice(0, 2), 'lo pintado sale tapado').toEqual([negro, negro]);
+  for (const c of colores.slice(2)) expect(c, 'fuera del trazo, la foto queda igual').not.toBe(negro);
 });
 
 test('imagen diminuta: nunca se presenta como limpia', async () => {
@@ -295,6 +353,62 @@ test('el mismo archivo dos veces no se duplica', async () => {
   await abrir(sesion, [m('negra.png')]);
   await expect(pagina.getByTestId('anuncio')).toContainText('Ya tenías abierta');
   await expect(pagina.getByRole('navigation').getByRole('listitem')).toHaveCount(1);
+});
+
+/** Simula la respuesta del diálogo nativo de preguntas y cuenta cuántas veces se mostró. */
+async function simularPregunta(sesion: Sesion, respuesta: number): Promise<void> {
+  await sesion.app.evaluate(({ dialog }, r) => {
+    const g = globalThis as unknown as { preguntas?: number };
+    g.preguntas ??= 0;
+    dialog.showMessageBox = (() => {
+      g.preguntas = (g.preguntas ?? 0) + 1;
+      return Promise.resolve({ response: r, checkboxChecked: false });
+    });
+  }, respuesta);
+}
+
+const preguntas = (s: Sesion): Promise<number> => s.app.evaluate(() => (globalThis as unknown as { preguntas?: number }).preguntas ?? 0);
+
+test('lote de 500 y de 501: pregunta, nada se descarta en silencio y la interfaz no se congela', async () => {
+  test.setTimeout(240_000);
+  const carpeta = mkdtempSync(join(tmpdir(), 'revisor-lote-'));
+  const rutas = Array.from({ length: 502 }, (_, i) => {
+    const ruta = join(carpeta, `foto ${String(i).padStart(3, '0')}.png`);
+    copyFileSync(m('negra.png'), ruta);
+    return ruta;
+  });
+  sesion = await lanzar();
+  const { pagina } = sesion;
+  const lista = pagina.getByRole('navigation', { name: 'Fotos abiertas' }).getByRole('listitem');
+
+  // 501: si cancelas, no se abre ninguna.
+  await simularPregunta(sesion, 1);
+  await abrir(sesion, rutas.slice(0, 501));
+  await expect.poll(() => preguntas(sesion)).toBe(1);
+  await expect(pagina.getByText('Abre una foto o arrástrala aquí.')).toBeVisible();
+  await expect(lista).toHaveCount(0);
+
+  // 501: si sigues, se abren 500 y se dice cuántas quedaron fuera.
+  await simularPregunta(sesion, 0);
+  const inicio = Date.now();
+  await abrir(sesion, rutas.slice(0, 501));
+  await expect(lista).toHaveCount(500, { timeout: 120_000 });
+  const segundos = (Date.now() - inicio) / 1000;
+  await expect(pagina.getByRole('alert').filter({ hasText: '1 foto más:' })).toContainText('hasta 500 fotos abiertas a la vez');
+  // Con la cola llena, la interfaz sigue respondiendo y se puede cancelar.
+  await pagina.getByRole('button', { name: 'Guía de privacidad' }).click();
+  await expect(pagina.getByRole('heading', { name: 'Guía de privacidad', level: 1 })).toBeVisible({ timeout: 2_000 });
+  await pagina.getByRole('button', { name: 'Guía de privacidad' }).click();
+  await pagina.getByRole('button', { name: 'Cancelar revisión' }).click();
+  await expect(pagina.getByRole('button', { name: 'Cancelar revisión' })).toHaveCount(0, { timeout: 60_000 });
+  await expect(pagina.getByText('Revisando…')).toHaveCount(0);
+
+  // Ya en el límite: una foto nueva no cabe y no hace falta preguntar; una ya abierta no cuenta.
+  await abrir(sesion, [rutas[501] ?? '', rutas[0] ?? '']);
+  await expect(pagina.getByRole('alert').filter({ hasText: '1 foto más:' })).toHaveCount(2);
+  expect(await preguntas(sesion)).toBe(2);
+  await expect(lista).toHaveCount(500);
+  console.log(`500 fotos cargadas en ${segundos.toFixed(1)} s`);
 });
 
 test('doble clic en exportar solo guarda una vez; cancelar el diálogo no guarda', async () => {

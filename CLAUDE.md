@@ -2,7 +2,7 @@
 
 App de escritorio que revisa fotos y videos antes de publicarlos, explica el riesgo con fuentes y oculta lo privado. **Todo el análisis es local: ninguna foto ni video sale del dispositivo.**
 
-Estado: Fase 1 implementada, con pendientes en `qa/REPORTE_FASE_1.md`. Solo revisa caras y ubicación en metadatos. Cada fase espera la aprobación del responsable.
+Estado: Fase 1 implementada y Fase 2 en curso, con pendientes en `qa/REPORTE_FASE_1.md` y `qa/REPORTE_FASE_2.md`. Cada fase espera la aprobación del responsable.
 
 ## Decisiones vigentes
 
@@ -28,7 +28,7 @@ Electron + React/TypeScript (strict) + sidecar Python 3.12 con uv.
 - **Ocultamiento:** texto, códigos, documentos y matrículas con relleno sólido por defecto. Difuminado y pixelado usan los colores de la imagen por decisión del responsable (2026-11-06), así que **no son irreversibles** y la app lo avisa. Solo el bloque sólido lo es. No se debe decir que un difuminado es irrecuperable.
 - **Contenido:** CLIP avisa sobre la imagen completa (armas, extremismo, desnudez, sugerente), y NudeNet da zonas de desnudez y de contenido sugerente. Siempre se dice "podría", nunca se afirma. La desnudez se marca sola para ocultar con bloque sólido, y la persona decide. Las muestras sensibles nunca se versionan.
 - **Texto y códigos:** RapidOCR y zxing-cpp en local. El contenido leído nunca se muestra, ni se guarda, ni va a los logs: solo se usa para clasificar.
-- **Selección manual:** SlimSAM por clic y rectángulo, con alternativa por coordenadas para usar sin mouse. Las siluetas viven en memoria: si se pierden, se oculta toda la caja.
+- **Selección manual:** SlimSAM por clic, rectángulo y pincel, con alternativa por coordenadas para usar sin mouse. El sidecar convierte cada trazo en silueta. El pincel solo agrega zonas: quitar parte de una silueta podría destapar algo. Las siluetas viven en memoria: si se pierden, se oculta toda la caja.
 - **Caras:** dos niveles. Con confianza de 0.6 o más es "cara" y pregunta por menores. Por debajo es "podría ser una cara", sin esa pregunta.
 
 ## Reglas de validación

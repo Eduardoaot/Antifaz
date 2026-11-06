@@ -99,9 +99,9 @@ Sin medir: arranque de la app y pico de memoria. Por eso esos presupuestos no ha
 - Disco lleno real: se simuló el error del sistema.
 - Arrastrar y soltar: el código existe, pero no tiene prueba.
 - El diálogo nativo de cierre con cambios sin exportar.
-- Limpiar `.parcial` al abrir tras un cierre forzado. Ese archivo solo trae la salida ya oculta.
+- ~~Limpiar `.parcial` tras un cierre forzado.~~ Hecho el 6 de noviembre de 2026: se borran en la siguiente exportación a esa carpeta (ver `REPORTE_FASE_2.md`).
 - Confirmar al ocultar el 100% de la imagen (VAL-030).
-- Subir `cargador` a 100%.
+- ~~Subir `cargador` a 100%.~~ Hecho el 6 de noviembre de 2026: 100% de líneas y ramas.
 - Pruebas de mutación: no se han corrido.
 - Regresión visual: hay capturas, pero no referencias comparadas. Se generan en CI.
 
