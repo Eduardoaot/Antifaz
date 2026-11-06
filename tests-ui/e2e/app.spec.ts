@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 import marca from '../../brand/brand.json';
-import { abrir, crearMuestras, entorno, lanzar, RAIZ, simularGuardar, type Sesion } from './ayuda';
+import { abrir, cerrar, crearMuestras, entorno, lanzar, llaveGuardada, matarArbol, RAIZ, simularGuardar, type Sesion } from './ayuda';
 
 const CAPTURAS = join(RAIZ, 'tests-ui', 'capturas');
 mkdirSync(CAPTURAS, { recursive: true });
@@ -19,10 +19,13 @@ test.beforeAll(() => {
 
 test.afterEach(async () => {
   // Sin esto, el aviso de cambios sin exportar detendría el cierre de la prueba.
-  await sesion.app.evaluate(({ BrowserWindow }) => {
-    for (const v of BrowserWindow.getAllWindows()) v.destroy();
-  }).catch(() => undefined);
-  await sesion.app.close().catch(() => undefined);
+  await Promise.race([
+    sesion.app.evaluate(({ BrowserWindow }) => {
+      for (const v of BrowserWindow.getAllWindows()) v.destroy();
+    }).catch(() => undefined),
+    new Promise((r) => setTimeout(r, 5000)),
+  ]);
+  await cerrar(sesion.app);
 });
 
 const m = (nombre: string): string => join(muestras, nombre);
@@ -583,6 +586,8 @@ test('seguridad: sin red durante el análisis', async () => {
 });
 
 test('recupera las decisiones tras un cierre forzado', async () => {
+  // Lanza la app dos veces y espera un análisis: en un equipo lento no cabe en 120 s.
+  test.setTimeout(300_000);
   sesion = await lanzar();
   const { pagina, datos, app } = sesion;
   await abrir(sesion, [m('cara con ñ.jpg')]);
@@ -592,8 +597,9 @@ test('recupera las decisiones tras un cierre forzado', async () => {
   const crudo = readFileSync(join(datos, 'recuperacion.json'));
   expect(crudo.length, 'la recuperación no debe llevar píxeles').toBeLessThan(4000);
   expect(crudo.includes('cara con'), 'la recuperación va cifrada').toBe(false);
-  app.process().kill('SIGKILL');
-  await app.close().catch(() => undefined);
+  // Lo que se prueba es recuperar tras un cierre forzado, no un cierre en los primeros segundos de un perfil nuevo.
+  await expect.poll(() => llaveGuardada(datos), { timeout: 60_000 }).toBe(true);
+  await matarArbol(app);
   // La instancia anterior tarda un momento en soltar el candado de instancia única.
   sesion = await reintentar(() => lanzar(datos));
   const segunda = sesion.pagina;
@@ -604,6 +610,8 @@ test('recupera las decisiones tras un cierre forzado', async () => {
 });
 
 test('recuperación sobre una foto que cambió: no aplica las decisiones', async () => {
+  // Lanza la app dos veces y espera un análisis: en un equipo lento no cabe en 120 s.
+  test.setTimeout(300_000);
   const carpeta = mkdtempSync(join(tmpdir(), 'revisor-cambio-'));
   const foto = join(carpeta, 'foto.jpg');
   copyFileSync(m('cara con ñ.jpg'), foto);
@@ -613,8 +621,9 @@ test('recuperación sobre una foto que cambió: no aplica las decisiones', async
   await expect(veredicto(pagina)).toBeVisible({ timeout: 60_000 });
   await pagina.getByRole('button', { name: /^Dejar visible/ }).click();
   await expect.poll(() => existsSync(join(datos, 'recuperacion.json'))).toBe(true);
-  app.process().kill('SIGKILL');
-  await app.close().catch(() => undefined);
+  // Lo que se prueba es recuperar tras un cierre forzado, no un cierre en los primeros segundos de un perfil nuevo.
+  await expect.poll(() => llaveGuardada(datos), { timeout: 60_000 }).toBe(true);
+  await matarArbol(app);
   copyFileSync(m('gps.jpg'), foto);
 
   sesion = await reintentar(() => lanzar(datos));
@@ -623,14 +632,17 @@ test('recuperación sobre una foto que cambió: no aplica las decisiones', async
 });
 
 test('el diálogo de recuperación no se borra si la app vuelve a cerrarse', async () => {
+  // Lanza la app dos veces y espera un análisis: en un equipo lento no cabe en 120 s.
+  test.setTimeout(300_000);
   sesion = await lanzar();
   const { pagina, datos, app } = sesion;
   await abrir(sesion, [m('cara con ñ.jpg')]);
   await expect(veredicto(pagina)).toBeVisible({ timeout: 60_000 });
   await pagina.getByRole('button', { name: /^Ocultar zona/ }).click();
   await expect.poll(() => existsSync(join(datos, 'recuperacion.json'))).toBe(true);
-  app.process().kill('SIGKILL');
-  await app.close().catch(() => undefined);
+  // Lo que se prueba es recuperar tras un cierre forzado, no un cierre en los primeros segundos de un perfil nuevo.
+  await expect.poll(() => llaveGuardada(datos), { timeout: 60_000 }).toBe(true);
+  await matarArbol(app);
 
   sesion = await reintentar(() => lanzar(datos));
   await expect(sesion.pagina.getByRole('dialog')).toContainText('sin terminar', { timeout: 60_000 });
