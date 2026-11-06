@@ -20,6 +20,12 @@ const api: ApiRevisor = {
   guardarEdiciones: (ediciones) => ipcRenderer.invoke(CANALES.guardarEdiciones, ediciones),
   recuperar: () => ipcRenderer.invoke(CANALES.recuperar),
   descartarRecuperacion: () => ipcRenderer.invoke(CANALES.descartarRecuperacion),
+  abrirVideo: () => ipcRenderer.invoke(CANALES.abrirVideo),
+  vistaVideo: (id, posicion, pistas) => ipcRenderer.invoke(CANALES.vistaVideo, id, posicion, pistas),
+  seguirVideo: (id, posicion, x, y) => ipcRenderer.invoke(CANALES.seguirVideo, id, posicion, x, y),
+  quitarPista: (id, pistaId) => ipcRenderer.invoke(CANALES.quitarPista, id, pistaId),
+  exportarVideo: (id, pistas) => ipcRenderer.invoke(CANALES.exportarVideo, id, pistas),
+  cerrarVideo: (id) => ipcRenderer.invoke(CANALES.cerrarVideo, id),
 };
 
 contextBridge.exposeInMainWorld('revisor', api);

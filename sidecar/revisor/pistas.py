@@ -118,29 +118,44 @@ def zonas(
     rastreadas: dict[int, Mascara], total: int, margen_frames: int = MARGEN_FRAMES_DEFAULT
 ) -> Iterator[ZonaFrame]:
     """Una zona por frame del video, en la resolución de las máscaras (el proxy)."""
-    if not 0 <= margen_frames <= MARGEN_FRAMES_MAX:
-        raise ErrorRevisor(Codigo.VALIDACION, f"margen de frames fuera de rango: {margen_frames}")
-    alto, ancho = _validar(rastreadas, total)
-    vacia = np.zeros((alto, ancho), dtype=bool)
-    con_objeto = sorted(i for i, m in rastreadas.items() if m.any())
-    if not con_objeto:
-        # El método no encontró nada en ningún frame: no hay de dónde ocultar. Quien llama decide;
-        # aquí no se inventa una zona. Se marca todo para revisión.
-        for t in range(total):
-            yield ZonaFrame(t, vacia, True)
-        return
-    rastreados = sorted(rastreadas)
-    primero, ultimo = con_objeto[0], con_objeto[-1]
+    contexto = _Contexto(rastreadas, total, margen_frames)
     for t in range(total):
+        yield contexto.zona(t)
+
+
+def zona_en(
+    rastreadas: dict[int, Mascara], total: int, t: int, margen_frames: int = MARGEN_FRAMES_DEFAULT
+) -> ZonaFrame:
+    """La zona de un solo frame, igual a la que daría `zonas`. Para la vista previa."""
+    if not 0 <= t < total:
+        raise ErrorRevisor(Codigo.VALIDACION, f"frame fuera del video: {t}")
+    return _Contexto(rastreadas, total, margen_frames).zona(t)
+
+
+class _Contexto:
+    def __init__(self, rastreadas: dict[int, Mascara], total: int, margen_frames: int) -> None:
+        if not 0 <= margen_frames <= MARGEN_FRAMES_MAX:
+            raise ErrorRevisor(Codigo.VALIDACION, f"margen de frames fuera de rango: {margen_frames}")
+        alto, ancho = _validar(rastreadas, total)
+        self.rastreadas = rastreadas
+        self.margen = margen_frames
+        self.vacia = np.zeros((alto, ancho), dtype=bool)
+        self.con_objeto = sorted(i for i, m in rastreadas.items() if m.any())
+        self.rastreados = sorted(rastreadas)
+
+    def zona(self, t: int) -> ZonaFrame:
+        if not self.con_objeto:
+            # El método no encontró nada en ningún frame: no hay de dónde ocultar. Quien llama decide;
+            # aquí no se inventa una zona. Se marca todo para revisión.
+            return ZonaFrame(t, self.vacia, True)
+        primero, ultimo = self.con_objeto[0], self.con_objeto[-1]
         if t < primero:
-            dentro = primero - t <= margen_frames
-            yield ZonaFrame(t, _ampliada(rastreadas[primero]) if dentro else vacia, False)
-            continue
+            dentro = primero - t <= self.margen
+            return ZonaFrame(t, _ampliada(self.rastreadas[primero]) if dentro else self.vacia, False)
         if t > ultimo:
-            dentro = t - ultimo <= margen_frames
-            yield ZonaFrame(t, _ampliada(rastreadas[ultimo]) if dentro else vacia, False)
-            continue
-        yield _zona_dentro(t, rastreadas, rastreados, con_objeto)
+            dentro = t - ultimo <= self.margen
+            return ZonaFrame(t, _ampliada(self.rastreadas[ultimo]) if dentro else self.vacia, False)
+        return _zona_dentro(t, self.rastreadas, self.rastreados, self.con_objeto)
 
 
 def _ampliada(m: Mascara) -> Mascara:
