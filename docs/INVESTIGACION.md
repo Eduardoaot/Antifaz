@@ -176,3 +176,10 @@ Un revisor cotejó las 15 fuentes del catálogo y encontró correcciones en 7, a
 - **Aviso de privacidad:** hay un argumento para no ser "responsable" si la app no recibe datos, pero no hallé criterio oficial. Conviene publicar un aviso voluntario y exacto.
 - **Biometría:** la [guía del INAI de 2018](https://procesos.finanzas.cdmx.gob.mx/OIP/assets/doc/Documento_Consulta/12.%20Guia%20Datos%20Biometricos_Web_Links.pdf) incluye el rostro como biométrico. Detectar para difuminar es más defendible que reconocer. Por eso los embeddings se borran al cerrar.
 - **Redacción:** no decir "es ilegal" ni "seguro para publicar". No usar el art. 77 de la LGDNNA contra particulares. Distinguir ley, recomendación y política de Meta.
+
+## Seguimiento en video
+
+**Decisión del responsable (6 de noviembre de 2026):** [EdgeTAM](https://huggingface.co/yonigozlan/EdgeTAM-hf) ([Apache-2.0](https://github.com/facebookresearch/EdgeTAM)), con la revisión `c266ce53` fijada. Pesa 54 MB y corre con PyTorch en CPU.
+
+Se eligió con el benchmark de 3 s a 24 fps en el i5-10210U: 1.85 s por frame, unos 2 minutos por video y 2.6 GB de RAM. No dejó visible nada del objeto en el video sintético, y con el clic tomó el 99% de la cara. SAM 2.1 tiny fue 3.6 veces más lento. CSRT fue casi instantáneo, pero el video sintético no tiene oclusiones ni giros, que es donde suele fallar. Detalle en `qa/REPORTE_FASE_3.md`.
+

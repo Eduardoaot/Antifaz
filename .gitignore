@@ -13,6 +13,8 @@ out/
 *.pt
 *.safetensors
 sidecar/modelos/
+# FFmpeg y exiftool: se descargan con hash, no se versionan
+sidecar/herramientas/
 tests-ui/capturas/
 test-results/
 coverage/

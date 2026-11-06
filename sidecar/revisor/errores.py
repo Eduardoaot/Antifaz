@@ -27,6 +27,14 @@ class Codigo(StrEnum):
     MODELO_NO_DISPONIBLE = "MODELO_NO_DISPONIBLE"
     EXPORTACION_NO_VERIFICADA = "EXPORTACION_NO_VERIFICADA"
     MEMORIA_INSUFICIENTE = "MEMORIA_INSUFICIENTE"
+    NO_ES_VIDEO = "NO_ES_VIDEO"
+    VIDEO_CORRUPTO = "VIDEO_CORRUPTO"
+    VIDEO_DEMASIADO_LARGO = "VIDEO_DEMASIADO_LARGO"
+    VIDEO_TAMANO_NO_SOPORTADO = "VIDEO_TAMANO_NO_SOPORTADO"
+    VIDEO_NO_SOPORTADO = "VIDEO_NO_SOPORTADO"
+    HERRAMIENTA_NO_DISPONIBLE = "HERRAMIENTA_NO_DISPONIBLE"
+    HERRAMIENTA_FALLO = "HERRAMIENTA_FALLO"
+    SEGUIMIENTO_NO_DISPONIBLE = "SEGUIMIENTO_NO_DISPONIBLE"
     INTERNO = "INTERNO"
 
 
@@ -60,6 +68,28 @@ MENSAJES: dict[Codigo, str] = {
         "No pudimos comprobar que el archivo saliera limpio, así que no lo guardamos. Intenta de nuevo."
     ),
     Codigo.MEMORIA_INSUFICIENTE: "No hay memoria suficiente para esta imagen. Cierra otros programas e intenta de nuevo.",
+    Codigo.NO_ES_VIDEO: "Este archivo no es un video que podamos abrir, aunque su nombre lo parezca. Prueba con otro.",
+    Codigo.VIDEO_CORRUPTO: "No pudimos leer este video: parece dañado o incompleto. Prueba con otra copia.",
+    Codigo.VIDEO_DEMASIADO_LARGO: (
+        "En esta versión beta revisamos videos de hasta 3 segundos. Recórtalo e intenta de nuevo."
+    ),
+    Codigo.VIDEO_TAMANO_NO_SOPORTADO: (
+        "El tamaño de este video está fuera de lo que podemos revisar (de 16 a 8192 píxeles por lado). "
+        "Prueba con otra versión."
+    ),
+    Codigo.VIDEO_NO_SOPORTADO: (
+        "Este video tiene algo que todavía no sabemos revisar completo, así que no lo marcamos como revisado. "
+        "Prueba con otra versión."
+    ),
+    Codigo.HERRAMIENTA_NO_DISPONIBLE: (
+        "Falta una herramienta para revisar videos o no es la versión que esperamos. "
+        "Vuelve a instalar la app; las fotos se siguen revisando."
+    ),
+    Codigo.HERRAMIENTA_FALLO: "No pudimos terminar de procesar este video. Intenta de nuevo y, si se repite, reporta el problema.",
+    Codigo.SEGUIMIENTO_NO_DISPONIBLE: (
+        "Falta el modelo para seguir objetos en video o no es la versión que esperamos. "
+        "Vuelve a instalar la app; las fotos se siguen revisando."
+    ),
     Codigo.INTERNO: "Algo salió mal de nuestro lado y no se completó la acción. Intenta de nuevo.",
 }
 

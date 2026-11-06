@@ -88,7 +88,9 @@ def _trayectoria(t: float, segundos: float, ancho: int, alto: int, base: int) ->
 Colocacion = tuple[int, int, int]  # x0, y0 y lado del recorte de la cara en ese frame
 
 
-def generar_video(segundos: float, alto: int) -> tuple[list[np.ndarray], list[np.ndarray], list[Colocacion]]:
+def generar_video(
+    segundos: float, alto: int, fps_video: int = FPS_VIDEO
+) -> tuple[list[np.ndarray], list[np.ndarray], list[Colocacion]]:
     """Frames RGB, la silueta de la cara en cada uno y dónde quedó el recorte."""
     ancho = round(alto * 16 / 9) // 2 * 2
     rng = np.random.default_rng(5)
@@ -100,8 +102,8 @@ def generar_video(segundos: float, alto: int) -> tuple[list[np.ndarray], list[np
     fondo[y : y + cara_d.shape[0], x : x + cara_d.shape[1]][mascara_d] = cara_d[mascara_d]
     base = round(alto * 0.22)
     frames, verdades, colocaciones = [], [], []
-    for i in range(round(segundos * FPS_VIDEO)):
-        cx, cy, esc = _trayectoria(i / FPS_VIDEO, segundos, ancho, alto, base)
+    for i in range(max(1, round(segundos * fps_video))):
+        cx, cy, esc = _trayectoria(i / fps_video, segundos, ancho, alto, base)
         cara, mascara = _sprite(max(8, round(base * esc)))
         lado = cara.shape[0]
         x0, y0 = round(cx - lado / 2), round(cy - lado / 2)
@@ -259,6 +261,7 @@ class Resultado:
     frames_rastreados: int
     s_por_frame_rastreado: float
     minutos_por_minuto_de_video: float
+    segundos_por_video: float
     memoria_pico_mb: float
     frames_con_algo_visible_pct: float
     peor_frame_visible_pct: float
@@ -266,14 +269,14 @@ class Resultado:
     cara_elegida_en_frame0_pct: float
 
 
-def correr(metodo: str, fps: int, proxy: int, segundos: float, hilos: int) -> Resultado:
+def correr(metodo: str, fps: int, proxy: int, segundos: float, hilos: int, fps_video: int = FPS_VIDEO) -> Resultado:
     import torch
 
     torch.set_num_threads(hilos)
     torch.set_num_interop_threads(1)
     cv2.setNumThreads(hilos)
-    frames, verdades, colocaciones = generar_video(segundos, proxy)
-    paso = max(1, round(FPS_VIDEO / fps))
+    frames, verdades, colocaciones = generar_video(segundos, proxy, fps_video)
+    paso = max(1, round(fps_video / fps))
     indices = list(range(0, len(frames), paso))
     sub = [frames[i] for i in indices]
     caja0 = _caja(verdades[0])
@@ -311,6 +314,7 @@ def correr(metodo: str, fps: int, proxy: int, segundos: float, hilos: int) -> Re
         frames_video=len(frames), frames_rastreados=len(sub),
         s_por_frame_rastreado=round(s_frame, 4),
         minutos_por_minuto_de_video=round(s_frame * fps * 60 / 60, 2),
+        segundos_por_video=round(segundos_cpu, 1),
         memoria_pico_mb=round(psutil.Process().memory_info().peak_wset / 2**20 if os.name == "nt" else 0, 0),
         # Un píxel de diferencia en el borde no cuenta: es ruido de redondeo.
         frames_con_algo_visible_pct=round(100 * sum(v > 0.005 for v in visibles) / len(visibles), 1),
@@ -333,19 +337,22 @@ def main() -> int:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--hilos", type=int, default=4, help="núcleos a usar; 4 imita el i5-10210U de referencia")
     p.add_argument("--segundos", type=float, default=10.0)
+    p.add_argument("--fps-video", type=int, default=FPS_VIDEO, help="fps del video sintético")
     p.add_argument("--fps", type=int, nargs="+", default=[5, 10])
     p.add_argument("--proxy", type=int, nargs="+", default=[480])
     p.add_argument("--metodos", nargs="+", choices=METODOS, default=METODOS)
     p.add_argument("--salida", type=Path, default=None)
     p.add_argument("--una", nargs=3, metavar=("METODO", "FPS", "PROXY"), help=argparse.SUPPRESS)
     a = p.parse_args()
-    if not 1 <= a.hilos <= 256 or not 0 < a.segundos <= 600:
-        p.error("hilos de 1 a 256 y segundos de más de 0 a 600")
+    if not 1 <= a.hilos <= 256 or not 0 < a.segundos <= 600 or not 1 <= a.fps_video <= 240:
+        p.error("hilos de 1 a 256, segundos de más de 0 a 600 y fps del video de 1 a 240")
+    if any(not 1 <= f <= a.fps_video for f in a.fps):
+        p.error("cada fps de tracking va de 1 al fps del video")
     _fijar_nucleos(a.hilos)
 
     if a.una is not None:
         metodo, fps, proxy = a.una[0], int(a.una[1]), int(a.una[2])
-        print(json.dumps(asdict(correr(metodo, fps, proxy, a.segundos, a.hilos))))
+        print(json.dumps(asdict(correr(metodo, fps, proxy, a.segundos, a.hilos, a.fps_video))))
         return 0
 
     resultados: list[dict[str, Any]] = []
@@ -355,7 +362,7 @@ def main() -> int:
                 print(f"… {metodo}, {fps} fps, proxy {proxy}", flush=True)
                 hecho = subprocess.run(
                     [sys.executable, __file__, "--una", metodo, str(fps), str(proxy),
-                     "--hilos", str(a.hilos), "--segundos", str(a.segundos)],
+                     "--hilos", str(a.hilos), "--segundos", str(a.segundos), "--fps-video", str(a.fps_video)],
                     capture_output=True, text=True, encoding="utf-8",
                 )
                 if hecho.returncode != 0:
@@ -364,7 +371,7 @@ def main() -> int:
                     continue
                 r = json.loads(hecho.stdout.strip().splitlines()[-1])
                 resultados.append(r)
-                print(f"   {r['s_por_frame_rastreado']} s/frame, {r['minutos_por_minuto_de_video']} min por minuto, "
+                print(f"   {r['s_por_frame_rastreado']} s/frame, {r['segundos_por_video']} s por video, "
                       f"algo visible en {r['frames_con_algo_visible_pct']}% de frames", flush=True)
 
     equipo = {
@@ -374,6 +381,7 @@ def main() -> int:
         "ram_gb": round(psutil.virtual_memory().total / 2**30, 1),
         "hilos_usados": a.hilos,
         "segundos_de_video": a.segundos,
+        "fps_video": a.fps_video,
         "modelos": MODELOS_HF,
     }
     informe = {"equipo": equipo, "resultados": resultados}
