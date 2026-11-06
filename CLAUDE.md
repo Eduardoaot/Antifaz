@@ -78,6 +78,7 @@ python -m venv .venv
 .venv\Scripts\python -m unittest tools\test_validar_catalogo.py
 .venv\Scripts\python tools\revisar_contraste.py
 .venv\Scripts\python tools\revisar_nombre.py
+npm run limpiar                                         # cachés y compilados; --profundo --si también borra dependencias
 ```
 
 ## Convenciones
