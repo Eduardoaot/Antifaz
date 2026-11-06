@@ -7,12 +7,13 @@ herramienta antes de usarla (ver sidecar/revisor/herramientas.py).
 """
 from __future__ import annotations
 
-import hashlib
 import argparse
+import hashlib
 import io
 import shutil
 import sys
 import time
+import urllib.error
 import urllib.request
 import zipfile
 from pathlib import Path
@@ -99,6 +100,32 @@ PAQUETES = {
 }
 
 
+# Varias réplicas de SourceForge no envían su certificado intermedio: los navegadores lo resuelven
+# y Python no, así que fallan la verificación TLS. Esta sí lo envía. Se prueba primero y, si falla,
+# se reintenta con la dirección genérica, que elige otra réplica cada vez. TLS se sigue verificando
+# y el hash del archivo decide si se usa.
+REPLICA_SOURCEFORGE = "phoenixnap"
+REINTENTOS_GENERICOS = 4
+
+
+def _direcciones(url: str) -> list[str]:
+    if "downloads.sourceforge.net" not in url:
+        return [url]
+    return [f"{url}?use_mirror={REPLICA_SOURCEFORGE}"] + [url] * REINTENTOS_GENERICOS
+
+
+def _descargar(nombre: str, url: str) -> bytes | None:
+    errores: list[str] = []
+    for direccion in _direcciones(url):
+        try:
+            with urllib.request.urlopen(direccion, timeout=600) as respuesta:
+                return respuesta.read()
+        except (urllib.error.URLError, TimeoutError) as e:
+            errores.append(type(e).__name__)
+    print(f"ERROR: no se pudo descargar {nombre} ({', '.join(errores)}). Bájalo a mano y usa --zips CARPETA.")
+    return None
+
+
 def _instalar_paquete(
     nombre: str, url: str, esperado: str, prefijo: str, mapa: dict[str, str], zips: Path | None
 ) -> bool:
@@ -112,8 +139,9 @@ def _instalar_paquete(
     if local is not None and local.is_file():
         datos = local.read_bytes()
     else:
-        with urllib.request.urlopen(url, timeout=600) as respuesta:
-            datos = respuesta.read()
+        datos = _descargar(nombre, url)
+        if datos is None:
+            return False
     if hashlib.sha256(datos).hexdigest() != esperado:
         print(f"ERROR: {nombre} no coincide con el hash esperado; no se guardó")
         return False
