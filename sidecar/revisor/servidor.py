@@ -19,7 +19,7 @@ from typing import Any, BinaryIO, NoReturn, assert_never
 from PIL import Image
 from pydantic import ValidationError
 
-from . import analisis, cargador, efectos, exportar, segmentar
+from . import analisis, cargador, efectos, exportar, pincel, segmentar
 from .caras import ModeloNoDisponible
 from .errores import Codigo, ErrorRevisor
 from .esquemas import (
@@ -29,6 +29,7 @@ from .esquemas import (
     Cerrar,
     Exportar,
     Ping,
+    Pintar,
     Previsualizar,
     Segmentar,
     Solicitud,
@@ -109,8 +110,17 @@ class Sesion:
         mascara = modelo.segmentar(preparado, comando.x, comando.y)
         if mascara is None:
             raise ErrorRevisor(Codigo.SIN_OBJETO)
+        return self._guardar_mascara(comando.imagen_id, mascara)
+
+    def _pintar(self, comando: Pintar) -> dict[str, object]:
+        imagen = self._imagen(comando.imagen_id)
+        puntos = [(p.x, p.y) for p in comando.puntos]
+        mascara = pincel.rasterizar(puntos, comando.tamano, imagen.ancho, imagen.alto)
+        return self._guardar_mascara(comando.imagen_id, mascara)
+
+    def _guardar_mascara(self, imagen_id: str, mascara: segmentar.Mascara) -> dict[str, object]:
         mascara_id = uuid.uuid4().hex
-        self.mascaras.setdefault(comando.imagen_id, {})[mascara_id] = mascara.recorte
+        self.mascaras.setdefault(imagen_id, {})[mascara_id] = mascara.recorte
         return {
             "mascara_id": mascara_id,
             "caja": {"x": mascara.x, "y": mascara.y, "ancho": mascara.ancho, "alto": mascara.alto},
@@ -159,6 +169,8 @@ class Sesion:
                 ), None
             case Segmentar():
                 return self._segmentar(comando), None
+            case Pintar():
+                return self._pintar(comando), None
             case Cerrar(imagen_id=imagen_id):
                 self.imagenes.pop(imagen_id, None)
                 self.preparados.pop(imagen_id, None)

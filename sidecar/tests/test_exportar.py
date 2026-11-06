@@ -341,3 +341,61 @@ def _bloque(tipo: bytes, datos: bytes = b"") -> bytes:
 def test_verificar_png_rechaza(mutar) -> None:  # type: ignore[no-untyped-def]
     with pytest.raises(ErrorRevisor):
         metadatos.verificar_png(mutar(_png()))
+
+
+# --- Temporales de una exportación interrumpida ------------------------------------------------
+
+
+def _parcial(carpeta: Path, nombre: str, antiguedad_s: float) -> Path:
+    ruta = carpeta / nombre
+    ruta.write_bytes(b"salida ya oculta, a medias")
+    viejo = ruta.stat().st_mtime - antiguedad_s
+    os.utime(ruta, (viejo, viejo))
+    return ruta
+
+
+def test_exportar_borra_solo_los_temporales_viejos_propios(tmp_path: Path) -> None:
+    hexa = "0123456789abcdef" * 2
+    viejo = _parcial(tmp_path, f".{hexa}.parcial", 3600)
+    reciente = _parcial(tmp_path, f".{'f' * 32}.parcial", 0)
+    ajenos = [
+        _parcial(tmp_path, "vacaciones.parcial", 3600),
+        # Windows no distingue mayúsculas: se usa otro nombre para no pisar el de arriba.
+        _parcial(tmp_path, f".{'ABCDEF12' * 4}.parcial", 3600),
+        _parcial(tmp_path, f".{hexa}.parcial.jpg", 3600),
+        _parcial(tmp_path, f".{hexa[:-1]}.parcial", 3600),
+    ]
+    imagen = cargador.abrir(str(guardar(tmp_path / "o.png", imagen_prueba())))
+    exportar.exportar(imagen, [oculto()], str(tmp_path / "s.png"))
+    assert not viejo.exists()
+    assert reciente.exists(), "uno reciente podría estar escribiéndose"
+    assert all(a.exists() for a in ajenos), "nunca se borra algo que no creamos"
+
+
+def test_una_carpeta_de_temporales_no_se_borra(tmp_path: Path) -> None:
+    carpeta = tmp_path / f".{'a' * 32}.parcial"
+    carpeta.mkdir()
+    os.utime(carpeta, (0, 0))
+    assert exportar.limpiar_parciales(str(tmp_path)) == 0
+    assert carpeta.is_dir()
+
+
+def test_limpiar_una_carpeta_ilegible_no_falla(tmp_path: Path) -> None:
+    assert exportar.limpiar_parciales(str(tmp_path / "no-existe")) == 0
+
+
+def test_si_no_se_puede_borrar_sigue(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _parcial(tmp_path, f".{'b' * 32}.parcial", 3600)
+
+    def negado(_ruta: str) -> None:
+        raise PermissionError(errno.EACCES, "negado")
+
+    monkeypatch.setattr(exportar.os, "remove", negado)
+    assert exportar.limpiar_parciales(str(tmp_path)) == 0
+
+
+def test_cuenta_lo_borrado(tmp_path: Path) -> None:
+    for letra in "cde":
+        _parcial(tmp_path, f".{letra * 32}.parcial", 3600)
+    assert exportar.limpiar_parciales(str(tmp_path)) == 3
+    assert list(tmp_path.iterdir()) == []

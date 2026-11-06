@@ -1,14 +1,16 @@
 import { useState, type SyntheticEvent } from 'react';
-import { esquemaEfecto } from '../../shared/contrato';
-import { efectoManual, leerCaja, leerPunto, type Herramienta, type Caja, type Revision, type ZonaManual } from '../../shared/logica';
+import { esquemaEfecto, LIMITES } from '../../shared/contrato';
+import { efectoManual, leerCaja, leerPunto, textoOrigen, type Herramienta, type Caja, type Revision, type ZonaManual } from '../../shared/logica';
 
 interface Props {
   ancho: number;
   alto: number;
   herramienta: Herramienta;
+  tamanoPincel: number;
   revision: Revision;
   ocupado: boolean;
   alElegirHerramienta: (h: Herramienta) => void;
+  alCambiarTamano: (tamano: number) => void;
   alAgregarCaja: (caja: Caja) => void;
   alBuscarEnPunto: (x: number, y: number) => void;
   alQuitar: (id: string) => void;
@@ -19,9 +21,10 @@ const HERRAMIENTAS: readonly { valor: Herramienta; texto: string }[] = [
   { valor: 'ninguna', texto: 'Solo ver' },
   { valor: 'clic', texto: 'Clic en un objeto' },
   { valor: 'rectangulo', texto: 'Dibujar rectángulo' },
+  { valor: 'pincel', texto: 'Pintar con pincel' },
 ];
 
-export function Manual({ ancho, alto, herramienta, revision, ocupado, alElegirHerramienta, alAgregarCaja, alBuscarEnPunto, alQuitar, alCambiarEfecto }: Props): React.JSX.Element {
+export function Manual({ ancho, alto, herramienta, tamanoPincel, revision, ocupado, alElegirHerramienta, alCambiarTamano, alAgregarCaja, alBuscarEnPunto, alQuitar, alCambiarEfecto }: Props): React.JSX.Element {
   const [valores, setValores] = useState({ x: '', y: '', ancho: '', alto: '' });
   const [error, setError] = useState<string | null>(null);
 
@@ -61,6 +64,20 @@ export function Manual({ ancho, alto, herramienta, revision, ocupado, alElegirHe
           </button>
         ))}
       </div>
+      {herramienta === 'pincel' && (
+        <div className="campo-pincel">
+          <label htmlFor="tamano-pincel">Tamaño del pincel: {tamanoPincel} px de la foto</label>
+          <input
+            id="tamano-pincel"
+            type="range"
+            min={LIMITES.pincel.min}
+            max={LIMITES.pincel.max}
+            value={tamanoPincel}
+            onChange={(e) => { alCambiarTamano(Number(e.target.value)); }}
+          />
+          <p className="suave">Pinta sobre lo que quieras tapar, como una parte que la selección dejó fuera. Cada trazo es una zona nueva.</p>
+        </div>
+      )}
       <details>
         <summary>Escribir coordenadas (sin mouse)</summary>
         <form className="coordenadas" onSubmit={agregar}>
@@ -80,7 +97,7 @@ export function Manual({ ancho, alto, herramienta, revision, ocupado, alElegirHe
             <li key={z.id} className="advertencia bajo" data-manual={z.id}>
               <p>
                 <strong>Tu zona {i + 1}</strong>
-                {z.mascara_id === null ? ' (rectángulo)' : ' (silueta)'}
+                {` (${textoOrigen(z.origen)})`}
               </p>
               <div className="controles">
                 <label>

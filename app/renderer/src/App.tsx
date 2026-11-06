@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } fro
 import logoClaro from '../../../brand/logo/horizontal-claro.svg';
 import logoOscuro from '../../../brand/logo/horizontal-oscuro.svg';
 import { AVISO_LEGAL, MARCA } from '../../shared/catalogo';
-import { esquemaTema, ERROR_INTERNO, type Analisis, type ArchivoAbierto, type ArchivoCargado, type ErrorApp, type Recuperable, type Tema } from '../../shared/contrato';
+import { esquemaTema, ERROR_INTERNO, LIMITES, type Analisis, type ArchivoAbierto, type ArchivoCargado, type ErrorApp, type Origen, type Punto, type Recuperable, type Tema } from '../../shared/contrato';
 import {
   aEdicion,
   agregarManual,
@@ -24,6 +24,7 @@ import {
   rehacer,
   resumenTexto,
   textoConfirmacion,
+  trazoLleno,
   type Caja,
   type Herramienta,
   type Historial,
@@ -54,6 +55,15 @@ interface Fallo {
   mensaje: string;
 }
 
+/** Zona que la persona pidió agregar y que puede requerir confirmación si tapa todo. */
+interface ZonaNueva {
+  archivoId: string;
+  caja: Caja;
+  mascaraId: string | null;
+  origen: Origen;
+  anuncio: string;
+}
+
 const api = (): typeof window.revisor => window.revisor;
 
 export function App(): React.JSX.Element {
@@ -71,7 +81,8 @@ export function App(): React.JSX.Element {
   const [vista, setVista] = useState<'revision' | 'guia'>('revision');
   const [herramienta, setHerramienta] = useState<Herramienta>('ninguna');
   const [buscando, setBuscando] = useState(false);
-  const [cajaTotal, setCajaTotal] = useState<Caja | null>(null);
+  const [tamanoPincel, setTamanoPincel] = useState<number>(LIMITES.pincel.porDefecto);
+  const [zonaTotal, setZonaTotal] = useState<ZonaNueva | null>(null);
   const colaOcupada = useRef(false);
   const seleccion = elegido ?? archivos[0]?.info.id ?? null;
 
@@ -209,28 +220,40 @@ export function App(): React.JSX.Element {
     else void exportarAhora();
   }, [actual, analisis, exportando, exportarAhora, hallazgos, revision]);
 
-  const agregarCaja = useCallback(
-    (caja: Caja) => {
-      if (actual === null) return;
-      const { id } = actual.info;
-      cambiarRevision(id, (r) => agregarManual(r, crypto.randomUUID(), caja, null));
-      setAnuncio('Agregamos tu zona para ocultarla.');
+  const agregarZona = useCallback(
+    (z: ZonaNueva) => {
+      cambiarRevision(z.archivoId, (r) => agregarManual(r, crypto.randomUUID(), z.caja, z.mascaraId, z.origen));
+      setAnuncio(z.anuncio);
     },
-    [actual, cambiarRevision],
+    [cambiarRevision],
+  );
+
+  /** Una zona que tapa toda la foto se confirma antes, sin importar cómo se hizo. */
+  const pedirZona = useCallback(
+    (z: ZonaNueva) => {
+      const archivo = archivos.find((a) => a.info.id === z.archivoId);
+      if (archivo === undefined) return;
+      if (cubreTodo(z.caja, archivo.info.ancho, archivo.info.alto)) setZonaTotal(z);
+      else agregarZona(z);
+    },
+    [agregarZona, archivos],
   );
 
   const pedirCaja = useCallback(
     (caja: Caja) => {
       if (actual === null) return;
-      if (cubreTodo(caja, actual.info.ancho, actual.info.alto)) setCajaTotal(caja);
-      else agregarCaja(caja);
+      pedirZona({ archivoId: actual.info.id, caja, mascaraId: null, origen: 'rectangulo', anuncio: 'Agregamos tu zona para ocultarla.' });
     },
-    [actual, agregarCaja],
+    [actual, pedirZona],
   );
 
   const buscarEnPunto = useCallback(
     async (x: number, y: number) => {
-      if (actual === null || buscando) return;
+      if (actual === null) return;
+      if (buscando) {
+        setAnuncio('Espera a que terminemos con tu selección anterior.');
+        return;
+      }
       const { id } = actual.info;
       setBuscando(true);
       setAnuncio('Buscando el objeto en ese punto. La primera vez tarda unos segundos.');
@@ -238,8 +261,7 @@ export function App(): React.JSX.Element {
         const resultado = await api().segmentar(id, x, y);
         if (resultado.ok) {
           const { caja, mascara_id: mascaraId } = resultado.datos;
-          cambiarRevision(id, (r) => agregarManual(r, crypto.randomUUID(), caja, mascaraId));
-          setAnuncio('Seleccionamos ese objeto para ocultarlo. Revisa la vista previa.');
+          pedirZona({ archivoId: id, caja, mascaraId, origen: 'silueta', anuncio: 'Seleccionamos ese objeto para ocultarlo. Revisa la vista previa.' });
         } else {
           setAnuncio(resultado.error.mensaje);
         }
@@ -249,7 +271,37 @@ export function App(): React.JSX.Element {
         setBuscando(false);
       }
     },
-    [actual, buscando, cambiarRevision],
+    [actual, buscando, pedirZona],
+  );
+
+  const pintar = useCallback(
+    async (puntos: Punto[]) => {
+      if (actual === null) return;
+      if (buscando) {
+        setAnuncio('Espera a que terminemos con tu selección anterior. Ese trazo no se agregó.');
+        return;
+      }
+      const { id } = actual.info;
+      setBuscando(true);
+      try {
+        const resultado = await api().pintar(id, puntos, tamanoPincel);
+        if (resultado.ok) {
+          const { caja, mascara_id: mascaraId } = resultado.datos;
+          // Nada se recorta en silencio: si el trazo llegó al límite, se dice.
+          const anuncio = trazoLleno(puntos)
+            ? 'Tu trazo era muy largo, así que solo tomamos la primera parte. Pinta otro trazo para tapar el resto.'
+            : 'Agregamos tu trazo para ocultarlo. Revisa la vista previa.';
+          pedirZona({ archivoId: id, caja, mascaraId, origen: 'pincel', anuncio });
+        } else {
+          setAnuncio(resultado.error.mensaje);
+        }
+      } catch {
+        setAnuncio(ERROR_INTERNO.mensaje);
+      } finally {
+        setBuscando(false);
+      }
+    },
+    [actual, buscando, pedirZona, tamanoPincel],
   );
 
   const cerrarArchivo = useCallback((id: string) => {
@@ -463,8 +515,10 @@ export function App(): React.JSX.Element {
                 ocultamientos={ocultamientos}
                 revision={revision}
                 herramienta={analisis === null || exportando ? 'ninguna' : herramienta}
+                tamanoPincel={tamanoPincel}
                 alClic={(x, y) => { void buscarEnPunto(x, y); }}
                 alDibujar={pedirCaja}
+                alPintar={(puntos) => { void pintar(puntos); }}
                 alFuera={() => { setAnuncio('Ese punto queda fuera de la imagen.'); }}
               />
             </>
@@ -500,9 +554,11 @@ export function App(): React.JSX.Element {
                 ancho={actual.info.ancho}
                 alto={actual.info.alto}
                 herramienta={herramienta}
+                tamanoPincel={tamanoPincel}
                 revision={revision}
                 ocupado={buscando}
                 alElegirHerramienta={setHerramienta}
+                alCambiarTamano={setTamanoPincel}
                 alAgregarCaja={pedirCaja}
                 alBuscarEnPunto={(x, y) => { void buscarEnPunto(x, y); }}
                 alQuitar={(id) => { cambiarRevision(actual.info.id, (r) => quitarManual(r, id)); setAnuncio('Quitamos tu zona.'); }}
@@ -531,14 +587,14 @@ export function App(): React.JSX.Element {
           alCancelar={() => { setConfirmarExport(null); }}
         />
       )}
-      {cajaTotal !== null && (
+      {zonaTotal !== null && (
         <Confirmacion
           titulo="Esta zona cubre toda la imagen"
           texto="Si la agregas, no se verá nada de la foto. ¿Quieres hacerlo?"
           aceptar="Agregar de todos modos"
           cancelar="Volver"
-          alAceptar={() => { agregarCaja(cajaTotal); setCajaTotal(null); }}
-          alCancelar={() => { setCajaTotal(null); }}
+          alAceptar={() => { agregarZona(zonaTotal); setZonaTotal(null); }}
+          alCancelar={() => { setZonaTotal(null); setAnuncio('No agregamos esa zona.'); }}
         />
       )}
       {recuperables.length > 0 && (

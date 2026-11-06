@@ -15,6 +15,7 @@ import {
   esquemaExportado,
   esquemaListaOcultamientos,
   esquemaSegmentado,
+  esquemaTrazo,
   esquemaTema,
   type ArchivoCargado,
   type Edicion,
@@ -22,7 +23,7 @@ import {
   type Resultado,
   type Tema,
 } from '../shared/contrato';
-import { Archivos } from './archivos';
+import { Archivos, planearLote } from './archivos';
 import { Sidecar } from './sidecar';
 
 const ESQUEMA_APP = 'app';
@@ -176,17 +177,25 @@ async function guardarEdiciones(ediciones: Edicion[]): Promise<void> {
 
 const NOMBRES_IMAGEN = ['jpg', 'jpeg', 'png', 'webp', 'heic', 'heif', 'avif', 'gif', 'tif', 'tiff', 'bmp', 'dng', 'cr2', 'cr3', 'nef', 'arw', 'orf', 'rw2', 'raf', 'pef', 'srw'];
 
+/** Si no caben todas, tú decides: se abren las primeras o ninguna. Las que no entran se dicen. */
 async function abrirRutas(rutas: string[]): Promise<ArchivoCargado[]> {
+  const lugares = LIMITES.loteArchivos - archivos.cantidad;
+  const plan = planearLote(rutas, (r) => archivos.estaAbierta(r), lugares);
+  if (plan.sobran > 0 && plan.nuevas > 0 && ventana !== null) {
+    const { response } = await dialog.showMessageBox(ventana, {
+      type: 'question',
+      title: 'No caben todas las fotos',
+      message: `Elegiste ${plan.nuevas + plan.sobran} fotos, pero solo caben ${plan.nuevas} más.`,
+      detail: `Puedes tener hasta ${LIMITES.loteArchivos} fotos abiertas a la vez. Si sigues, abrimos las primeras ${plan.nuevas} y te decimos cuántas quedaron fuera.`,
+      buttons: [`Abrir las primeras ${plan.nuevas}`, 'Cancelar'],
+      defaultId: 0,
+      cancelId: 1,
+      noLink: true,
+    });
+    if (response !== 0) return [];
+  }
   const salida: ArchivoCargado[] = [];
-  for (const [i, ruta] of rutas.entries()) {
-    if (i >= LIMITES.loteArchivos) {
-      salida.push({
-        ok: false,
-        nombre: basename(ruta),
-        error: { codigo: 'LOTE_LLENO', mensaje: `Este archivo no se cargó: el máximo es de ${LIMITES.loteArchivos} a la vez.` },
-      });
-      continue;
-    }
+  for (const ruta of plan.abrir) {
     if (existsSync(ruta) && statSync(ruta).isDirectory()) {
       salida.push({
         ok: false,
@@ -196,6 +205,17 @@ async function abrirRutas(rutas: string[]): Promise<ArchivoCargado[]> {
       continue;
     }
     salida.push(await archivos.abrir(ruta));
+  }
+  if (plan.sobran > 0) {
+    // Un solo aviso para todas: cientos de avisos iguales no ayudan a nadie.
+    salida.push({
+      ok: false,
+      nombre: `${plan.sobran} ${plan.sobran === 1 ? 'foto más' : 'fotos más'}`,
+      error: {
+        codigo: 'LOTE_LLENO',
+        mensaje: `No se abrieron: puedes tener hasta ${LIMITES.loteArchivos} fotos abiertas a la vez. Cierra algunas y vuelve a abrirlas.`,
+      },
+    });
   }
   return salida;
 }
@@ -302,6 +322,17 @@ function registrarCanales(): void {
     const sidecarId = await archivos.sidecarId(archivoId);
     if (!sidecarId.ok) return sidecarId;
     const { resultado } = await sidecar.pedir({ tipo: 'segmentar', imagen_id: sidecarId.datos, ...punto });
+    if (!resultado.ok) return resultado;
+    return { ok: true, datos: esquemaSegmentado.parse(resultado.datos) };
+  });
+
+  manejar(CANALES.pintar, FALLO, async (id: unknown, puntos: unknown, tamano: unknown): Promise<Resultado<unknown>> => {
+    const archivoId = validar(esquemaArchivoId, id);
+    const trazo = validar(esquemaTrazo, { puntos, tamano });
+    if (archivoId === null || trazo === null) return invalido;
+    const sidecarId = await archivos.sidecarId(archivoId);
+    if (!sidecarId.ok) return sidecarId;
+    const { resultado } = await sidecar.pedir({ tipo: 'pintar', imagen_id: sidecarId.datos, ...trazo });
     if (!resultado.ok) return resultado;
     return { ok: true, datos: esquemaSegmentado.parse(resultado.datos) };
   });

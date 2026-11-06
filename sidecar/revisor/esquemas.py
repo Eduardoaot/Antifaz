@@ -14,6 +14,9 @@ MAX_OCULTAMIENTOS = 5000
 LADO_MAX_PX = 30000
 PREVISTA_LADO_MIN = 64
 PREVISTA_LADO_MAX = 4096
+PINCEL_MIN = 1
+PINCEL_MAX = 512
+PUNTOS_TRAZO_MAX = 5000
 
 
 class Estricto(BaseModel):
@@ -83,13 +86,27 @@ class Segmentar(Estricto):
     y: Annotated[int, Field(ge=0, le=LADO_MAX_PX - 1)]
 
 
+class Punto(Estricto):
+    x: Annotated[int, Field(ge=0, le=LADO_MAX_PX - 1)]
+    y: Annotated[int, Field(ge=0, le=LADO_MAX_PX - 1)]
+
+
+class Pintar(Estricto):
+    """Un trazo del pincel. Que cada punto quepa en la imagen se revisa al abrirla."""
+
+    tipo: Literal["pintar"]
+    imagen_id: Annotated[str, Field(min_length=1, max_length=64)]
+    puntos: Annotated[list[Punto], Field(min_length=1, max_length=PUNTOS_TRAZO_MAX)]
+    tamano: Annotated[int, Field(ge=PINCEL_MIN, le=PINCEL_MAX)]
+
+
 class Cerrar(Estricto):
     tipo: Literal["cerrar"]
     imagen_id: Annotated[str, Field(min_length=1, max_length=64)]
 
 
 Comando = Annotated[
-    Ping | AbrirImagen | Analizar | Previsualizar | Exportar | Segmentar | Cerrar,
+    Ping | AbrirImagen | Analizar | Previsualizar | Exportar | Segmentar | Pintar | Cerrar,
     Field(discriminator="tipo"),
 ]
 

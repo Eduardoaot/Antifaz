@@ -1,6 +1,6 @@
 # Matriz de pruebas de Antifaz
 
-**Estado:** Fase 1 en cierre. Un caso de la Fase 1 solo dice `automatizado` si hay una prueba real detrás; lo demás conserva su motivo. Los casos de fases posteriores no se han ejecutado.
+**Estado:** Fase 1 en cierre y Fase 2 en curso. Un caso de la Fase 1 solo dice `automatizado` si hay una prueba real detrás; lo demás conserva su motivo. Los casos de fases posteriores no se han ejecutado.
 
 **Valores de Estado:**
 - `pendiente`: se automatizará o ejecutará en la fase indicada.
@@ -95,8 +95,8 @@ Al ejecutar un caso, el Estado pasa a `automatizado` o `manual`, con enlace a su
 | ARC-055 | 1 | Archivo borrado durante el proceso | Borrar el origen mientras se analiza | Mensaje claro; no se presenta como revisado | automatizado: tests-ui/e2e/app.spec.ts, tests-ui/unit/main.test.ts |
 | ARC-056 | 1 | Archivo movido durante el proceso | Mover el origen mientras se analiza | Mensaje claro; no se presenta como revisado | automatizado: tests-ui/e2e/app.spec.ts, tests-ui/unit/main.test.ts |
 | ARC-057 | 1 | Mismo archivo cargado dos veces | Cargarlo otra vez | Se avisa y no se duplica sin querer; también si se carga desde otra ruta | automatizado: tests-ui/e2e/app.spec.ts, tests-ui/unit/main.test.ts |
-| ARC-058 | 2 | 500 archivos a la vez | Cargar el máximo del lote | Sin congelar la UI; progreso por archivo; se puede cancelar | pendiente |
-| ARC-059 | 2 | 501 archivos a la vez | Cargar uno más que el máximo | Se explica el límite y tú decides; ninguno se descarta en silencio | pendiente |
+| ARC-058 | 2 | 500 archivos a la vez | Cargar el máximo del lote | Sin congelar la UI; progreso por archivo; se puede cancelar | automatizado: tests-ui/e2e/app.spec.ts (500 fotos en 2.4 s, la interfaz responde y se cancela). El progreso es el estado de cada foto en la lista; no hay aserción de que avance |
+| ARC-059 | 2 | 501 archivos a la vez | Cargar uno más que el máximo | Se explica el límite y tú decides; ninguno se descarta en silencio | automatizado: tests-ui/e2e/app.spec.ts, tests-ui/unit/main.test.ts. El límite cuenta las fotos ya abiertas |
 
 ## Contenido visual: caras (VIS)
 
@@ -268,7 +268,7 @@ Al ejecutar un caso, el Estado pasa a `automatizado` o `manual`, con enlace a su
 | INT-009 | 1 | Arrastrar una carpeta | Arrastrar una carpeta | Carga lo soportado con resumen, o explica | pendiente: arrastrar y soltar no se prueba aún; la carpeta sí se rechaza al abrir |
 | INT-010 | 1 | Arrastrar archivos mientras otro se procesa | Arrastrar durante un análisis | Se encolan; el análisis actual sigue | pendiente: arrastrar y soltar no se prueba aún |
 | INT-011 | 1 | Cerrar con cambios sin guardar | Cerrar la ventana | Pregunta antes de cerrar; también con Alt+F4 | pendiente: el diálogo nativo de cierre no se ha probado |
-| INT-012 | 2 | Clic fuera de la imagen | Clic de selección fuera | Sin máscara; aviso claro | pendiente |
+| INT-012 | 2 | Clic fuera de la imagen | Clic de selección fuera | Sin máscara; aviso claro | automatizado: tests-ui/e2e/app.spec.ts (coordenadas fuera), sidecar/tests/test_segmentar.py, test_pincel.py. Con el mouse no hay forma de hacer clic fuera: el lienzo es la imagen |
 | INT-013 | 2 | Clic en el borde exacto | Clic en la primera y última fila y columna | Máscara válida, sin error de índice | pendiente |
 | INT-014 | 1 | Zoom extremo | Zoom al mínimo y al máximo, editando | Máscara alineada; UI estable | pendiente: no hay zoom de imagen todavía; pasa a la Fase 2 |
 | INT-015 | 1 | Sliders en sus extremos | Llevar cada slider a mín y máx | Aplica sin error; efecto correcto | pendiente: no hay sliders todavía; el campo de intensidad sí se probó en sus extremos |
@@ -279,6 +279,11 @@ Al ejecutar un caso, el Estado pasa a `automatizado` o `manual`, con enlace a su
 | INT-020 | 1 | Escribir "1e10" | Igual que INT-016 | Rechazo | automatizado: tests-ui/e2e/app.spec.ts, tests-ui/unit/numeros.test.ts |
 | INT-021 | 1 | Escribir "0,5" | Igual que INT-016 | 0.5 en campos decimales; rechazo en enteros | automatizado: tests-ui/e2e/app.spec.ts, tests-ui/unit/numeros.test.ts |
 | INT-022 | 1 | Pegar texto largo | Pegar miles de caracteres | Rechazo sin congelar | automatizado: tests-ui/e2e/app.spec.ts, tests-ui/unit/numeros.test.ts |
+| INT-023 | 2 | Trazo con el pincel | Pintar, deshacer, rehacer y exportar | Solo lo pintado, con el margen mínimo, sale tapado; el resto queda igual | automatizado: tests-ui/e2e/app.spec.ts, sidecar/tests/test_pincel.py |
+| INT-024 | 2 | Pincel que sale del lienzo | Arrastrar fuera de la imagen | El trazo sigue por el borde; el sidecar rechaza puntos fuera | automatizado: sidecar/tests/test_pincel.py, tests-ui/unit/logica.test.ts (sin E2E) |
+| INT-025 | 2 | Trazo muy largo | Más de 5000 puntos | Toma la primera parte y avisa | automatizado: tests-ui/unit/logica.test.ts, sidecar/tests/test_pincel.py (el aviso en pantalla no tiene E2E) |
+| INT-026 | 2 | Pincel en sus extremos | Tamaño 1 y 512, puntos en las esquinas | Máscara válida; fuera de rango se rechaza | automatizado: sidecar/tests/test_pincel.py, tests-ui/unit/logica.test.ts |
+| INT-027 | 2 | Trazo tras reiniciar el sidecar o recuperar | Recuperar una edición con un trazo | Se oculta toda la caja del trazo y sigue diciendo "trazo a mano" | automatizado: sidecar/tests/test_segmentar.py (máscara perdida), tests-ui/unit/logica.test.ts (origen recuperado) |
 
 ## Seguridad y privacidad (SEG)
 
@@ -334,7 +339,7 @@ Cada caso se aplica a cada función, comando del IPC y control, en la UI y de nu
 | VAL-027 | 3 | Rango fuera de la duración | Enviar fin mayor que la duración | Rechazo tipado | pendiente |
 | VAL-028 | 1 | Coordenadas fuera de la imagen | Enviar x o y fuera | Rechazo tipado | automatizado: sidecar/tests/test_efectos.py, test_esquemas.py |
 | VAL-029 | 1 | Máscara vacía | Enviar máscara sin píxeles | Rechazo tipado con mensaje | automatizado: sidecar/tests/test_efectos.py, test_esquemas.py |
-| VAL-030 | 1 | Máscara al 100% de la imagen | Enviar máscara completa | Se pide confirmar; luego se aplica | pendiente: el efecto funciona al 100%, pero aún no se pide confirmar |
+| VAL-030 | 1 | Máscara al 100% de la imagen | Enviar máscara completa | Se pide confirmar; luego se aplica | automatizado para rectángulos: tests-ui/e2e/app.spec.ts (coordenadas). La silueta y el trazo usan la misma confirmación sobre su caja, sin E2E propio. Se mide la caja, no la máscara: puede preguntar de más, nunca de menos |
 | VAL-031 | 1 | Esquemas tipados en las fronteras | Revisar que cada comando tenga Zod y Pydantic, por test de contrato | Sin comandos sin esquema; ambos coinciden | automatizado: sidecar/tests/test_esquemas.py, test_servidor.py, tests-ui/e2e/app.spec.ts |
 | VAL-032 | 1 | El sidecar no confía en la UI | Mandar comandos inválidos directo al sidecar | Rechazo tipado, sin depender de la UI | automatizado: sidecar/tests/test_esquemas.py, test_servidor.py, tests-ui/e2e/app.spec.ts |
 
@@ -379,7 +384,7 @@ Cada caso se aplica a cada función, comando del IPC y control, en la UI y de nu
 | ERR-001 | 1 | Errores tipados | Comprobar cada error por test | Código interno, mensaje de usuario y log técnico | automatizado: sidecar/tests/test_servidor.py |
 | ERR-002 | 1 | Sin códigos ni stack traces en pantalla | Forzar errores en E2E y revisar el texto | Solo mensajes en tono de marca: qué pasó, por qué, qué hacer | automatizado: tests-ui/e2e/app.spec.ts (mensajes de los errores probados) |
 | ERR-003 | 1 | Logs sin imágenes | Revisar logs tras un flujo completo | Nada binario ni base64 | automatizado: tests-ui/e2e/app.spec.ts, sidecar/tests/test_servidor.py |
-| ERR-004 | 2 | Logs sin texto de OCR | Procesar texto centinela y buscarlo | No aparece | pendiente |
+| ERR-004 | 2 | Logs sin texto de OCR | Procesar texto centinela y buscarlo | No aparece | automatizado: tests-ui/e2e/app.spec.ts (teléfono, correo y QR leídos; ninguno llega a los logs) |
 | ERR-005 | 1 | Logs sin rutas con datos personales | Usar una ruta centinela y buscarla | Anonimizada | automatizado: tests-ui/e2e/app.spec.ts, sidecar/tests/test_servidor.py |
 | ERR-006 | 1 | Recuperación tras cierre de golpe | Matar la app con ediciones y abrirla | Ofrece recuperar, y solo con ediciones, sin píxeles | automatizado: tests-ui/e2e/app.spec.ts |
 | ERR-007 | 1 | Error del sidecar | Terminar el sidecar | Mensaje claro; reinicio o guía; sin presentar nada como revisado | automatizado: tests-ui/e2e/app.spec.ts, tests-ui/unit/main.test.ts |
