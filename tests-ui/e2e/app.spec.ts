@@ -793,3 +793,47 @@ test('zoom del 200%, colores forzados y simulación de daltonismo', async () => 
     await expect(pagina.locator('[data-regla="UBI-01"] .nivel svg').first()).toBeVisible();
   }
 });
+
+test('modo de video: se entra sin archivo, dice lo que no hace y es accesible', async () => {
+  sesion = await lanzar();
+  const { pagina } = sesion;
+  await pagina.getByRole('button', { name: 'Video' }).click();
+  await expect(pagina.getByRole('heading', { name: 'Revisa un video antes de publicarlo' })).toBeVisible();
+  await expect(pagina.getByText('hasta 3 segundos')).toBeVisible();
+  await expect(pagina.getByText('Todavía no detectamos nada solos en video')).toBeVisible();
+  // Un solo destino para "Saltar al contenido", aunque el modo de fotos siga montado.
+  await expect(pagina.locator('#principal')).toHaveCount(1);
+  await sinViolaciones(pagina);
+  for (const tema of ['claro', 'oscuro'] as const) {
+    await pagina.getByLabel('Tema').selectOption(tema);
+    await pagina.screenshot({ path: join(CAPTURAS, `video-vacio-${tema}.png`) });
+  }
+  await pagina.getByRole('button', { name: 'Fotos' }).click();
+  await expect(pagina.getByRole('heading', { name: 'Revisa tus fotos antes de publicarlas' })).toBeVisible();
+  await expect(pagina.locator('#principal')).toHaveCount(1);
+});
+
+test('video: el renderer no puede pedir nada inválido', async () => {
+  sesion = await lanzar();
+  const { pagina } = sesion;
+  const r = await pagina.evaluate(async () => {
+    const id = '6f9619ff-8b86-4011-b42d-00c04fc964ff';
+    const api = window.revisor as unknown as Record<string, (...a: unknown[]) => Promise<{ error?: { codigo: string } }>>;
+    const cod = async (f: Promise<{ error?: { codigo: string } }>): Promise<string> => (await f).error?.codigo ?? 'ok';
+    const pista = { pista_id: 'a', efecto: 'solido' };
+    return {
+      idMalo: await cod(api.vistaVideo!('../x', 0, [])),
+      posicionNegativa: await cod(api.vistaVideo!(id, -1, [])),
+      posicionDecimal: await cod(api.vistaVideo!(id, 1.5, [])),
+      repetidas: await cod(api.vistaVideo!(id, 0, [pista, pista])),
+      efectoMalo: await cod(api.exportarVideo!(id, [{ pista_id: 'a', efecto: 'borroso' }])),
+      coordenadaNaN: await cod(api.seguirVideo!(id, 0, Number.NaN, 0)),
+      noAbierto: await cod(api.vistaVideo!(id, 0, [])),
+      seguirNoAbierto: await cod(api.seguirVideo!(id, 0, 1, 1)),
+    };
+  });
+  expect(r).toEqual({
+    idMalo: 'VALIDACION', posicionNegativa: 'VALIDACION', posicionDecimal: 'VALIDACION', repetidas: 'VALIDACION',
+    efectoMalo: 'VALIDACION', coordenadaNaN: 'VALIDACION', noAbierto: 'VIDEO_NO_ABIERTO', seguirNoAbierto: 'VIDEO_NO_ABIERTO',
+  });
+});

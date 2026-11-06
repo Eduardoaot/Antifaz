@@ -181,3 +181,16 @@ summary { cursor: pointer; min-height: 1.75rem; }
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
 }
+
+/* Video (Fase 3) */
+.cuerpo-video { grid-template-columns: minmax(0, 1fr) minmax(18rem, 24rem); }
+.cuerpo-solo { grid-template-columns: minmax(0, 1fr); }
+@media (max-width: 1000px) {
+  .cuerpo-video { grid-template-columns: minmax(0, 1fr); }
+}
+.aviso-video { margin-bottom: 0.75rem; }
+.lienzo.herramienta-clic { cursor: crosshair; }
+.campo-frame { display: grid; gap: 0.25rem; margin-top: 0.75rem; }
+.campo-frame input { width: 100%; }
+.acciones-video { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem; }
+

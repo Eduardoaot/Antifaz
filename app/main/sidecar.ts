@@ -135,14 +135,15 @@ export class Sidecar {
     this.entregar(mensaje.id, { resultado: { ok: false, error: mensaje.error ?? ERROR_SIDECAR }, binario: null });
   }
 
-  pedir(comando: Record<string, unknown>): Promise<RespuestaSidecar> {
+  /** `limiteMs` reemplaza el límite general para pedidos largos, como seguir un objeto en video. */
+  pedir(comando: Record<string, unknown>, limiteMs?: number): Promise<RespuestaSidecar> {
     return new Promise((resolver) => {
       const proceso = this.iniciar();
       const id = this.siguienteId++;
       const limite = setTimeout(() => {
         this.opciones.registrar('Un pedido al sidecar rebasó el límite de tiempo');
         proceso.kill();
-      }, this.opciones.limitePedidoMs ?? LIMITE_PEDIDO_MS);
+      }, limiteMs ?? this.opciones.limitePedidoMs ?? LIMITE_PEDIDO_MS);
       this.pendientes.set(id, {
         resolver: (r) => {
           clearTimeout(limite);

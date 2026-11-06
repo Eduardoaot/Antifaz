@@ -74,7 +74,7 @@ def _verificar_contenido(
             raise ErrorRevisor(Codigo.EXPORTACION_NO_VERIFICADA, f"zona oculta alterada: {diferencia:.1f}")
 
 
-def _error_de_sistema(e: OSError) -> ErrorRevisor:
+def error_de_sistema(e: OSError) -> ErrorRevisor:
     if e.errno in (errno.ENOSPC, errno.EDQUOT):
         return ErrorRevisor(Codigo.DISCO_LLENO)
     if e.errno in (errno.EACCES, errno.EPERM, errno.EROFS) or isinstance(e, PermissionError):
@@ -122,7 +122,7 @@ def _escribir_atomico(destino: str, datos: bytes) -> None:
             os.fsync(f.fileno())
         os.replace(temporal, destino)
     except OSError as e:
-        raise _error_de_sistema(e) from e
+        raise error_de_sistema(e) from e
     finally:
         try:
             if os.path.exists(temporal):

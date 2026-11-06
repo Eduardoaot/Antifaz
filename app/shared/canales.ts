@@ -15,4 +15,10 @@ export const CANALES = {
   guardarEdiciones: 'recuperacion:guardar',
   recuperar: 'recuperacion:consultar',
   descartarRecuperacion: 'recuperacion:descartar',
+  abrirVideo: 'video:abrir',
+  vistaVideo: 'video:vista',
+  seguirVideo: 'video:seguir',
+  quitarPista: 'video:quitar',
+  exportarVideo: 'video:exportar',
+  cerrarVideo: 'video:cerrar',
 } as const;
