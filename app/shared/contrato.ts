@@ -13,6 +13,8 @@ export const LIMITES = {
   ocultamientos: 5000,
   jpegCalidad: { min: 60, max: 100, porDefecto: 92 },
   ladoVista: 1600,
+  pincel: { min: 1, max: 512, porDefecto: 32 },
+  puntosTrazo: 5000,
 } as const;
 
 export const esquemaEfecto = z.enum(['solido', 'difuminado', 'pixelado']);
@@ -80,6 +82,18 @@ export const esquemaSegmentado = z.strictObject({
 });
 export type Segmentado = z.infer<typeof esquemaSegmentado>;
 
+const esquemaPunto = z.strictObject({ x: enteroEnRango(0, LIMITES.ladoMax - 1), y: enteroEnRango(0, LIMITES.ladoMax - 1) });
+export type Punto = z.infer<typeof esquemaPunto>;
+
+/** Un trazo del pincel, en píxeles de la imagen original. */
+export const esquemaTrazo = z.strictObject({
+  puntos: z.array(esquemaPunto).min(1).max(LIMITES.puntosTrazo),
+  tamano: enteroEnRango(LIMITES.pincel.min, LIMITES.pincel.max),
+});
+
+export const esquemaOrigen = z.enum(['rectangulo', 'silueta', 'pincel']);
+export type Origen = z.infer<typeof esquemaOrigen>;
+
 export const esquemaExportado = z.strictObject({
   formato: z.string(),
   bytes: z.number().int().positive(),
@@ -128,6 +142,8 @@ const esquemaManual = z.strictObject({
   alto: enteroEnRango(1, LIMITES.ladoMax),
   efecto: esquemaEfecto,
   mascara_id: z.string().min(1).max(64).nullable(),
+  // Opcional: las recuperaciones guardadas antes del pincel no lo traen.
+  origen: esquemaOrigen.optional(),
 });
 
 export const esquemaEdicion = z.strictObject({
@@ -161,6 +177,7 @@ export interface ApiRevisor {
   vista(id: string, ocultamientos: Ocultamiento[]): Promise<Resultado<Vista>>;
   exportar(id: string, ocultamientos: Ocultamiento[]): Promise<Resultado<Exportado | null>>;
   segmentar(id: string, x: number, y: number): Promise<Resultado<Segmentado>>;
+  pintar(id: string, puntos: Punto[], tamano: number): Promise<Resultado<Segmentado>>;
   cerrar(id: string): Promise<void>;
   cancelar(): Promise<void>;
   abrirFuente(url: string): Promise<void>;

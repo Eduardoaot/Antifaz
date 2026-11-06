@@ -9,12 +9,14 @@ import {
   type Hallazgo,
   type Motivo,
   type Ocultamiento,
+  type Origen,
+  type Punto,
 } from './contrato';
 import { leerEnRango } from './numeros';
 
 export const HISTORIAL_PASOS = 100;
 
-export type Herramienta = 'ninguna' | 'clic' | 'rectangulo';
+export type Herramienta = 'ninguna' | 'clic' | 'rectangulo' | 'pincel';
 
 export interface Caja {
   x: number;
@@ -27,6 +29,7 @@ export interface ZonaManual extends Caja {
   id: string;
   efecto: Efecto;
   mascara_id: string | null;
+  origen: Origen;
 }
 
 export interface Revision {
@@ -137,8 +140,9 @@ export function construirOcultamientos(r: Revision, hallazgos: readonly Hallazgo
       efecto: z.efecto,
       intensidad: r.intensidad,
       dilatacion_px: LIMITES.dilatacionPx.porDefecto,
-      // Una zona dibujada a mano ya es lo que se pidió: solo lleva el margen mínimo.
-      dilatacion_pct: z.mascara_id === null ? 0 : LIMITES.dilatacionPct.porDefecto,
+      // Un rectángulo o un trazo ya son lo que se pidió: solo llevan el margen mínimo.
+      // La silueta del modelo puede quedarse corta, así que lleva el margen completo.
+      dilatacion_pct: z.origen === 'silueta' ? LIMITES.dilatacionPct.porDefecto : 0,
       mascara_id: z.mascara_id,
     });
   }
@@ -308,9 +312,49 @@ export function textoConfirmacion(faltan: number, parcial: boolean): string {
 
 export const efectoManual = (z: ZonaManual): Efecto => z.efecto;
 
-export function agregarManual(r: Revision, id: string, caja: Caja, mascaraId: string | null): Revision {
-  return { ...r, manuales: [...r.manuales, { ...caja, id, efecto: 'solido', mascara_id: mascaraId }] };
+const origenPorMascara = (mascaraId: string | null): Origen => (mascaraId === null ? 'rectangulo' : 'silueta');
+
+export function agregarManual(
+  r: Revision,
+  id: string,
+  caja: Caja,
+  mascaraId: string | null,
+  origen: Origen = origenPorMascara(mascaraId),
+): Revision {
+  return { ...r, manuales: [...r.manuales, { ...caja, id, efecto: 'solido', mascara_id: mascaraId, origen }] };
 }
+
+export function textoOrigen(origen: Origen): string {
+  switch (origen) {
+    case 'rectangulo':
+      return 'rectángulo';
+    case 'silueta':
+      return 'silueta';
+    case 'pincel':
+      return 'trazo a mano';
+    default: {
+      const inalcanzable: never = origen;
+      throw new Error(`Origen desconocido: ${String(inalcanzable)}`);
+    }
+  }
+}
+
+/**
+ * Suma un punto al trazo del pincel. Omite los que casi no se movieron, para no mandar miles
+ * de puntos repetidos, y nunca pasa del límite: el resto del trazo se descarta.
+ * Devuelve el mismo arreglo si no agregó nada.
+ */
+export function agregarPuntoTrazo(trazo: readonly Punto[], punto: Punto, tamano: number): readonly Punto[] {
+  const ultimo = trazo.at(-1);
+  if (trazo.length >= LIMITES.puntosTrazo) return trazo;
+  if (ultimo !== undefined) {
+    const paso = Math.max(1, Math.floor(tamano / 4));
+    if (Math.hypot(punto.x - ultimo.x, punto.y - ultimo.y) < paso) return trazo;
+  }
+  return [...trazo, punto];
+}
+
+export const trazoLleno = (trazo: readonly Punto[]): boolean => trazo.length >= LIMITES.puntosTrazo;
 
 export function quitarManual(r: Revision, id: string): Revision {
   return { ...r, manuales: r.manuales.filter((z) => z.id !== id) };
@@ -416,7 +460,13 @@ export function aEdicion(archivoId: string, r: Revision): Edicion {
 }
 
 export function desdeEdicion(e: Edicion): Revision {
-  return { decisiones: e.decisiones, efectos: e.efectos, intensidad: e.intensidad, hayMenores: e.hayMenores, manuales: e.manuales };
+  return {
+    decisiones: e.decisiones,
+    efectos: e.efectos,
+    intensidad: e.intensidad,
+    hayMenores: e.hayMenores,
+    manuales: e.manuales.map((z) => ({ ...z, origen: z.origen ?? origenPorMascara(z.mascara_id) })),
+  };
 }
 
 export function hayCambios(r: Revision): boolean {

@@ -11,6 +11,7 @@ const api: ApiRevisor = {
   vista: (id, ocultamientos) => ipcRenderer.invoke(CANALES.vista, id, ocultamientos),
   exportar: (id, ocultamientos) => ipcRenderer.invoke(CANALES.exportar, id, ocultamientos),
   segmentar: (id, x, y) => ipcRenderer.invoke(CANALES.segmentar, id, x, y),
+  pintar: (id, puntos, tamano) => ipcRenderer.invoke(CANALES.pintar, id, puntos, tamano),
   cerrar: (id) => ipcRenderer.invoke(CANALES.cerrar, id),
   cancelar: () => ipcRenderer.invoke(CANALES.cancelar),
   abrirFuente: (url) => ipcRenderer.invoke(CANALES.abrirFuente, url),

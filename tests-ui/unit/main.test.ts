@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import fc from 'fast-check';
 import { describe, expect, it, vi } from 'vitest';
 import tokens from '../../brand/tokens.json';
-import { Archivos, ERROR_ARCHIVO_CAMBIO, ERROR_NO_ABIERTA } from '../../app/main/archivos';
+import { Archivos, ERROR_ARCHIVO_CAMBIO, ERROR_NO_ABIERTA, planearLote } from '../../app/main/archivos';
 import { ERROR_SIDECAR, LectorMarcos, MAX_BYTES_MARCO, Sidecar, type RespuestaSidecar } from '../../app/main/sidecar';
 
 const marco = (contenido: Buffer): Buffer => {
@@ -148,6 +148,70 @@ describe('Archivos: las rutas no salen de main', () => {
     expect(archivos.ruta(r.archivo.id)).toBeUndefined();
     await archivos.cerrar(r.archivo.id);
     expect(pedir).toHaveBeenCalledTimes(2);
+  });
+
+  it('cuenta las fotos abiertas y las reconoce sin importar mayúsculas', async () => {
+    const { archivos } = falso([abierta('s1'), { ok: true, datos: {} }]);
+    expect(archivos.cantidad).toBe(0);
+    const r = await archivos.abrir(RUTA);
+    if (!r.ok) throw new Error('debió abrir');
+    expect(archivos.cantidad).toBe(1);
+    expect(archivos.estaAbierta(RUTA.toUpperCase())).toBe(true);
+    expect(archivos.estaAbierta('C:\\otra.jpg')).toBe(false);
+    await archivos.cerrar(r.archivo.id);
+    expect(archivos.cantidad).toBe(0);
+  });
+});
+
+describe('planearLote: el límite es de fotos abiertas a la vez', () => {
+  const rutas = (n: number, prefijo = 'f'): string[] => Array.from({ length: n }, (_, i) => `C:\\${prefijo}${i}.jpg`);
+  const ninguna = (): boolean => false;
+
+  it('justo en el límite caben todas', () => {
+    expect(planearLote(rutas(500), ninguna, 500)).toEqual({ abrir: rutas(500), nuevas: 500, sobran: 0 });
+  });
+
+  it('una de más no se descarta en silencio: se cuenta', () => {
+    const plan = planearLote(rutas(501), ninguna, 500);
+    expect(plan.abrir).toEqual(rutas(500));
+    expect(plan.sobran).toBe(1);
+  });
+
+  it('lo ya abierto ocupa lugar: con 300 abiertas solo caben 200 más', () => {
+    const plan = planearLote(rutas(300, 'n'), ninguna, 500 - 300);
+    expect(plan).toEqual({ abrir: rutas(200, 'n'), nuevas: 200, sobran: 100 });
+  });
+
+  it('una foto ya abierta o repetida en la selección no gasta otro lugar', () => {
+    const abierta = (r: string): boolean => r === 'C:\\ya.jpg';
+    const plan = planearLote(['C:\\ya.jpg', 'C:\\a.jpg', 'c:\\A.JPG', 'C:\\b.jpg'], abierta, 1);
+    expect(plan).toEqual({ abrir: ['C:\\ya.jpg', 'C:\\a.jpg', 'c:\\A.JPG'], nuevas: 1, sobran: 1 });
+  });
+
+  it('una repetida de una que no cupo tampoco entra', () => {
+    expect(planearLote(['C:\\a.jpg', 'C:\\b.jpg', 'C:\\B.jpg'], ninguna, 1)).toEqual({ abrir: ['C:\\a.jpg'], nuevas: 1, sobran: 2 });
+  });
+
+  it('sin lugares, ninguna nueva entra, aunque el cálculo dé negativo', () => {
+    expect(planearLote(rutas(3), ninguna, 0)).toEqual({ abrir: [], nuevas: 0, sobran: 3 });
+    expect(planearLote(rutas(3), ninguna, -5)).toEqual({ abrir: [], nuevas: 0, sobran: 3 });
+    expect(planearLote([], ninguna, 10)).toEqual({ abrir: [], nuevas: 0, sobran: 0 });
+  });
+
+  it('propiedad: nada se pierde y nunca se pasa del límite', () => {
+    fc.assert(
+      fc.property(fc.array(fc.constantFrom(...rutas(20)), { maxLength: 60 }), fc.integer({ min: -3, max: 25 }), (seleccion, lugares) => {
+        const plan = planearLote(seleccion, ninguna, lugares);
+        const tope = Math.max(0, lugares);
+        const distintasAbiertas = new Set(plan.abrir.map((r) => r.toLowerCase())).size;
+        return (
+          plan.abrir.length + plan.sobran === seleccion.length && // cada ruta se abre o se cuenta
+          plan.nuevas === distintasAbiertas &&
+          plan.nuevas <= tope &&
+          (plan.sobran === 0 || plan.nuevas === tope) // solo sobra si de verdad se llenó
+        );
+      }),
+    );
   });
 });
 
