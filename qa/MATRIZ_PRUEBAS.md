@@ -27,8 +27,8 @@ Al ejecutar un caso, el Estado pasa a `automatizado` o `manual`, con enlace a su
 | ARC-007 | 1 | Imagen de más de 100 MP | Cargar imagen dentro del límite | Procesa con progreso y sin rebasar memoria, o explica el límite | automatizado: sidecar/tests/test_analisis.py, test_cargador.py |
 | ARC-008 | 1 | Panorámica muy alargada | Cargar imagen con relación de aspecto extrema | Procesa si está en el límite; si no, mensaje específico. La UI no se deforma | automatizado: sidecar/tests/test_cargador.py |
 | ARC-009 | 3 | Video 8K | Cargar y crear proxy | Procesa sobre proxy con tiempo estimado | pendiente |
-| ARC-010 | 3 | Video de 1 frame | Cargar, ocultar y exportar | Funciona; ningún cálculo divide entre cero | pendiente |
-| ARC-011 | 3 | Video de varias horas | Cargar video por encima del máximo | Rechazo explicado, o aviso con tiempo estimado si cabe. Sin bloquear la UI | pendiente |
+| ARC-010 | 3 | Video de 1 frame | Cargar, ocultar y exportar | Funciona; ningún cálculo divide entre cero | pendiente: la lectura con ffprobe está automatizada en sidecar/tests/test_video.py; falta el flujo completo |
+| ARC-011 | 3 | Video de varias horas | Cargar video por encima del máximo | Rechazo explicado, o aviso con tiempo estimado si cabe. Sin bloquear la UI | pendiente: la lectura con ffprobe está automatizada en sidecar/tests/test_video.py; falta el flujo completo |
 | ARC-012 | 1 | Archivo de 0 bytes | Cargar | "Este archivo está vacío"; el resto del lote sigue | automatizado: sidecar/tests/test_cargador.py |
 
 ## Archivos: corruptos y maliciosos
@@ -65,18 +65,18 @@ Al ejecutar un caso, el Estado pasa a `automatizado` o `manual`, con enlace a su
 | ID | Fase | Caso | Pasos | Resultado esperado | Estado |
 |---|---|---|---|---|---|
 | ARC-032 | 3 | Frame rate variable | Cargar, rastrear y exportar | Máscaras sincronizadas con el frame correcto; audio en sincronía | pendiente |
-| ARC-033 | 3 | Video sin audio | Cargar y exportar | Exporta sin error y sin pista de audio inventada | pendiente |
+| ARC-033 | 3 | Video sin audio | Cargar y exportar | Exporta sin error y sin pista de audio inventada | pendiente: la lectura con ffprobe está automatizada en sidecar/tests/test_video.py; falta el flujo completo |
 | ARC-034 | 3 | HDR | Cargar, ocultar y exportar | Conversión a SDR sin colores lavados; máscaras correctas | pendiente |
 | ARC-035 | 3 | 10 bits | Cargar, ocultar y exportar | Se convierte al formato de salida sin artefactos | pendiente |
 | ARC-036 | 3 | 60 fps | Cargar, rastrear y exportar | Sin frames sin ocultar | pendiente |
 | ARC-037 | 3 | 120 fps | Cargar, rastrear y exportar | Sin frames sin ocultar; salida dentro de los fps permitidos | pendiente |
-| ARC-038 | 3 | Metadato de rotación | Cargar video con rotación de 90, 180 y 270° | Vista y máscara alineadas; la salida se ve derecha | pendiente |
+| ARC-038 | 3 | Metadato de rotación | Cargar video con rotación de 90, 180 y 270° | Vista y máscara alineadas; la salida se ve derecha | pendiente: la lectura con ffprobe está automatizada en sidecar/tests/test_video.py; falta el flujo completo |
 | ARC-039 | 3 | Códec HEVC | Cargar y exportar | Vista previa desde el sidecar; exporta bien | pendiente |
 | ARC-040 | 3 | Códec AV1 | Cargar y exportar | Igual que ARC-039, o limitación explicada | pendiente |
 | ARC-041 | 3 | Códec ProRes | Cargar y exportar | Igual que ARC-039 | pendiente |
 | ARC-042 | 3 | Corrupción a la mitad | Cargar video dañado en medio | "No pudimos analizar los segundos X–Y"; no se presenta como revisado | pendiente |
-| ARC-043 | 3 | Video vertical | Flujo completo | UI y salida correctas | pendiente |
-| ARC-044 | 3 | Video horizontal | Flujo completo | UI y salida correctas | pendiente |
+| ARC-043 | 3 | Video vertical | Flujo completo | UI y salida correctas | pendiente: la lectura con ffprobe está automatizada en sidecar/tests/test_video.py; falta el flujo completo |
+| ARC-044 | 3 | Video horizontal | Flujo completo | UI y salida correctas | pendiente: la lectura con ffprobe está automatizada en sidecar/tests/test_video.py; falta el flujo completo |
 
 ## Archivos: nombres, rutas y sistema de archivos
 
@@ -296,7 +296,7 @@ Al ejecutar un caso, el Estado pasa a `automatizado` o `manual`, con enlace a su
 | SEG-005 | 1 | Exportado sin EXIF | Revisar con `exiftool -a -G1 -ee` | Nada fuera de la lista blanca | automatizado: sidecar/tests/test_exportar.py, tests-ui/e2e/app.spec.ts |
 | SEG-006 | 1 | Exportado sin GPS, XMP ni IPTC | Revisar una imagen que sí los tenía | Nada | automatizado: sidecar/tests/test_exportar.py, tests-ui/e2e/app.spec.ts |
 | SEG-007 | 1 | Sin miniatura EXIF | Revisar imagen con miniatura sin ocultar | Sin miniatura ni imagen embebida | automatizado: sidecar/tests/test_exportar.py, tests-ui/e2e/app.spec.ts |
-| SEG-008 | 3 | Sin GPS en contenedores MP4 y MOV | Revisar con `ffprobe` y `exiftool` un video con GPS | Nada, incluidos `udta` y streams de datos | pendiente |
+| SEG-008 | 3 | Sin GPS en contenedores MP4 y MOV | Revisar con `ffprobe` y `exiftool` un video con GPS | Nada, incluidos `udta` y streams de datos | pendiente: el verificador de bytes está automatizado en sidecar/tests/test_metadatos_video.py; falta exportar con FFmpeg y revisar con exiftool |
 | SEG-009 | 1 | Sin nombre del dispositivo | Revisar foto y video con marca y modelo | Nada | automatizado: sidecar/tests/test_exportar.py, tests-ui/e2e/app.spec.ts |
 | SEG-010 | 1 | Irreversibilidad | Sólido: dos entradas distintas en la zona. Difuminado y pixelado: una cara real y detalle fino | Sólido: misma salida, no se recupera nada. Difuminado y pixelado: **no son irreversibles por decisión del responsable**; la cara deja de detectarse, el detalle fino se pierde y la app avisa | automatizado: sidecar/tests/test_efectos.py, test_exportar.py. No incluye un ataque de reconstrucción contra difuminado o pixelado |
 | SEG-011 | 6 | El reporte no tiene datos sensibles | Generar el reporte y buscar texto OCR, rutas y recortes | Nada | pendiente |
