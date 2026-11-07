@@ -102,7 +102,7 @@ Sin medir: arranque de la app y pico de memoria. Por eso esos presupuestos no ha
 - RAW real: se probó con LibRaw simulado. Tampoco hay muestra Display P3 o Adobe RGB.
 - Disco lleno real: se simuló el error del sistema.
 - Arrastrar y soltar: el código existe, pero no tiene prueba.
-- El diálogo nativo de cierre con cambios sin exportar.
+- ~~El diálogo nativo de cierre con cambios sin exportar.~~ Hecho el 6 de noviembre de 2026: ahora es un aviso de la app con prueba E2E (INT-011). El de Windows queda solo si la interfaz se cayó o no responde.
 - ~~Limpiar `.parcial` tras un cierre forzado.~~ Hecho el 6 de noviembre de 2026: se borran en la siguiente exportación a esa carpeta (ver `REPORTE_FASE_2.md`).
 - Confirmar al ocultar el 100% de la imagen (VAL-030).
 - ~~Subir `cargador` a 100%.~~ Hecho el 6 de noviembre de 2026: 100% de líneas y ramas.

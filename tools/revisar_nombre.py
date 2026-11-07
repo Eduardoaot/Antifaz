@@ -10,7 +10,11 @@ from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent.parent
 PERMITIDOS = ("brand/", "docs/", "qa/", "CLAUDE.md", "README.md", "LICENSE", "tools/test_")
-IGNORADOS = {".git", ".venv", "node_modules", "dist", "out", "__pycache__"}
+# Carpetas generadas y fuera de git: cachés de pruebas y resultados locales.
+IGNORADOS = {
+    ".git", ".venv", "node_modules", "dist", "out", "__pycache__",
+    ".hypothesis", ".pytest_cache", ".ruff_cache", "coverage", "test-results", "playwright-report",
+}
 
 
 def main() -> int:

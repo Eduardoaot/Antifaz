@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } fro
 import logoClaro from '../../../brand/logo/horizontal-claro.svg';
 import logoOscuro from '../../../brand/logo/horizontal-oscuro.svg';
 import { AVISO_LEGAL, MARCA } from '../../shared/catalogo';
-import { esquemaTema, ERROR_INTERNO, LIMITES, type Analisis, type ArchivoAbierto, type ArchivoCargado, type ErrorApp, type Origen, type Punto, type Recuperable, type Tema } from '../../shared/contrato';
+import { esquemaAvisoCierre, esquemaTema, ERROR_INTERNO, LIMITES, textoCierre, TITULO_CIERRE, type AvisoCierre, type Analisis, type ArchivoAbierto, type ArchivoCargado, type ErrorApp, type Origen, type Punto, type Recuperable, type Tema } from '../../shared/contrato';
 import {
   aEdicion,
   agregarManual,
@@ -84,6 +84,7 @@ export function App(): React.JSX.Element {
   const [buscando, setBuscando] = useState(false);
   const [tamanoPincel, setTamanoPincel] = useState<number>(LIMITES.pincel.porDefecto);
   const [zonaTotal, setZonaTotal] = useState<ZonaNueva | null>(null);
+  const [avisoCierre, setAvisoCierre] = useState<AvisoCierre | null>(null);
   const colaOcupada = useRef(false);
   const seleccion = elegido ?? archivos[0]?.info.id ?? null;
 
@@ -328,6 +329,17 @@ export function App(): React.JSX.Element {
       clearTimeout(espera);
     };
   }, [archivos, recuperacionResuelta]);
+
+  // Main avisa cuando se quiere cerrar con cambios sin exportar; la decisión se toma aquí.
+  useEffect(
+    () =>
+      api().alPedirCierre((aviso) => {
+        const valido = esquemaAvisoCierre.safeParse(aviso);
+        // Si el aviso no es válido, se dice lo más prudente: que las decisiones podrían perderse.
+        setAvisoCierre(valido.success ? valido.data : { recuperacionSegura: false });
+      }),
+    [],
+  );
 
   useEffect(() => {
     void api().obtenerTema().then(setTema);
@@ -615,6 +627,16 @@ export function App(): React.JSX.Element {
           cancelar="Volver"
           alAceptar={() => { agregarZona(zonaTotal); setZonaTotal(null); }}
           alCancelar={() => { setZonaTotal(null); setAnuncio('No agregamos esa zona.'); }}
+        />
+      )}
+      {avisoCierre !== null && (
+        <Confirmacion
+          titulo={TITULO_CIERRE}
+          texto={textoCierre(avisoCierre.recuperacionSegura)}
+          aceptar="Cerrar de todos modos"
+          cancelar="Seguir revisando"
+          alAceptar={() => { setAvisoCierre(null); void api().confirmarCierre(); }}
+          alCancelar={() => { setAvisoCierre(null); }}
         />
       )}
       {recuperables.length > 0 && (

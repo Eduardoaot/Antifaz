@@ -21,4 +21,7 @@ export const CANALES = {
   quitarPista: 'video:quitar',
   exportarVideo: 'video:exportar',
   cerrarVideo: 'video:cerrar',
+  /** De main al renderer: se quiere cerrar la ventana con cambios sin exportar. */
+  pedirCierre: 'ventana:pedir-cierre',
+  confirmarCierre: 'ventana:confirmar-cierre',
 } as const;

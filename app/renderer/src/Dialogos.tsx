@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useId, useRef } from 'react';
 import { MARCA, type Fuente, type Regla } from '../../shared/catalogo';
 
 function useModal(alCerrar: () => void): React.RefObject<HTMLDialogElement | null> {
@@ -40,9 +40,11 @@ interface ConfirmacionProps {
 
 export function Confirmacion({ titulo, texto, aceptar, cancelar, alAceptar, alCancelar }: ConfirmacionProps): React.JSX.Element {
   const referencia = useModal(alCancelar);
+  // Puede haber dos a la vez (por ejemplo, exportar y cerrar): cada título necesita su propio id.
+  const idTitulo = useId();
   return (
-    <dialog ref={referencia} aria-labelledby="titulo-confirmar" className="dialogo">
-      <h2 id="titulo-confirmar">{titulo}</h2>
+    <dialog ref={referencia} aria-labelledby={idTitulo} className="dialogo">
+      <h2 id={idTitulo}>{titulo}</h2>
       <p>{texto}</p>
       <div className="fila-botones">
         <button type="button" className="boton" autoFocus onClick={alCancelar}>{cancelar}</button>
