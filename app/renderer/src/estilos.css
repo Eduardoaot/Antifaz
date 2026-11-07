@@ -130,6 +130,8 @@ summary { cursor: pointer; min-height: 1.75rem; }
 .advertencia.medio .nivel { color: var(--riesgo-medio); background: var(--riesgo-medio-fondo); }
 .advertencia.bajo { border-left-color: var(--riesgo-bajo); }
 .advertencia.bajo .nivel { color: var(--riesgo-bajo); background: var(--riesgo-bajo-fondo); }
+/* Una pregunta no es una advertencia: sin color de riesgo. */
+.advertencia.nivel-pregunta { border-left-color: var(--borde-control); }
 .pregunta { border: 0; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.5rem; }
 .pregunta legend { padding: 0 0 0.25rem; font-weight: 700; }
 .intensidad { display: grid; gap: 0.25rem; margin-top: 0.75rem; }

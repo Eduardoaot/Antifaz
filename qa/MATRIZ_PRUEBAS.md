@@ -123,6 +123,30 @@ Al ejecutar un caso, el Estado pasa a `automatizado` o `manual`, con enlace a su
 | VIS-014 | 1 | Mascota | Analizar | Igual que VIS-012 | pendiente: falta el dataset de evaluación con fotos reales y licencia clara |
 | VIS-015 | 1 | Dibujo | Analizar | Igual que VIS-012 | pendiente: falta el dataset de evaluación con fotos reales y licencia clara |
 
+## Contenido visual: niveles de riesgo y escenas (Fase 4)
+
+| ID | Fase | Caso | Pasos | Resultado esperado | Estado |
+|---|---|---|---|---|---|
+| NIV-001 | 4 | Foto con una amiga o un amigo | Analizar una foto con una cara | La cara es "Riesgo bajo"; la pregunta de menores se ve como "Pregunta", sin color de riesgo; el veredicto dice que solo hay detalles menores | automatizado: tests-ui/unit/logica.test.ts y tests-ui/e2e/app.spec.ts |
+| NIV-002 | 4 | Responder que sí hay menores | Responder "Sí" | La pregunta, las caras y el baño pasan a "Riesgo alto" | automatizado: tests-ui/unit/logica.test.ts |
+| NIV-003 | 4 | Lo grave no baja | Hallazgo de riesgo alto con poca confianza | Sigue en "Riesgo alto" | automatizado: propiedad en tests-ui/unit/logica.test.ts |
+| NIV-004 | 4 | "Ocultar todo lo de riesgo alto" | Usarlo sin responder la pregunta de menores | Oculta solo lo que la pantalla marca como alto | automatizado: tests-ui/unit/logica.test.ts |
+| ESC-001 | 4 | Foto en un baño | Analizar | Aviso de riesgo bajo sobre la foto completa; con menores, riesgo alto | automatizado con modelo simulado: sidecar/tests/test_contenido.py. Pendiente: medir el umbral con fotos reales |
+| ESC-002 | 4 | Desnudo tomado en un baño | Analizar | DES-01 se sigue avisando: el baño no le quita puntaje | automatizado con modelo simulado: sidecar/tests/test_contenido.py |
+| ESC-003 | 4 | Ventana con vista a la calle | Analizar | Zona UBI-06 de riesgo bajo | pendiente: el umbral 0.2 es una propuesta sin medir |
+| ESC-004 | 4 | Ventana con cortina o sin vista | Analizar | No debería avisar; tasa de falsas alarmas medida | pendiente: falta muestra |
+
+## Sesgos (SES, Fase 4)
+
+| ID | Fase | Caso | Pasos | Resultado esperado | Estado |
+|---|---|---|---|---|---|
+| SES-001 | 4 | Recall de caras por tono de piel | `tools/medir_sesgo.py` con un dataset balanceado (escala Monk) | Brecha entre grupos dentro del límite aprobado | pendiente: falta el dataset con licencia y aprobar el límite (propuesta: 5 puntos) |
+| SES-002 | 4 | Pregunta de menores por grupo | Igual, con caras seguras (confianza de 0.6 o más) | Misma brecha máxima: la pregunta debe salir igual para todas las personas | pendiente: igual que SES-001 |
+| SES-003 | 4 | Falsas alarmas de desnudez y contenido sugerente | Igual, en fotos sin ese contenido | Brecha de falsas alarmas dentro del límite | pendiente: igual que SES-001 |
+| SES-004 | 4 | Recall por edad aparente y género percibido | Igual, agrupando por esas etiquetas del dataset | Dentro del límite | pendiente: igual que SES-001 |
+| SES-005 | 4 | La app no infiere grupos | Buscar en código, logs y exportaciones | Ninguna estimación de edad, género, tono de piel ni origen | automatizado en parte: ningún modelo de la app las calcula (revisión de código) |
+| SES-006 | 4 | Métricas de la herramienta | Pruebas unitarias | IoU, Wilson, brecha y manifiesto inválido detienen todo | automatizado: tools/test_medir_sesgo.py |
+
 ## Contenido visual: condiciones de captura
 
 | ID | Fase | Caso | Pasos | Resultado esperado | Estado |

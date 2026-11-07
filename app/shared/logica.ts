@@ -1,5 +1,5 @@
 /** Lógica pura de la revisión de una foto. Sin React ni Electron, para probarla a fondo. */
-import { catalogo, etiquetaNivel, reglaDe, type Regla } from './catalogo';
+import { catalogo, etiquetaNivel, reglaDe, type Nivel, type Regla } from './catalogo';
 import {
   LIMITES,
   type Analisis,
@@ -94,18 +94,11 @@ export const ocultarTodo = (r: Revision, hallazgos: readonly Hallazgo[]): Revisi
   ocultarVarios(r, hallazgos.filter(esVisual));
 
 /**
- * Oculta lo de riesgo alto. Si podría haber menores, las caras cuentan como riesgo alto,
- * salvo que la persona ya haya dicho que no los hay.
+ * Oculta lo que la pantalla muestra como riesgo alto. Las caras entran solo si dijiste que hay
+ * menores: sin respuesta, una cara es riesgo bajo y la pregunta sigue a la vista.
  */
 export function ocultarRiesgoAlto(r: Revision, hallazgos: readonly Hallazgo[]): Revision {
-  const hayPregunta = hallazgos.some((h) => reglaDe(h.regla_id).requiere_confirmacion === true);
-  const carasEnRiesgo = hayPregunta && r.hayMenores !== false;
-  return ocultarVarios(
-    r,
-    hallazgos.filter(
-      (h) => esVisual(h) && (reglaDe(h.regla_id).nivel_riesgo === 'alto' || (carasEnRiesgo && h.regla_id === 'CAR-01')),
-    ),
-  );
+  return ocultarVarios(r, hallazgos.filter((h) => esVisual(h) && nivelMostrado(h, r) === 'alto'));
 }
 
 /** Responder que sí hay menores oculta todas las caras; responder que no, no quita lo ya oculto. */
@@ -168,6 +161,8 @@ const NOMBRE_REVISADO: Readonly<Record<string, string>> = {
   'PAN-01': 'pantallas',
   'VAL-02': 'joyas',
   'UBI-04': 'letreros',
+  'UBI-06': 'ventanas',
+  'INT-01': 'baños',
 };
 
 /** Dice qué se revisó de verdad en esta foto, no lo que la app sabría revisar. */
@@ -190,8 +185,36 @@ export function ordenarHallazgos(hallazgos: readonly Hallazgo[]): Hallazgo[] {
 
 /** Sin zona no se puede tapar todavía: se dice para que la persona pueda recortar. */
 export function soloAvisaSinZona(h: Hallazgo): boolean {
-  return h.caja === null && !['MEN-01', 'UBI-01'].includes(h.regla_id);
+  return h.caja === null && !['MEN-01', 'UBI-01', 'INT-01'].includes(h.regla_id);
 }
+
+/** Una pregunta no es una advertencia: no lleva color de riesgo hasta que se responde. */
+export type NivelMostrado = Nivel | 'pregunta';
+
+/** Reglas que se vuelven riesgo alto si la persona dice que hay menores. */
+const SUBEN_CON_MENORES: ReadonlySet<string> = new Set(['CAR-01', 'INT-01']);
+
+/**
+ * Nivel que se muestra, según el contexto. Menos alarma con lo cotidiano y nunca menos con lo grave:
+ * - La pregunta de menores es neutral hasta que se responde. Con un "sí", ella y las caras suben a alto.
+ * - Con poca confianza, lo de riesgo medio se muestra como bajo.
+ * - Lo de riesgo alto nunca baja por sí solo.
+ */
+export function nivelMostrado(h: Hallazgo, r: Revision): NivelMostrado {
+  const regla = reglaDe(h.regla_id);
+  if (regla.requiere_confirmacion === true) return r.hayMenores === true ? 'alto' : 'pregunta';
+  if (r.hayMenores === true && SUBEN_CON_MENORES.has(h.regla_id)) return 'alto';
+  if (h.requiere_revision && regla.nivel_riesgo === 'medio') return 'bajo';
+  return regla.nivel_riesgo;
+}
+
+export function etiquetaNivelMostrado(nivel: NivelMostrado): string {
+  return nivel === 'pregunta' ? 'Pregunta' : etiquetaNivel(nivel);
+}
+
+/** Cuántas advertencias hay, sin contar preguntas. */
+export const contarAdvertencias = (hallazgos: readonly Hallazgo[]): number =>
+  hallazgos.filter((h) => reglaDe(h.regla_id).requiere_confirmacion !== true).length;
 
 /** Lo que aún pide una decisión: zonas sin resolver y la pregunta de menores. */
 export function pendientes(r: Revision, hallazgos: readonly Hallazgo[]): Hallazgo[] {
@@ -235,12 +258,18 @@ export function textoMotivo(motivo: Motivo): string {
   }
 }
 
-export type Veredicto = 'parcial' | 'con_advertencias' | 'sin_hallazgos';
+export type Veredicto = 'parcial' | 'con_advertencias' | 'leve' | 'sin_hallazgos';
 
 /** Una revisión fallida o parcial nunca se presenta como limpia. */
 export function veredicto(analisis: Analisis): Veredicto {
   if (!analisis.cobertura.completa) return 'parcial';
-  return analisis.hallazgos.length > 0 ? 'con_advertencias' : 'sin_hallazgos';
+  if (analisis.hallazgos.length === 0) return 'sin_hallazgos';
+  // Solo riesgo bajo y preguntas: una foto con amigos no debe sonar a peligro.
+  const leve = analisis.hallazgos.every((h) => {
+    const regla = reglaDe(h.regla_id);
+    return regla.requiere_confirmacion === true || regla.nivel_riesgo === 'bajo';
+  });
+  return leve ? 'leve' : 'con_advertencias';
 }
 
 export function tituloVeredicto(v: Veredicto): string {
@@ -249,6 +278,8 @@ export function tituloVeredicto(v: Veredicto): string {
       return 'No pudimos revisar esta foto por completo';
     case 'con_advertencias':
       return 'Revisa estas advertencias';
+    case 'leve':
+      return 'Solo encontramos detalles menores en lo que revisamos';
     case 'sin_hallazgos':
       return 'No encontramos nada riesgoso en lo que revisamos';
     default: {
@@ -293,7 +324,7 @@ export function resumenTexto(nombre: string, analisis: Analisis, r: Revision): s
   }
   for (const h of analisis.hallazgos) {
     if (h.regla_id === 'CAR-01') continue;
-    partes.push(`${etiquetaNivel(reglaDe(h.regla_id).nivel_riesgo)}: ${describirHallazgo(h)}`);
+    partes.push(`${etiquetaNivelMostrado(nivelMostrado(h, r))}: ${describirHallazgo(h)}`);
   }
   partes.push(...analisis.cobertura.motivos.map(textoMotivo));
   return partes.join(' ');
@@ -435,6 +466,7 @@ const TITULO_CATEGORIA: Readonly<Record<string, string>> = {
   objetos_valor: 'Objetos y pantallas',
   pantallas: 'Objetos y pantallas',
   codigos: 'Objetos y pantallas',
+  espacios_intimos: 'Contenido íntimo o sugerente',
 };
 
 /** Reglas agrupadas por tema, para la Guía de privacidad. */
