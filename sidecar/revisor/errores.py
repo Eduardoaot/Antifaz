@@ -35,6 +35,8 @@ class Codigo(StrEnum):
     HERRAMIENTA_NO_DISPONIBLE = "HERRAMIENTA_NO_DISPONIBLE"
     HERRAMIENTA_FALLO = "HERRAMIENTA_FALLO"
     SEGUIMIENTO_NO_DISPONIBLE = "SEGUIMIENTO_NO_DISPONIBLE"
+    VIDEO_NO_ABIERTO = "VIDEO_NO_ABIERTO"
+    ARCHIVO_CAMBIO = "ARCHIVO_CAMBIO"
     INTERNO = "INTERNO"
 
 
@@ -89,6 +91,11 @@ MENSAJES: dict[Codigo, str] = {
     Codigo.SEGUIMIENTO_NO_DISPONIBLE: (
         "Falta el modelo para seguir objetos en video o no es la versión que esperamos. "
         "Vuelve a instalar la app; las fotos se siguen revisando."
+    ),
+    Codigo.VIDEO_NO_ABIERTO: "Este video ya no está abierto. Vuelve a abrirlo; lo que habías elegido se perdió.",
+    Codigo.ARCHIVO_CAMBIO: (
+        "Este archivo cambió desde que lo abriste, así que tus decisiones ya no le corresponden. "
+        "No se guardó nada. Vuelve a abrirlo."
     ),
     Codigo.INTERNO: "Algo salió mal de nuestro lado y no se completó la acción. Intenta de nuevo.",
 }

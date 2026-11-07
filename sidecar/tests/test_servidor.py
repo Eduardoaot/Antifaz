@@ -273,3 +273,62 @@ def test_seg_python_no_puede_abrir_red() -> None:
     )
     salida = subprocess.run([sys.executable, "-c", codigo], cwd=SIDECAR, capture_output=True, text=True, timeout=60, check=True)
     assert salida.stdout.strip() == "['bloqueado', 'bloqueado', 'bloqueado']"
+
+
+# --- Video (Fase 3) -----------------------------------------------------------------------------
+
+PISTA = {"pista_id": "a", "efecto": "solido"}
+
+
+@pytest.mark.parametrize(
+    "comando",
+    [
+        {"tipo": "vista_video", "video_id": "x", "posicion": 0, "pistas": []},
+        {"tipo": "seguir_video", "video_id": "x", "posicion": 0, "x": 1, "y": 1},
+        {"tipo": "quitar_pista", "video_id": "x", "pista_id": "a"},
+        {"tipo": "exportar_video", "video_id": "x", "pistas": [], "ruta_destino": "C:\s.mp4"},
+    ],
+)
+def test_video_no_abierto(comando: dict[str, Any]) -> None:
+    respuesta, _ = _pedir(_sesion(), comando)
+    assert respuesta["error"]["codigo"] == "VIDEO_NO_ABIERTO"
+
+
+def test_cerrar_video_desconocido_no_falla() -> None:
+    respuesta, _ = _pedir(_sesion(), {"tipo": "cerrar_video", "video_id": "x"})
+    assert respuesta["ok"]
+
+
+@pytest.mark.parametrize(
+    "comando",
+    [
+        {"tipo": "vista_video", "video_id": "x", "posicion": 0, "pistas": [PISTA, PISTA]},
+        {"tipo": "exportar_video", "video_id": "x", "pistas": [PISTA, PISTA], "ruta_destino": "s.mp4"},
+        {"tipo": "vista_video", "video_id": "x", "posicion": -1, "pistas": []},
+        {"tipo": "vista_video", "video_id": "x", "posicion": 1000, "pistas": []},
+        {"tipo": "vista_video", "video_id": "x", "posicion": 0, "pistas": [PISTA] * 0 + [{"pista_id": str(i), "efecto": "solido"} for i in range(51)]},
+        {"tipo": "seguir_video", "video_id": "x", "posicion": 0, "x": 4096, "y": 0},
+        {"tipo": "seguir_video", "video_id": "x", "posicion": 0, "x": 0, "y": -1},
+        {"tipo": "seguir_video", "video_id": "x", "posicion": 0, "x": 1.5, "y": 0},
+        {"tipo": "vista_video", "video_id": "x", "posicion": 0, "pistas": [{"pista_id": "a", "efecto": "borroso"}]},
+        {"tipo": "exportar_video", "video_id": "", "pistas": [], "ruta_destino": "s.mp4"},
+        {"tipo": "abrir_video", "ruta": ""},
+    ],
+)
+def test_video_valores_invalidos(comando: dict[str, Any]) -> None:
+    respuesta, _ = _pedir(_sesion(), comando)
+    assert respuesta["error"]["codigo"] == "VALIDACION"
+
+
+@pytest.mark.parametrize("posicion", [0, 999])
+def test_video_posicion_en_los_limites_llega_al_video(posicion: int) -> None:
+    respuesta, _ = _pedir(_sesion(), {"tipo": "vista_video", "video_id": "x", "posicion": posicion, "pistas": []})
+    assert respuesta["error"]["codigo"] == "VIDEO_NO_ABIERTO"
+
+
+def test_abrir_video_sin_herramientas(tmp_path: Path) -> None:
+    ruta = tmp_path / "v.mp4"
+    ruta.write_bytes(b"algo")
+    sesion = Sesion(MODELOS, tmp_path / "sin-herramientas")
+    respuesta, _ = _pedir(sesion, {"tipo": "abrir_video", "ruta": str(ruta)})
+    assert respuesta["error"]["codigo"] == "HERRAMIENTA_NO_DISPONIBLE"

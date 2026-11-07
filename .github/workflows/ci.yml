@@ -2,65 +2,180 @@ name: CI
 on:
   push:
   pull_request:
+  workflow_dispatch:
   schedule:
     - cron: '0 8 * * 1'
 
 permissions:
   contents: read
 
+# Un push nuevo cancela la corrida anterior de la misma rama o PR: solo importa la última.
+concurrency:
+  group: ci-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    # En PowerShell solo cuenta el código del último comando de cada paso: un `ruff` o un `lint`
+    # fallido pasaba sin que nadie lo notara. Bash con -eo pipefail se detiene en el primer error.
+    shell: bash
+
 jobs:
-  windows:
-    runs-on: windows-latest
-    timeout-minutes: 45
+  que-probar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      herramientas: ${{ steps.decidir.outputs.herramientas }}
+      sidecar: ${{ steps.decidir.outputs.sidecar }}
+      interfaz: ${{ steps.decidir.outputs.interfaz }}
+      e2e: ${{ steps.decidir.outputs.e2e }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - id: decidir
+        run: bash .github/scripts/que_probar.sh
+        env:
+          EVENTO: ${{ github.event_name }}
+          RAMA: ${{ github.ref_name }}
+          ANTES: ${{ github.event.before }}
+          BASE_PR: ${{ github.base_ref }}
+          GH_TOKEN: ${{ github.token }}
+
+  revisiones:
+    needs: que-probar
+    if: needs.que-probar.outputs.herramientas == 'true' || needs.que-probar.outputs.sidecar == 'true' || needs.que-probar.outputs.interfaz == 'true'
+    runs-on: windows-latest
+    timeout-minutes: 30
+    env:
+      HERRAMIENTAS: ${{ needs.que-probar.outputs.herramientas }}
+      SIDECAR: ${{ needs.que-probar.outputs.sidecar }}
+      INTERFAZ: ${{ needs.que-probar.outputs.interfaz }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: tools/requirements.txt
+      - uses: astral-sh/setup-uv@v10.3.3
+        if: env.SIDECAR == 'true'
+        with:
+          enable-cache: true
+          cache-dependency-glob: sidecar/uv.lock
+      - uses: actions/setup-node@v7
+        if: env.INTERFAZ == 'true'
         with:
           node-version: 24
           cache: npm
-      - uses: astral-sh/setup-uv@v5
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
 
       - name: Herramientas y catálogo
+        if: env.HERRAMIENTAS == 'true'
         run: |
           python -m venv .venv
-          .venv\Scripts\pip install -q -r tools\requirements.txt
-          .venv\Scripts\python tools\descargar_modelos.py
-          .venv\Scripts\python tools\validar_catalogo.py
-          .venv\Scripts\python -m unittest tools\test_validar_catalogo.py
-          .venv\Scripts\python tools\revisar_contraste.py
-          .venv\Scripts\python tools\revisar_nombre.py
+          .venv/Scripts/pip install -q -r tools/requirements.txt
+          .venv/Scripts/python tools/validar_catalogo.py
+          .venv/Scripts/python -m unittest tools/test_validar_catalogo.py
+          .venv/Scripts/python -m unittest tools/test_limpiar_cache.py
+          .venv/Scripts/python tools/revisar_contraste.py
+          .venv/Scripts/python tools/revisar_nombre.py
+
+      # Los modelos y FFmpeg/exiftool pesan cientos de MB y algunas réplicas fallan: se guardan
+      # entre corridas. El script vuelve a comprobar el hash de todo lo que ya está.
+      - id: modelos
+        if: env.SIDECAR == 'true'
+        uses: actions/cache/restore@v6
+        with:
+          path: |
+            sidecar/modelos
+            sidecar/herramientas
+          key: modelos-${{ runner.os }}-${{ hashFiles('tools/descargar_modelos.py') }}
+      - name: Modelos
+        if: env.SIDECAR == 'true'
+        run: python tools/descargar_modelos.py
+      - if: env.SIDECAR == 'true' && steps.modelos.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: |
+            sidecar/modelos
+            sidecar/herramientas
+          key: modelos-${{ runner.os }}-${{ hashFiles('tools/descargar_modelos.py') }}
 
       - name: Sidecar
+        if: env.SIDECAR == 'true'
         working-directory: sidecar
         run: |
           uv sync --python 3.12
-          .venv\Scripts\ruff check revisor
-          .venv\Scripts\pyright
-          .venv\Scripts\python -m pytest --cov=revisor --cov-branch --cov-report=term-missing
+          .venv/Scripts/ruff check revisor
+          .venv/Scripts/pyright
+          .venv/Scripts/python -m pytest --cov=revisor --cov-branch --cov-report=term-missing
 
       - name: Interfaz
+        if: env.INTERFAZ == 'true'
         run: |
           npm ci
           npm run tipos
           npm run lint
           npm run cobertura
 
+      - name: Fuzzing y propiedades largas (semanal)
+        if: github.event_name == 'schedule'
+        working-directory: sidecar
+        run: .venv/Scripts/python -m pytest --hypothesis-profile=largo
+
+  e2e:
+    needs: que-probar
+    if: needs.que-probar.outputs.e2e == 'true'
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - uses: astral-sh/setup-uv@v10.3.3
+        with:
+          enable-cache: true
+          cache-dependency-glob: sidecar/uv.lock
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - id: modelos
+        uses: actions/cache/restore@v6
+        with:
+          path: |
+            sidecar/modelos
+            sidecar/herramientas
+          key: modelos-${{ runner.os }}-${{ hashFiles('tools/descargar_modelos.py') }}
+      - name: Modelos
+        run: python tools/descargar_modelos.py
+      - if: steps.modelos.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: |
+            sidecar/modelos
+            sidecar/herramientas
+          key: modelos-${{ runner.os }}-${{ hashFiles('tools/descargar_modelos.py') }}
+
+      - name: Dependencias
+        run: |
+          (cd sidecar && uv sync --python 3.12)
+          npm ci
+
       - name: E2E y accesibilidad
         run: npm run e2e
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: capturas-e2e
+          retention-days: 14
           path: |
             test-results/
             tests-ui/capturas/
           if-no-files-found: ignore
-
-      - name: Fuzzing y propiedades largas (semanal)
-        if: github.event_name == 'schedule'
-        working-directory: sidecar
-        run: .venv\Scripts\python -m pytest --hypothesis-profile=largo

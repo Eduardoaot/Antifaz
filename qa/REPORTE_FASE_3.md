@@ -2,7 +2,7 @@
 
 Fecha: 6 de noviembre de 2026. Equipo de referencia: Intel i5-10210U (4 núcleos, 8 hilos), 16 GB de RAM, sin GPU, Windows 11.
 
-**La fase no está terminada.** Ya están el benchmark en el equipo de referencia, el seguimiento con EdgeTAM en el sidecar, las herramientas de video con hash, la lectura de video, la zona oculta por frame, las tuberías de frames y el verificador de MP4. Faltan el IPC, la interfaz de video y la exportación real con FFmpeg.
+**La fase no está terminada.** El video ya está en la app: se abre, se elige con un clic lo que se quiere ocultar, EdgeTAM lo sigue y se exporta un MP4. **Nunca se ha probado con FFmpeg real**, porque el sistema de permisos impide que el asistente lo ejecute: la primera prueba con un video real la hace el responsable.
 
 ## Decisiones del responsable (6 de noviembre de 2026)
 
@@ -41,18 +41,38 @@ Corrida parcial anterior, de 10 s, detenida al cambiar la decisión: SAM 2.1 tar
 | `sidecar/revisor/video.py` | Interpreta ffprobe y valida contra `qa/RANGOS.md`. Rechaza más de una pista de video, rotaciones que no sean múltiplo de 90° y contenedores fuera de la lista | `test_video.py` |
 | `sidecar/revisor/pistas.py` | Zona oculta por frame a partir de cualquier método. Interpola entre frames rastreados; si el objeto se pierde, oculta la caja que cubre las dos posiciones conocidas y lo marca para revisión; agrega `pista.margen_frames` antes y después. Al escalar del proxy, nada cubierto queda fuera | `test_pistas.py` |
 | `sidecar/revisor/seguimiento.py` | EdgeTAM detrás de la interfaz `Seguidor`. Antes de cargar los pesos verifica el hash de sus cinco archivos y los carga sin red. Sigue el objeto desde un punto o una caja en cualquier frame, hacia adelante y hacia atrás, e informa el avance. Si un frame queda sin máscara, es un error y no se toma como "sin objeto" | `test_seguimiento.py`, con una corrida real en un subproceso con la red bloqueada |
+| `sidecar/revisor/video_app.py` | Abrir (huella, ffprobe y proxy en memoria), vista de un frame con las zonas ocultas, seguir, quitar y exportar. La exportación decodifica a resolución completa por tubería, oculta cada frame con los mismos efectos que en fotos, codifica H.264 y AAC sin metadatos a un temporal, lo revisa con `metadatos_video.py`, exiftool y ffprobe, y solo entonces lo renombra. Si cambió el original o salen más o menos frames, no se guarda nada | `test_video_app.py` |
+| App (`ModoVideo.tsx`, `videos.ts`, canales `video:*`) | Botón **Video**, clic para seguir, coordenadas sin mouse, efecto por objeto, aviso de frames por revisar, cancelar y exportar. Dice que en video no hay detección automática | `videos.test.ts`, E2E del modo de video |
 | `sidecar/revisor/metadatos_video.py` | Revisa los bytes del MP4 exportado con lista blanca de cajas. Rechaza `udta`, `meta`, `uuid`, `©xyz` (GPS), fechas distintas de cero, pistas que no sean de video o audio, nombre de compresor y perfiles ICC | `test_metadatos_video.py` |
 
 ## Resultados
 
 | Prueba | Resultado |
 |---|---|
-| Sidecar | 786 pasan (267 nuevas). La corrida real de EdgeTAM tarda 64 s |
-| Interfaz y main | 187 pasan |
+| Sidecar | 852 pasan (333 nuevas). La corrida real de EdgeTAM tarda 64 s |
+| Interfaz y main | 218 pasan |
 | Tipado estricto y lint | Sin errores |
-| E2E | No se corrieron: esta etapa no cambió la interfaz |
+| E2E | 41 pasan y 4 se omiten (ejemplos locales del responsable). Las de video no abren un video, para no ejecutar FFmpeg |
+| Capturas | Modo de video vacío en claro y oscuro, revisadas |
 
 Corrida del 6 de noviembre de 2026 en el i5-10210U. **CI no ha corrido** porque no hay commit.
+
+## CI (6 de noviembre de 2026)
+
+Por qué fallaba, en orden de frecuencia:
+
+1. **E2E de recuperación colgadas** (corregido en `fab7c56`): las ramas que no tienen ese commit, incluida `main` antes de este merge, siguen fallando en "E2E y accesibilidad" tras unos 22 minutos.
+2. **Descargas** en "Herramientas y catálogo": réplicas de SourceForge sin certificado intermedio y fallos momentáneos de Hugging Face o GitHub. Los modelos se bajaban con un solo intento.
+3. **Una etiqueta de acción que no existe** (`setup-uv@v10`, corregido en `5a5f1fd`): falla en "Set up job".
+4. **Fallas ocultas:** en Windows cada paso corría en PowerShell, que solo toma el código del último comando. Un `ruff`, `pyright`, `tipos` o `lint` fallido no ponía la CI en rojo.
+
+Qué cambió:
+
+- Los pasos corren en bash con `-eo pipefail`: cualquier comando que falle detiene el paso.
+- Los modelos, FFmpeg y exiftool se guardan en caché entre corridas, con llave en el hash de `descargar_modelos.py`; el script vuelve a comprobar cada hash. Todas las descargas tienen 3 intentos.
+- `.github/scripts/que_probar.sh` decide qué corre según los archivos que cambiaron desde la base de `main`: con solo `docs/`, `qa/` o `.md` no corre nada; las E2E (unos 20 min) corren en el PR, en `main` y cada semana, no en cada push a una rama. Un push a una rama con PR abierto no duplica la corrida del PR. Un cambio en `.github/` prueba todo.
+- Un push nuevo cancela la corrida anterior de la misma rama o PR.
+- Revisiones rápidas y E2E van en trabajos separados y en paralelo.
 
 ## Bloqueos
 
@@ -61,8 +81,8 @@ Corrida del 6 de noviembre de 2026 en el i5-10210U. **CI no ha corrido** porque 
 
 ## Pendiente
 
-1. ~~Elegir el método de seguimiento.~~ EdgeTAM.
-2. Exponer el seguimiento por IPC: abrir video, proxy, seguir y zonas con `pistas.py`.
-3. Interfaz de video: carga, selección en un frame, vista previa por frame y aviso de "revisar" en los frames donde se perdió el objeto.
-4. Exportación: FFmpeg con H.264 y AAC, recodificado desde frames, archivo temporal, `metadatos_video.py` y exiftool antes del renombrado.
-5. Casos de la matriz: ARC-010, 011, 024, 031, 033, 038, 042, 043, 044; SEG-004, SEG-008; FCL-004, FCL-008.
+1. **Primera prueba con FFmpeg real**, a cargo del responsable: abrir un video de hasta 3 s, seguir un objeto y exportar. Si la exportación falla con "No pudimos comprobar que el archivo saliera limpio", es probable que FFmpeg escriba una caja que la lista blanca no conoce: se revisa el log y se ajusta la lista, sin relajar la regla.
+2. Confirmar rutas largas y con acentos con FFmpeg y exiftool.
+3. Sin barra de avance real durante el seguimiento: el protocolo es de pedido y respuesta. Se muestra el tiempo estimado y se puede cancelar.
+4. Casos de la matriz: ARC-024 (GIF), ARC-031 (Live Photo), ARC-042 (video dañado a la mitad), SEG-004, SEG-008 y FCL-008 con FFmpeg real.
+5. Detección automática en video (caras, texto y placas): Fase 4.

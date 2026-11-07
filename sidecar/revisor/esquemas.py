@@ -105,8 +105,90 @@ class Cerrar(Estricto):
     imagen_id: Annotated[str, Field(min_length=1, max_length=64)]
 
 
+# --- Video (Fase 3) ---------------------------------------------------------------------------
+# Posiciones: índice dentro de los frames rastreados (hasta FRAMES_MAX). Coordenadas: en el proxy.
+POSICION_MAX = 999
+PROXY_LADO_MAX = 4096
+PISTAS_MAX = 50
+Id = Annotated[str, Field(min_length=1, max_length=64)]
+
+
+class PistaElegida(Estricto):
+    pista_id: Id
+    efecto: TipoEfecto
+
+
+def _sin_repetidas(pistas: list[PistaElegida]) -> list[PistaElegida]:
+    if len({p.pista_id for p in pistas}) != len(pistas):
+        raise ValueError("pista repetida")
+    return pistas
+
+
+class AbrirVideo(Estricto):
+    tipo: Literal["abrir_video"]
+    ruta: Annotated[str, Field(min_length=1, max_length=32767)]
+
+
+class VistaVideo(Estricto):
+    tipo: Literal["vista_video"]
+    video_id: Id
+    posicion: Annotated[int, Field(ge=0, le=POSICION_MAX)]
+    pistas: Annotated[list[PistaElegida], Field(max_length=PISTAS_MAX)]
+
+    @model_validator(mode="after")
+    def unicas(self) -> VistaVideo:
+        _sin_repetidas(self.pistas)
+        return self
+
+
+class SeguirVideo(Estricto):
+    tipo: Literal["seguir_video"]
+    video_id: Id
+    posicion: Annotated[int, Field(ge=0, le=POSICION_MAX)]
+    x: Annotated[int, Field(ge=0, le=PROXY_LADO_MAX - 1)]
+    y: Annotated[int, Field(ge=0, le=PROXY_LADO_MAX - 1)]
+
+
+class QuitarPista(Estricto):
+    tipo: Literal["quitar_pista"]
+    video_id: Id
+    pista_id: Id
+
+
+class ExportarVideo(Estricto):
+    tipo: Literal["exportar_video"]
+    video_id: Id
+    # Puede ir vacía: quitar metadatos ya es útil aunque no se oculte nada.
+    pistas: Annotated[list[PistaElegida], Field(max_length=PISTAS_MAX)]
+    ruta_destino: Annotated[str, Field(min_length=1, max_length=32767)]
+    sobrescribir: bool = False
+
+    @model_validator(mode="after")
+    def unicas(self) -> ExportarVideo:
+        _sin_repetidas(self.pistas)
+        return self
+
+
+class CerrarVideo(Estricto):
+    tipo: Literal["cerrar_video"]
+    video_id: Id
+
+
 Comando = Annotated[
-    Ping | AbrirImagen | Analizar | Previsualizar | Exportar | Segmentar | Pintar | Cerrar,
+    Ping
+    | AbrirImagen
+    | Analizar
+    | Previsualizar
+    | Exportar
+    | Segmentar
+    | Pintar
+    | Cerrar
+    | AbrirVideo
+    | VistaVideo
+    | SeguirVideo
+    | QuitarPista
+    | ExportarVideo
+    | CerrarVideo,
     Field(discriminator="tipo"),
 ]
 

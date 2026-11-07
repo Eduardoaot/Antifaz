@@ -203,3 +203,16 @@ def test_escalar_nunca_destapa(alto0: int, ancho0: int, alto: int, ancho: int, y
     y0, y1 = math.floor(y * sy), max(math.floor(y * sy) + 1, math.ceil((y + 1) * sy))
     x0, x1 = math.floor(x * sx), max(math.floor(x * sx) + 1, math.ceil((x + 1) * sx))
     assert salida[y0:y1, x0:x1].all()
+
+
+def test_zona_en_coincide_con_zonas() -> None:
+    rastreadas = {0: cuadro(20, 20), 3: vacia(), 6: cuadro(120, 60), 9: cuadro(150, 70)}
+    todas = list(zonas(rastreadas, 12, margen_frames=2))
+    for t in range(12):
+        sola = pistas.zona_en(rastreadas, 12, t, margen_frames=2)
+        assert np.array_equal(sola.mascara, todas[t].mascara) and sola.revisar == todas[t].revisar
+
+
+@pytest.mark.parametrize("t", [-1, 5])
+def test_zona_en_fuera_del_video(t: int) -> None:
+    assert codigo_de(pistas.zona_en, {0: cuadro(1, 1)}, 5, t) is Codigo.VALIDACION
