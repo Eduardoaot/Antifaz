@@ -18,7 +18,7 @@ import hashlib
 import os
 import subprocess
 import threading
-from collections.abc import Iterable, Iterator
+from collections.abc import Generator, Iterable
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
@@ -181,8 +181,13 @@ class Herramientas:
         self._verificadas[herramienta] = ruta
         return ruta
 
-    def ejecutar(self, herramienta: Herramienta, argumentos: list[str], tiempo_max_s: float) -> bytes:
-        """Corre la herramienta y devuelve su salida estándar. Cualquier fallo es un error tipado."""
+    def ejecutar(
+        self, herramienta: Herramienta, argumentos: list[str], tiempo_max_s: float, cwd: str | None = None
+    ) -> bytes:
+        """Corre la herramienta y devuelve su salida estándar. Cualquier fallo es un error tipado.
+
+        `cwd` permite pasar un archivo por su nombre corto: exiftool lee mal rutas con acentos.
+        """
         _validar_tiempo(tiempo_max_s)
         ruta = self.ruta(herramienta)
         comando = [str(ruta), *self._prefijos[herramienta], *argumentos]
@@ -195,7 +200,7 @@ class Herramientas:
                 shell=False,
                 check=False,
                 env=_entorno_minimo(),
-                cwd=str(ruta.parent),
+                cwd=cwd if cwd is not None else str(ruta.parent),
                 creationflags=_BANDERAS,
             )
         except subprocess.TimeoutExpired as e:
@@ -234,7 +239,7 @@ class Herramientas:
 
     def leer_frames(
         self, argumentos: list[str], ancho: int, alto: int, max_frames: int, tiempo_max_s: float
-    ) -> Iterator[Frame]:
+    ) -> Generator[Frame]:
         """Frames RGB de ffmpeg por tubería, uno a la vez. Un frame incompleto o de más es un error.
 
         Si quien llama deja de leer, al cerrar el generador se termina el proceso.
@@ -252,7 +257,7 @@ class Herramientas:
         forma: tuple[int, int, int],
         max_frames: int,
         tiempo_max_s: float,
-    ) -> Iterator[Frame]:
+    ) -> Generator[Frame]:
         proceso = self._abrir(Herramienta.FFMPEG, argumentos, escribir=False)
         vigilante = _Vigilante(proceso, tiempo_max_s)
         try:

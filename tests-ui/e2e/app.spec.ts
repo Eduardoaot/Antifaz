@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 import marca from '../../brand/brand.json';
-import { abrir, crearMuestras, entorno, lanzar, RAIZ, simularGuardar, type Sesion } from './ayuda';
+import { abrir, cerrar, crearMuestras, entorno, lanzar, llaveGuardada, matarArbol, RAIZ, simularGuardar, type Sesion } from './ayuda';
 
 const CAPTURAS = join(RAIZ, 'tests-ui', 'capturas');
 mkdirSync(CAPTURAS, { recursive: true });
@@ -19,10 +19,13 @@ test.beforeAll(() => {
 
 test.afterEach(async () => {
   // Sin esto, el aviso de cambios sin exportar detendría el cierre de la prueba.
-  await sesion.app.evaluate(({ BrowserWindow }) => {
-    for (const v of BrowserWindow.getAllWindows()) v.destroy();
-  }).catch(() => undefined);
-  await sesion.app.close().catch(() => undefined);
+  await Promise.race([
+    sesion.app.evaluate(({ BrowserWindow }) => {
+      for (const v of BrowserWindow.getAllWindows()) v.destroy();
+    }).catch(() => undefined),
+    new Promise((r) => setTimeout(r, 5000)),
+  ]);
+  await cerrar(sesion.app);
 });
 
 const m = (nombre: string): string => join(muestras, nombre);
@@ -583,6 +586,8 @@ test('seguridad: sin red durante el análisis', async () => {
 });
 
 test('recupera las decisiones tras un cierre forzado', async () => {
+  // Lanza la app dos veces y espera un análisis: en un equipo lento no cabe en 120 s.
+  test.setTimeout(300_000);
   sesion = await lanzar();
   const { pagina, datos, app } = sesion;
   await abrir(sesion, [m('cara con ñ.jpg')]);
@@ -592,8 +597,9 @@ test('recupera las decisiones tras un cierre forzado', async () => {
   const crudo = readFileSync(join(datos, 'recuperacion.json'));
   expect(crudo.length, 'la recuperación no debe llevar píxeles').toBeLessThan(4000);
   expect(crudo.includes('cara con'), 'la recuperación va cifrada').toBe(false);
-  app.process().kill('SIGKILL');
-  await app.close().catch(() => undefined);
+  // Lo que se prueba es recuperar tras un cierre forzado, no un cierre en los primeros segundos de un perfil nuevo.
+  await expect.poll(() => llaveGuardada(datos), { timeout: 60_000 }).toBe(true);
+  await matarArbol(app);
   // La instancia anterior tarda un momento en soltar el candado de instancia única.
   sesion = await reintentar(() => lanzar(datos));
   const segunda = sesion.pagina;
@@ -604,6 +610,8 @@ test('recupera las decisiones tras un cierre forzado', async () => {
 });
 
 test('recuperación sobre una foto que cambió: no aplica las decisiones', async () => {
+  // Lanza la app dos veces y espera un análisis: en un equipo lento no cabe en 120 s.
+  test.setTimeout(300_000);
   const carpeta = mkdtempSync(join(tmpdir(), 'revisor-cambio-'));
   const foto = join(carpeta, 'foto.jpg');
   copyFileSync(m('cara con ñ.jpg'), foto);
@@ -613,8 +621,9 @@ test('recuperación sobre una foto que cambió: no aplica las decisiones', async
   await expect(veredicto(pagina)).toBeVisible({ timeout: 60_000 });
   await pagina.getByRole('button', { name: /^Dejar visible/ }).click();
   await expect.poll(() => existsSync(join(datos, 'recuperacion.json'))).toBe(true);
-  app.process().kill('SIGKILL');
-  await app.close().catch(() => undefined);
+  // Lo que se prueba es recuperar tras un cierre forzado, no un cierre en los primeros segundos de un perfil nuevo.
+  await expect.poll(() => llaveGuardada(datos), { timeout: 60_000 }).toBe(true);
+  await matarArbol(app);
   copyFileSync(m('gps.jpg'), foto);
 
   sesion = await reintentar(() => lanzar(datos));
@@ -623,19 +632,65 @@ test('recuperación sobre una foto que cambió: no aplica las decisiones', async
 });
 
 test('el diálogo de recuperación no se borra si la app vuelve a cerrarse', async () => {
+  // Lanza la app dos veces y espera un análisis: en un equipo lento no cabe en 120 s.
+  test.setTimeout(300_000);
   sesion = await lanzar();
   const { pagina, datos, app } = sesion;
   await abrir(sesion, [m('cara con ñ.jpg')]);
   await expect(veredicto(pagina)).toBeVisible({ timeout: 60_000 });
   await pagina.getByRole('button', { name: /^Ocultar zona/ }).click();
   await expect.poll(() => existsSync(join(datos, 'recuperacion.json'))).toBe(true);
-  app.process().kill('SIGKILL');
-  await app.close().catch(() => undefined);
+  // Lo que se prueba es recuperar tras un cierre forzado, no un cierre en los primeros segundos de un perfil nuevo.
+  await expect.poll(() => llaveGuardada(datos), { timeout: 60_000 }).toBe(true);
+  await matarArbol(app);
 
   sesion = await reintentar(() => lanzar(datos));
   await expect(sesion.pagina.getByRole('dialog')).toContainText('sin terminar', { timeout: 60_000 });
   await sesion.pagina.waitForTimeout(800);
   expect(existsSync(join(datos, 'recuperacion.json'))).toBe(true);
+});
+
+test('al cerrar con cambios sin exportar, el aviso es de la app y se puede contestar', async () => {
+  test.setTimeout(180_000);
+  sesion = await lanzar();
+  const { pagina, datos, app } = sesion;
+  await abrir(sesion, [m('cara con ñ.jpg')]);
+  await expect(veredicto(pagina)).toBeVisible({ timeout: 60_000 });
+  await pagina.getByRole('button', { name: /^Ocultar zona/ }).click();
+  await expect.poll(() => existsSync(join(datos, 'recuperacion.json'))).toBe(true);
+  // El de Windows no se puede contestar desde la prueba: si apareciera, se cuenta y se cancela.
+  await app.evaluate(({ dialog }) => {
+    const g = globalThis as unknown as { avisosWindows: number };
+    g.avisosWindows = 0;
+    dialog.showMessageBoxSync = () => {
+      g.avisosWindows += 1;
+      return 1;
+    };
+  });
+  const pedirCierre = (): Promise<void> => app.evaluate(({ BrowserWindow }) => { BrowserWindow.getAllWindows()[0]?.close(); });
+  const aviso = pagina.getByRole('dialog').filter({ hasText: 'Tienes cambios sin exportar' });
+
+  await pedirCierre();
+  await expect(aviso).toContainText('podrás recuperarlas');
+  await expect(aviso.getByRole('button', { name: 'Seguir revisando' })).toBeFocused();
+  await sinViolaciones(pagina);
+  // Con el aviso abierto no se puede usar el selector de tema: se cambia por la API.
+  for (const tema of ['claro', 'oscuro'] as const) {
+    await pagina.evaluate((t) => window.revisor.definirTema(t), tema);
+    await pagina.screenshot({ path: join(CAPTURAS, `aviso-cierre-${tema}.png`) });
+  }
+  await aviso.getByRole('button', { name: 'Seguir revisando' }).click();
+  await expect(aviso).toHaveCount(0);
+  expect(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length)).toBe(1);
+
+  await pedirCierre();
+  await expect(aviso).toBeVisible();
+  expect(await app.evaluate(() => (globalThis as unknown as { avisosWindows: number }).avisosWindows)).toBe(0);
+  const cerrada = app.waitForEvent('close');
+  // Clic diferido: la ventana se cierra antes de que Playwright termine un clic normal.
+  await aviso.getByRole('button', { name: 'Cerrar de todos modos' }).evaluate((b: HTMLElement) => { setTimeout(() => { b.click(); }, 0); });
+  await cerrada;
+  expect(existsSync(join(datos, 'recuperacion.json')), 'cerrar no borra lo que se puede recuperar').toBe(true);
 });
 
 test('si el archivo cambió en disco, no exporta otra foto con las cajas viejas', async () => {
@@ -792,4 +847,48 @@ test('zoom del 200%, colores forzados y simulación de daltonismo', async () => 
     await expect(pagina.locator('[data-regla="UBI-01"] .nivel')).toContainText('Riesgo alto');
     await expect(pagina.locator('[data-regla="UBI-01"] .nivel svg').first()).toBeVisible();
   }
+});
+
+test('modo de video: se entra sin archivo, dice lo que no hace y es accesible', async () => {
+  sesion = await lanzar();
+  const { pagina } = sesion;
+  await pagina.getByRole('button', { name: 'Video' }).click();
+  await expect(pagina.getByRole('heading', { name: 'Revisa un video antes de publicarlo' })).toBeVisible();
+  await expect(pagina.getByText('hasta 3 segundos')).toBeVisible();
+  await expect(pagina.getByText('Todavía no detectamos nada solos en video')).toBeVisible();
+  // Un solo destino para "Saltar al contenido", aunque el modo de fotos siga montado.
+  await expect(pagina.locator('#principal')).toHaveCount(1);
+  await sinViolaciones(pagina);
+  for (const tema of ['claro', 'oscuro'] as const) {
+    await pagina.getByLabel('Tema').selectOption(tema);
+    await pagina.screenshot({ path: join(CAPTURAS, `video-vacio-${tema}.png`) });
+  }
+  await pagina.getByRole('button', { name: 'Fotos' }).click();
+  await expect(pagina.getByRole('heading', { name: 'Revisa tus fotos antes de publicarlas' })).toBeVisible();
+  await expect(pagina.locator('#principal')).toHaveCount(1);
+});
+
+test('video: el renderer no puede pedir nada inválido', async () => {
+  sesion = await lanzar();
+  const { pagina } = sesion;
+  const r = await pagina.evaluate(async () => {
+    const id = '6f9619ff-8b86-4011-b42d-00c04fc964ff';
+    const api = window.revisor as unknown as Record<string, (...a: unknown[]) => Promise<{ error?: { codigo: string } }>>;
+    const cod = async (f: Promise<{ error?: { codigo: string } }>): Promise<string> => (await f).error?.codigo ?? 'ok';
+    const pista = { pista_id: 'a', efecto: 'solido' };
+    return {
+      idMalo: await cod(api.vistaVideo!('../x', 0, [])),
+      posicionNegativa: await cod(api.vistaVideo!(id, -1, [])),
+      posicionDecimal: await cod(api.vistaVideo!(id, 1.5, [])),
+      repetidas: await cod(api.vistaVideo!(id, 0, [pista, pista])),
+      efectoMalo: await cod(api.exportarVideo!(id, [{ pista_id: 'a', efecto: 'borroso' }])),
+      coordenadaNaN: await cod(api.seguirVideo!(id, 0, Number.NaN, 0)),
+      noAbierto: await cod(api.vistaVideo!(id, 0, [])),
+      seguirNoAbierto: await cod(api.seguirVideo!(id, 0, 1, 1)),
+    };
+  });
+  expect(r).toEqual({
+    idMalo: 'VALIDACION', posicionNegativa: 'VALIDACION', posicionDecimal: 'VALIDACION', repetidas: 'VALIDACION',
+    efectoMalo: 'VALIDACION', coordenadaNaN: 'VALIDACION', noAbierto: 'VIDEO_NO_ABIERTO', seguirNoAbierto: 'VIDEO_NO_ABIERTO',
+  });
 });

@@ -267,7 +267,7 @@ Al ejecutar un caso, el Estado pasa a `automatizado` o `manual`, con enlace a su
 | INT-008 | 1 | Arrastrar un archivo no soportado | Arrastrar `.pdf` o `.zip` | Mensaje claro; sigue lo demás | pendiente: arrastrar y soltar no se prueba aún; el código comparte camino con abrir |
 | INT-009 | 1 | Arrastrar una carpeta | Arrastrar una carpeta | Carga lo soportado con resumen, o explica | pendiente: arrastrar y soltar no se prueba aún; la carpeta sí se rechaza al abrir |
 | INT-010 | 1 | Arrastrar archivos mientras otro se procesa | Arrastrar durante un análisis | Se encolan; el análisis actual sigue | pendiente: arrastrar y soltar no se prueba aún |
-| INT-011 | 1 | Cerrar con cambios sin guardar | Cerrar la ventana | Pregunta antes de cerrar; también con Alt+F4 | pendiente: el diálogo nativo de cierre no se ha probado |
+| INT-011 | 1 | Cerrar con cambios sin guardar | Cerrar la ventana | Pregunta antes de cerrar; también con Alt+F4 | automatizado: tests-ui/e2e/app.spec.ts (aviso propio de la app). Alt+F4 dispara el mismo evento de cierre, pero la tecla en sí no se ha probado |
 | INT-012 | 2 | Clic fuera de la imagen | Clic de selección fuera | Sin máscara; aviso claro | automatizado: tests-ui/e2e/app.spec.ts (coordenadas fuera), sidecar/tests/test_segmentar.py, test_pincel.py. Con el mouse no hay forma de hacer clic fuera: el lienzo es la imagen |
 | INT-013 | 2 | Clic en el borde exacto | Clic en la primera y última fila y columna | Máscara válida, sin error de índice | pendiente |
 | INT-014 | 1 | Zoom extremo | Zoom al mínimo y al máximo, editando | Máscara alineada; UI estable | pendiente: no hay zoom de imagen todavía; pasa a la Fase 2 |

@@ -86,7 +86,11 @@ Sin medir: arranque de la app y pico de memoria. Por eso esos presupuestos no ha
 
 **Necesita decisión tuya:**
 - `sidecar/.coverage`, con la ruta de tu PC, sigue público en el historial de GitHub. Ver abajo.
-- Subir los commits: **CI nunca se ha ejecutado**, y la definición de terminado lo exige.
+- ~~Subir los commits: CI nunca se ha ejecutado.~~ CI ya corre. Fallaba siempre en 3 E2E de recuperación (corregido el 2026-11-06, ver abajo).
+
+**Limitación conocida (2026-11-06): recuperación en los primeros segundos de un perfil nuevo.** safeStorage cifra la recuperación con una llave que Chromium escribe en `Local State` unos 10 s después de crearla, y Electron no permite forzar esa escritura. Si la app se cae de golpe en esos segundos la primera vez que se usa, esa recuperación queda ilegible: no se aplica nada equivocado, solo se pierde. Para acortar la ventana, la llave se crea al arrancar y no al guardar la primera decisión. Un cierre normal no tiene el problema.
+
+**CI (2026-11-06):** las 3 E2E de recuperación se colgaban en GitHub. Mataban solo el proceso principal; los hijos de Electron, que en esa máquina tardan más en morir, retenían el candado de instancia única, y la segunda app se cerraba sin abrir ventana mientras la prueba la esperaba sin límite. Ahora la prueba termina el árbol completo de procesos y espera la llave en disco; abrir la ventana y cerrar la app tienen límite de tiempo.
 
 **Necesita a una persona, con guion:**
 - NVDA y Narrador. Sin esto, la accesibilidad para personas ciegas **no está comprobada**, aunque axe pase.
@@ -98,7 +102,7 @@ Sin medir: arranque de la app y pico de memoria. Por eso esos presupuestos no ha
 - RAW real: se probó con LibRaw simulado. Tampoco hay muestra Display P3 o Adobe RGB.
 - Disco lleno real: se simuló el error del sistema.
 - Arrastrar y soltar: el código existe, pero no tiene prueba.
-- El diálogo nativo de cierre con cambios sin exportar.
+- ~~El diálogo nativo de cierre con cambios sin exportar.~~ Hecho el 6 de noviembre de 2026: ahora es un aviso de la app con prueba E2E (INT-011). El de Windows queda solo si la interfaz se cayó o no responde.
 - ~~Limpiar `.parcial` tras un cierre forzado.~~ Hecho el 6 de noviembre de 2026: se borran en la siguiente exportación a esa carpeta (ver `REPORTE_FASE_2.md`).
 - Confirmar al ocultar el 100% de la imagen (VAL-030).
 - ~~Subir `cargador` a 100%.~~ Hecho el 6 de noviembre de 2026: 100% de líneas y ramas.

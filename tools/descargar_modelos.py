@@ -7,12 +7,13 @@ herramienta antes de usarla (ver sidecar/revisor/herramientas.py).
 """
 from __future__ import annotations
 
-import hashlib
 import argparse
+import hashlib
 import io
 import shutil
 import sys
 import time
+import urllib.error
 import urllib.request
 import zipfile
 from pathlib import Path
@@ -99,6 +100,42 @@ PAQUETES = {
 }
 
 
+# Varias réplicas de SourceForge no envían su certificado intermedio: los navegadores lo resuelven
+# y Python no, así que fallan la verificación TLS. Esta sí lo envía. Se prueba primero y, si falla,
+# se reintenta con la dirección genérica, que elige otra réplica cada vez. TLS se sigue verificando
+# y el hash del archivo decide si se usa.
+REPLICA_SOURCEFORGE = "phoenixnap"
+REINTENTOS_GENERICOS = 4
+
+
+# Hugging Face y GitHub fallan a veces por un momento (sobre todo en la CI): se reintenta igual.
+REINTENTOS = 3
+ESPERA_REINTENTO_S = 5.0
+
+
+def _direcciones(url: str) -> list[str]:
+    if "downloads.sourceforge.net" not in url:
+        return [url] * REINTENTOS
+    return [f"{url}?use_mirror={REPLICA_SOURCEFORGE}"] + [url] * REINTENTOS_GENERICOS
+
+
+def _descargar(nombre: str, url: str) -> bytes | None:
+    errores: list[str] = []
+    for intento, direccion in enumerate(_direcciones(url)):
+        if intento > 0:
+            time.sleep(ESPERA_REINTENTO_S)
+        try:
+            with urllib.request.urlopen(direccion, timeout=600) as respuesta:
+                return respuesta.read()
+        except (urllib.error.URLError, TimeoutError, ConnectionError) as e:
+            errores.append(type(e).__name__)
+    print(
+        f"ERROR: no se pudo descargar {nombre} ({', '.join(errores)}). Revisa tu conexión y vuelve a intentarlo;"
+        " para FFmpeg y exiftool también puedes bajar el zip a mano y usar --zips CARPETA."
+    )
+    return None
+
+
 def _instalar_paquete(
     nombre: str, url: str, esperado: str, prefijo: str, mapa: dict[str, str], zips: Path | None
 ) -> bool:
@@ -112,8 +149,9 @@ def _instalar_paquete(
     if local is not None and local.is_file():
         datos = local.read_bytes()
     else:
-        with urllib.request.urlopen(url, timeout=600) as respuesta:
-            datos = respuesta.read()
+        datos = _descargar(nombre, url)
+        if datos is None:
+            return False
     if hashlib.sha256(datos).hexdigest() != esperado:
         print(f"ERROR: {nombre} no coincide con el hash esperado; no se guardó")
         return False
@@ -175,8 +213,9 @@ def main() -> int:
         if destino.exists() and hashlib.sha256(destino.read_bytes()).hexdigest() == esperado:
             print(f"OK: {nombre} ya estaba")
             continue
-        with urllib.request.urlopen(url, timeout=120) as respuesta:
-            datos = respuesta.read()
+        datos = _descargar(nombre, url)
+        if datos is None:
+            return 1
         if nombre in DENTRO_DE_ZIP:
             with zipfile.ZipFile(io.BytesIO(datos)) as paquete:
                 datos = paquete.read(DENTRO_DE_ZIP[nombre])

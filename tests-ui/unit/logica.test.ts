@@ -1,7 +1,7 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { catalogo, etiquetaNivel, reglaDe, urlsDeFuentes, type Nivel } from '../../app/shared/catalogo';
-import { esquemaEdicion, esquemaOcultamiento, esquemaTrazo, LIMITES, type Analisis, type Hallazgo, type Motivo, type Punto } from '../../app/shared/contrato';
+import { esquemaAvisoCierre, esquemaEdicion, esquemaOcultamiento, esquemaTrazo, LIMITES, textoCierre, type Analisis, type Hallazgo, type Motivo, type Punto } from '../../app/shared/contrato';
 import {
   HISTORIAL_PASOS,
   REVISION_INICIAL,
@@ -532,5 +532,25 @@ describe('catálogo', () => {
 
   it.each(['alto', 'medio', 'bajo'] as Nivel[])('el nivel %s siempre se dice con palabras', (n) => {
     expect(etiquetaNivel(n)).toMatch(/^Riesgo /);
+  });
+});
+
+describe('aviso de cierre con cambios sin exportar', () => {
+  it('solo promete recuperar cuando el guardado funcionó', () => {
+    expect(textoCierre(true)).toContain('podrás recuperarlas');
+    expect(textoCierre(false)).toContain('se perderán');
+    expect(textoCierre(false)).not.toContain('recuperar');
+  });
+
+  it.each([undefined, null, {}, { recuperacionSegura: 'si' }, { recuperacionSegura: true, extra: 1 }])(
+    'rechaza un aviso inválido de main: %#',
+    (aviso) => {
+      expect(esquemaAvisoCierre.safeParse(aviso).success).toBe(false);
+    },
+  );
+
+  it('acepta ambos valores válidos', () => {
+    expect(esquemaAvisoCierre.parse({ recuperacionSegura: true })).toEqual({ recuperacionSegura: true });
+    expect(esquemaAvisoCierre.parse({ recuperacionSegura: false })).toEqual({ recuperacionSegura: false });
   });
 });

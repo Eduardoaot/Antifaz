@@ -15,6 +15,10 @@ export const LIMITES = {
   ladoVista: 1600,
   pincel: { min: 1, max: 512, porDefecto: 32 },
   puntosTrazo: 5000,
+  // Video (Fase 3). Coinciden con sidecar/revisor/esquemas.py.
+  videoPistas: 50,
+  videoPosicionMax: 999,
+  videoProxyLadoMax: 4096,
 } as const;
 
 export const esquemaEfecto = z.enum(['solido', 'difuminado', 'pixelado']);
@@ -22,6 +26,21 @@ export type Efecto = z.infer<typeof esquemaEfecto>;
 
 export const esquemaTema = z.enum(['sistema', 'claro', 'oscuro']);
 export type Tema = z.infer<typeof esquemaTema>;
+
+/** Lo que main avisa al renderer cuando se quiere cerrar con cambios sin exportar. */
+export const esquemaAvisoCierre = z.strictObject({
+  /** Falso si el último guardado de la recuperación falló: cerrar perdería las decisiones. */
+  recuperacionSegura: z.boolean(),
+});
+export type AvisoCierre = z.infer<typeof esquemaAvisoCierre>;
+
+export const TITULO_CIERRE = 'Tienes cambios sin exportar';
+/** Lo usan el aviso de la app y el de Windows, que solo aparece si la interfaz no responde. */
+export function textoCierre(recuperacionSegura: boolean): string {
+  return recuperacionSegura
+    ? 'Si cierras ahora, tus decisiones no se exportan. La próxima vez que abras podrás recuperarlas.'
+    : 'Si cierras ahora, tus decisiones no se exportan y se perderán, porque no pudimos guardarlas.';
+}
 
 const enteroEnRango = (min: number, max: number) => z.number().int().min(min).max(max);
 
@@ -99,6 +118,86 @@ export const esquemaExportado = z.strictObject({
   bytes: z.number().int().positive(),
   zonas_ocultas: z.number().int().nonnegative(),
 });
+
+// --- Video (Fase 3) -----------------------------------------------------------------------------
+
+export const esquemaVideoAbierto = z.strictObject({
+  video_id: z.string().min(1).max(64),
+  ancho: z.number().int().positive(),
+  alto: z.number().int().positive(),
+  duracion_s: z.number().positive(),
+  fps: z.number().positive(),
+  frames: z.number().int().positive(),
+  posiciones: z.number().int().positive().max(LIMITES.videoPosicionMax + 1),
+  proxy_ancho: z.number().int().positive().max(LIMITES.videoProxyLadoMax),
+  proxy_alto: z.number().int().positive().max(LIMITES.videoProxyLadoMax),
+  tiene_audio: z.boolean(),
+  pistas_sin_revisar: z.number().int().nonnegative(),
+  huella: z.string().length(64),
+});
+
+export const esquemaSeguido = z.strictObject({
+  pista_id: z.string().min(1).max(64),
+  frames_revisar: z.number().int().nonnegative(),
+  posiciones_revisar: z.array(z.number().int().nonnegative()),
+  frames_con_objeto: z.number().int().nonnegative(),
+  frames_rastreados: z.number().int().positive(),
+});
+
+export const esquemaPistaElegida = z.strictObject({ pista_id: z.string().min(1).max(64), efecto: esquemaEfecto });
+export type PistaElegida = z.infer<typeof esquemaPistaElegida>;
+export const esquemaListaPistas = z
+  .array(esquemaPistaElegida)
+  .max(LIMITES.videoPistas)
+  .refine((lista) => new Set(lista.map((p) => p.pista_id)).size === lista.length, 'pista repetida');
+
+export const esquemaVideoExportado = z.strictObject({
+  bytes: z.number().int().positive(),
+  pistas_ocultas: z.number().int().nonnegative(),
+  frames: z.number().int().positive(),
+  frames_revisar: z.number().int().nonnegative(),
+});
+
+export const esquemaPosicion = z.number().int().min(0).max(LIMITES.videoPosicionMax);
+export const esquemaCoordenadaProxy = z.number().int().min(0).max(LIMITES.videoProxyLadoMax - 1);
+
+export interface VideoInfo {
+  id: string;
+  /** Solo el nombre, nunca la carpeta. */
+  nombre: string;
+  ancho: number;
+  alto: number;
+  duracion: number;
+  fps: number;
+  frames: number;
+  /** Frames que se pueden ver y elegir: los que se rastrean. */
+  posiciones: number;
+  proxyAncho: number;
+  proxyAlto: number;
+  tieneAudio: boolean;
+  pistasSinRevisar: number;
+}
+
+export interface VistaVideo {
+  mime: string;
+  datos: Uint8Array;
+  /** En este frame se perdió un objeto: se ocultó de más y conviene revisarlo. */
+  revisar: boolean;
+}
+
+export interface Seguido {
+  pistaId: string;
+  framesRevisar: number;
+  posicionesRevisar: number[];
+  framesConObjeto: number;
+  framesRastreados: number;
+}
+
+export interface VideoExportado {
+  nombre: string;
+  pistasOcultas: number;
+  framesRevisar: number;
+}
 
 export interface ErrorApp {
   codigo: string;
@@ -186,6 +285,16 @@ export interface ApiRevisor {
   guardarEdiciones(ediciones: Edicion[]): Promise<void>;
   recuperar(): Promise<Recuperacion>;
   descartarRecuperacion(): Promise<void>;
+  abrirVideo(): Promise<Resultado<VideoInfo | null>>;
+  vistaVideo(id: string, posicion: number, pistas: PistaElegida[]): Promise<Resultado<VistaVideo>>;
+  seguirVideo(id: string, posicion: number, x: number, y: number): Promise<Resultado<Seguido>>;
+  quitarPista(id: string, pistaId: string): Promise<void>;
+  exportarVideo(id: string, pistas: PistaElegida[]): Promise<Resultado<VideoExportado | null>>;
+  cerrarVideo(id: string): Promise<void>;
+  /** Avisa cuando se quiere cerrar con cambios sin exportar. Devuelve la función para dejar de escuchar. */
+  alPedirCierre(avisar: (aviso: unknown) => void): () => void;
+  /** Solo cierra si main pidió confirmación antes. */
+  confirmarCierre(): Promise<void>;
 }
 
 export const ERROR_INTERNO: ErrorApp = {

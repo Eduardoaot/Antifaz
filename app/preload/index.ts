@@ -1,5 +1,5 @@
 /** Puente mínimo: lista cerrada de canales. El renderer nunca recibe ipcRenderer ni rutas. */
-import { contextBridge, ipcRenderer, webUtils } from 'electron';
+import { contextBridge, ipcRenderer, webUtils, type IpcRendererEvent } from 'electron';
 import { CANALES } from '../shared/canales';
 import type { ApiRevisor } from '../shared/contrato';
 
@@ -20,6 +20,23 @@ const api: ApiRevisor = {
   guardarEdiciones: (ediciones) => ipcRenderer.invoke(CANALES.guardarEdiciones, ediciones),
   recuperar: () => ipcRenderer.invoke(CANALES.recuperar),
   descartarRecuperacion: () => ipcRenderer.invoke(CANALES.descartarRecuperacion),
+  abrirVideo: () => ipcRenderer.invoke(CANALES.abrirVideo),
+  vistaVideo: (id, posicion, pistas) => ipcRenderer.invoke(CANALES.vistaVideo, id, posicion, pistas),
+  seguirVideo: (id, posicion, x, y) => ipcRenderer.invoke(CANALES.seguirVideo, id, posicion, x, y),
+  quitarPista: (id, pistaId) => ipcRenderer.invoke(CANALES.quitarPista, id, pistaId),
+  exportarVideo: (id, pistas) => ipcRenderer.invoke(CANALES.exportarVideo, id, pistas),
+  cerrarVideo: (id) => ipcRenderer.invoke(CANALES.cerrarVideo, id),
+  alPedirCierre: (avisar) => {
+    // El evento de Electron no cruza al renderer: solo el dato, que la UI valida con Zod.
+    const escuchar = (_evento: IpcRendererEvent, aviso: unknown): void => {
+      avisar(aviso);
+    };
+    ipcRenderer.on(CANALES.pedirCierre, escuchar);
+    return () => {
+      ipcRenderer.removeListener(CANALES.pedirCierre, escuchar);
+    };
+  },
+  confirmarCierre: () => ipcRenderer.invoke(CANALES.confirmarCierre),
 };
 
 contextBridge.exposeInMainWorld('revisor', api);

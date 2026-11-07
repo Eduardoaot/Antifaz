@@ -1,9 +1,9 @@
-import { BookOpen, FolderOpen, Redo2, Save, Undo2, X } from 'lucide-react';
+import { BookOpen, Film, FolderOpen, Image as IconoFoto, Redo2, Save, Undo2, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import logoClaro from '../../../brand/logo/horizontal-claro.svg';
 import logoOscuro from '../../../brand/logo/horizontal-oscuro.svg';
 import { AVISO_LEGAL, MARCA } from '../../shared/catalogo';
-import { esquemaTema, ERROR_INTERNO, LIMITES, type Analisis, type ArchivoAbierto, type ArchivoCargado, type ErrorApp, type Origen, type Punto, type Recuperable, type Tema } from '../../shared/contrato';
+import { esquemaAvisoCierre, esquemaTema, ERROR_INTERNO, LIMITES, textoCierre, TITULO_CIERRE, type AvisoCierre, type Analisis, type ArchivoAbierto, type ArchivoCargado, type ErrorApp, type Origen, type Punto, type Recuperable, type Tema } from '../../shared/contrato';
 import {
   aEdicion,
   agregarManual,
@@ -34,6 +34,7 @@ import { Advertencias, Cobertura } from './Advertencias';
 import { Confirmacion } from './Dialogos';
 import { Guia } from './Guia';
 import { Manual } from './Manual';
+import { ModoVideo } from './ModoVideo';
 import { Visor } from './Visor';
 
 export type EstadoAnalisis =
@@ -78,11 +79,12 @@ export function App(): React.JSX.Element {
   // Hasta resolverlo no se guarda nada, para no borrar la recuperación que se está ofreciendo.
   const [recuperacionResuelta, setRecuperacionResuelta] = useState(false);
   const exportandoAhora = useRef(false);
-  const [vista, setVista] = useState<'revision' | 'guia'>('revision');
+  const [vista, setVista] = useState<'revision' | 'guia' | 'video'>('revision');
   const [herramienta, setHerramienta] = useState<Herramienta>('ninguna');
   const [buscando, setBuscando] = useState(false);
   const [tamanoPincel, setTamanoPincel] = useState<number>(LIMITES.pincel.porDefecto);
   const [zonaTotal, setZonaTotal] = useState<ZonaNueva | null>(null);
+  const [avisoCierre, setAvisoCierre] = useState<AvisoCierre | null>(null);
   const colaOcupada = useRef(false);
   const seleccion = elegido ?? archivos[0]?.info.id ?? null;
 
@@ -328,6 +330,17 @@ export function App(): React.JSX.Element {
     };
   }, [archivos, recuperacionResuelta]);
 
+  // Main avisa cuando se quiere cerrar con cambios sin exportar; la decisión se toma aquí.
+  useEffect(
+    () =>
+      api().alPedirCierre((aviso) => {
+        const valido = esquemaAvisoCierre.safeParse(aviso);
+        // Si el aviso no es válido, se dice lo más prudente: que las decisiones podrían perderse.
+        setAvisoCierre(valido.success ? valido.data : { recuperacionSegura: false });
+      }),
+    [],
+  );
+
   useEffect(() => {
     void api().obtenerTema().then(setTema);
     void api().recuperar().then(({ recuperables: lista, descartadas }) => {
@@ -416,6 +429,10 @@ export function App(): React.JSX.Element {
   };
 
   const analizando = archivos.some((a) => a.estado.tipo === 'analizando' || a.estado.tipo === 'en_cola');
+  const fallar = useCallback((nombre: string, mensaje: string) => {
+    setFallos((f) => [...f, { clave: crypto.randomUUID(), nombre, mensaje }]);
+  }, []);
+  const enFotos = vista === 'revision';
 
   return (
     <div className="app" onDragOver={(e) => { e.preventDefault(); }} onDrop={alSoltar}>
@@ -427,12 +444,22 @@ export function App(): React.JSX.Element {
         </picture>
         <p className="eslogan">{MARCA.eslogan}</p>
         <div className="acciones">
-          <button type="button" className="boton primario" onClick={() => { void abrir(); }}>
-            <FolderOpen aria-hidden="true" /> Abrir fotos
+          {enFotos ? (
+            <button type="button" className="boton primario" onClick={() => { void abrir(); }}>
+              <FolderOpen aria-hidden="true" /> Abrir fotos
+            </button>
+          ) : (
+            <button type="button" className="boton" onClick={() => { setVista('revision'); }}>
+              <IconoFoto aria-hidden="true" /> Fotos
+            </button>
+          )}
+          <button type="button" className="boton" aria-pressed={vista === 'video'} onClick={() => { setVista((v) => (v === 'video' ? 'revision' : 'video')); }}>
+            <Film aria-hidden="true" /> Video
           </button>
           <button type="button" className="boton" aria-pressed={vista === 'guia'} onClick={() => { setVista((v) => (v === 'guia' ? 'revision' : 'guia')); }}>
             <BookOpen aria-hidden="true" /> Guía de privacidad
           </button>
+          {enFotos && (<>
           <button type="button" className="boton" disabled={!actual || exportando || actual.historial.pasado.length === 0} onClick={() => { moverHistorial(deshacer, 'Se deshizo el último cambio.'); }}>
             <Undo2 aria-hidden="true" /> Deshacer
           </button>
@@ -442,6 +469,7 @@ export function App(): React.JSX.Element {
           <button type="button" className="boton primario" disabled={analisis === null || exportando} onClick={pedirExportar}>
             <Save aria-hidden="true" /> {exportando ? 'Guardando…' : 'Exportar copia'}
           </button>
+          </>)}
           <label className="campo-tema">
             Tema
             <select
@@ -475,7 +503,11 @@ export function App(): React.JSX.Element {
         </ul>
       )}
 
-      {vista === 'guia' ? <Guia /> : (
+      {/* El modo de video queda montado mientras se usan fotos: así no se pierde lo que se siguió. */}
+      <div hidden={vista !== 'video'}>
+        <ModoVideo activo={vista === 'video'} alAnunciar={setAnuncio} alFallar={fallar} />
+      </div>
+      {vista === 'video' ? null : vista === 'guia' ? <Guia /> : (
       <div className="cuerpo">
         <nav className="lista-archivos" aria-label="Fotos abiertas">
           <h2>Fotos</h2>
@@ -595,6 +627,16 @@ export function App(): React.JSX.Element {
           cancelar="Volver"
           alAceptar={() => { agregarZona(zonaTotal); setZonaTotal(null); }}
           alCancelar={() => { setZonaTotal(null); setAnuncio('No agregamos esa zona.'); }}
+        />
+      )}
+      {avisoCierre !== null && (
+        <Confirmacion
+          titulo={TITULO_CIERRE}
+          texto={textoCierre(avisoCierre.recuperacionSegura)}
+          aceptar="Cerrar de todos modos"
+          cancelar="Seguir revisando"
+          alAceptar={() => { setAvisoCierre(null); void api().confirmarCierre(); }}
+          alCancelar={() => { setAvisoCierre(null); }}
         />
       )}
       {recuperables.length > 0 && (

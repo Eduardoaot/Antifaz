@@ -19,21 +19,30 @@ from typing import Any, BinaryIO, NoReturn, assert_never
 from PIL import Image
 from pydantic import ValidationError
 
-from . import analisis, cargador, efectos, exportar, pincel, segmentar
+from . import analisis, cargador, efectos, exportar, pincel, segmentar, seguimiento, video_app
 from .caras import ModeloNoDisponible
 from .errores import Codigo, ErrorRevisor
 from .esquemas import (
     MAX_BYTES_MENSAJE,
     AbrirImagen,
+    AbrirVideo,
     Analizar,
     Cerrar,
+    CerrarVideo,
     Exportar,
+    ExportarVideo,
     Ping,
     Pintar,
+    PistaElegida,
     Previsualizar,
+    QuitarPista,
     Segmentar,
+    SeguirVideo,
     Solicitud,
+    TipoEfecto,
+    VistaVideo,
 )
+from .herramientas import Herramientas
 
 registro = logging.getLogger(__name__)
 
@@ -73,8 +82,12 @@ def registrar_excepcion(e: BaseException) -> None:
 
 
 class Sesion:
-    def __init__(self, carpeta_modelos: Path) -> None:
+    def __init__(self, carpeta_modelos: Path, carpeta_herramientas: Path | None = None) -> None:
         self.carpeta_modelos = carpeta_modelos
+        if carpeta_herramientas is None:
+            carpeta_herramientas = carpeta_modelos.parent / "herramientas"
+        self.herramientas = Herramientas(carpeta_herramientas)
+        self.videos: dict[str, video_app.VideoAbierto] = {}
         self.imagenes: dict[str, cargador.ImagenCargada] = {}
         self.preparados: dict[str, dict[str, Any]] = {}
         self.mascaras: dict[str, dict[str, Any]] = {}
@@ -126,6 +139,62 @@ class Sesion:
             "caja": {"x": mascara.x, "y": mascara.y, "ancho": mascara.ancho, "alto": mascara.alto},
         }
 
+    def _video(self, video_id: str) -> video_app.VideoAbierto:
+        abierto = self.videos.get(video_id)
+        if abierto is None:
+            raise ErrorRevisor(Codigo.VIDEO_NO_ABIERTO)
+        return abierto
+
+    def _abrir_video(self, ruta: str) -> dict[str, object]:
+        abierto = video_app.abrir(self.herramientas, ruta)
+        video_id = uuid.uuid4().hex
+        self.videos[video_id] = abierto
+        info = abierto.info
+        return {
+            "video_id": video_id,
+            "ancho": info.ancho_visible,
+            "alto": info.alto_visible,
+            "duracion_s": info.duracion_s,
+            "fps": info.fps,
+            "frames": abierto.total,
+            "posiciones": len(abierto.indices),
+            "proxy_ancho": abierto.proxy_ancho,
+            "proxy_alto": abierto.proxy_alto,
+            "tiene_audio": info.tiene_audio,
+            "pistas_sin_revisar": info.pistas_sin_revisar,
+            "huella": abierto.huella,
+        }
+
+    def _ejecutar_video(self, comando: Any) -> tuple[dict[str, object], bytes | None]:
+        match comando:
+            case AbrirVideo(ruta=ruta):
+                return self._abrir_video(ruta), None
+            case VistaVideo():
+                elegidas = _elegidas(comando.pistas)
+                datos, revisar = video_app.vista(self._video(comando.video_id), comando.posicion, elegidas)
+                return {"mime": "image/jpeg", "revisar": revisar}, datos
+            case SeguirVideo():
+                abierto = self._video(comando.video_id)
+                seguidor = seguimiento.seguidor_de(self.carpeta_modelos)
+                return video_app.seguir(abierto, seguidor, comando.posicion, comando.x, comando.y), None
+            case QuitarPista():
+                video_app.quitar(self._video(comando.video_id), comando.pista_id)
+                return {"quitada": True}, None
+            case ExportarVideo():
+                elegidas = _elegidas(comando.pistas)
+                return video_app.exportar(
+                    self.herramientas,
+                    self._video(comando.video_id),
+                    elegidas,
+                    comando.ruta_destino,
+                    comando.sobrescribir,
+                ), None
+            case CerrarVideo(video_id=video_id):
+                self.videos.pop(video_id, None)
+                return {"cerrado": True}, None
+            case _:
+                raise ErrorRevisor(Codigo.INTERNO, "comando de video desconocido")
+
     def ejecutar(self, comando: Any) -> tuple[dict[str, object], bytes | None]:
         match comando:
             case Ping():
@@ -171,6 +240,10 @@ class Sesion:
                 return self._segmentar(comando), None
             case Pintar():
                 return self._pintar(comando), None
+            case (
+                AbrirVideo() | VistaVideo() | SeguirVideo() | QuitarPista() | ExportarVideo() | CerrarVideo()
+            ):
+                return self._ejecutar_video(comando)
             case Cerrar(imagen_id=imagen_id):
                 self.imagenes.pop(imagen_id, None)
                 self.preparados.pop(imagen_id, None)
@@ -178,6 +251,10 @@ class Sesion:
                 return {"cerrada": True}, None
             case _ as desconocido:
                 assert_never(desconocido)
+
+
+def _elegidas(lista: list[PistaElegida]) -> list[tuple[str, TipoEfecto]]:
+    return [(p.pista_id, p.efecto) for p in lista]
 
 
 def _error(id_solicitud: int | None, codigo: Codigo, mensaje: str | None = None) -> dict[str, object]:

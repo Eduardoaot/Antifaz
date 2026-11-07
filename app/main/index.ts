@@ -11,13 +11,21 @@ import {
   LIMITES,
   esquemaAnalisis,
   esquemaArchivoId,
+  esquemaCoordenadaProxy,
   esquemaEdiciones,
   esquemaExportado,
   esquemaListaOcultamientos,
+  esquemaListaPistas,
+  esquemaPosicion,
   esquemaSegmentado,
+  esquemaSeguido,
+  esquemaVideoExportado,
   esquemaTrazo,
   esquemaTema,
+  textoCierre,
+  TITULO_CIERRE,
   type ArchivoCargado,
+  type AvisoCierre,
   type Edicion,
   type Recuperacion,
   type Resultado,
@@ -25,6 +33,7 @@ import {
 } from '../shared/contrato';
 import { Archivos, planearLote } from './archivos';
 import { Sidecar } from './sidecar';
+import { esVideo, EXTENSIONES_VIDEO, Videos } from './videos';
 
 const ESQUEMA_APP = 'app';
 const CSP = [
@@ -72,6 +81,9 @@ function registrar(mensaje: string): void {
 let ventana: BrowserWindow | null = null;
 let hayCambios = false;
 let confirmoCierre = false;
+/** Main pidió confirmar el cierre y el renderer aún no contesta. Sin esto, nadie puede cerrar desde la UI. */
+let cierrePendiente = false;
+let rendererResponde = true;
 
 const sidecar = new Sidecar({
   ejecutable: join(raiz, 'sidecar', '.venv', 'Scripts', 'python.exe'),
@@ -80,9 +92,14 @@ const sidecar = new Sidecar({
   registrar,
   alCaer: () => {
     archivos.alReiniciarSidecar();
+    videos.alReiniciarSidecar();
   },
 });
 const archivos = new Archivos((comando) => sidecar.pedir(comando));
+const videos = new Videos((comando) => sidecar.pedir(comando));
+/** Seguir un objeto tarda unos 2 minutos en el equipo de referencia; exportar, menos. Con holgura. */
+const LIMITE_SEGUIR_MS = 15 * 60 * 1000;
+const LIMITE_EXPORTAR_VIDEO_MS = 60 * 60 * 1000;
 
 const rutaAjustes = (): string => join(app.getPath('userData'), 'ajustes.json');
 const rutaRecuperacion = (): string => join(app.getPath('userData'), 'recuperacion.json');
@@ -201,6 +218,14 @@ async function abrirRutas(rutas: string[]): Promise<ArchivoCargado[]> {
         ok: false,
         nombre: basename(ruta),
         error: { codigo: 'ES_CARPETA', mensaje: 'Esto es una carpeta. Abre las fotos que quieres revisar.' },
+      });
+      continue;
+    }
+    if (esVideo(ruta)) {
+      salida.push({
+        ok: false,
+        nombre: basename(ruta),
+        error: { codigo: 'ES_VIDEO', mensaje: 'Esto es un video. Ábrelo con el botón "Abrir video".' },
       });
       continue;
     }
@@ -370,9 +395,136 @@ function registrarCanales(): void {
 
   manejar(CANALES.recuperar, SIN_RECUPERACION, (): Promise<Recuperacion> => recuperar());
 
+  registrarCanalesVideo();
+
   manejar(CANALES.descartarRecuperacion, undefined, (): void => {
     rmSync(rutaRecuperacion(), { force: true });
     hayCambios = false;
+  });
+
+  manejar(CANALES.confirmarCierre, undefined, (): void => {
+    // Solo vale como respuesta a un aviso de main: el renderer no puede cerrar la app por su cuenta.
+    if (!cierrePendiente || ventana === null) {
+      registrar('Se rechazó un cierre que no se había pedido');
+      return;
+    }
+    cierrePendiente = false;
+    confirmoCierre = true;
+    ventana.close();
+  });
+}
+
+const esquemaVideoId = esquemaArchivoId;
+const esquemaPistaId = z.string().min(1).max(64);
+
+function registrarCanalesVideo(): void {
+  manejar(CANALES.abrirVideo, FALLO, async (): Promise<Resultado<unknown>> => {
+    if (ventana === null) return invalido;
+    const elegido = await dialog.showOpenDialog(ventana, {
+      title: 'Elige el video que quieres revisar',
+      properties: ['openFile'],
+      filters: [{ name: 'Videos', extensions: [...EXTENSIONES_VIDEO] }],
+    });
+    const ruta = elegido.filePaths[0];
+    if (elegido.canceled || ruta === undefined) return { ok: true, datos: null };
+    return videos.abrir(ruta);
+  });
+
+  manejar(CANALES.vistaVideo, FALLO, async (id: unknown, posicion: unknown, pistas: unknown): Promise<Resultado<unknown>> => {
+    const videoId = validar(esquemaVideoId, id);
+    const pos = validar(esquemaPosicion, posicion);
+    const lista = validar(esquemaListaPistas, pistas);
+    if (videoId === null || pos === null || lista === null) return invalido;
+    const sidecarId = videos.sidecarId(videoId);
+    if (!sidecarId.ok) return sidecarId;
+    const { resultado, binario } = await sidecar.pedir({ tipo: 'vista_video', video_id: sidecarId.datos, posicion: pos, pistas: lista });
+    if (!resultado.ok) return resultado;
+    if (binario === null) return invalido;
+    return { ok: true, datos: { mime: 'image/jpeg', datos: new Uint8Array(binario), revisar: resultado.datos.revisar === true } };
+  });
+
+  manejar(CANALES.seguirVideo, FALLO, async (id: unknown, posicion: unknown, x: unknown, y: unknown): Promise<Resultado<unknown>> => {
+    const videoId = validar(esquemaVideoId, id);
+    const pos = validar(esquemaPosicion, posicion);
+    const punto = validar(z.strictObject({ x: esquemaCoordenadaProxy, y: esquemaCoordenadaProxy }), { x, y });
+    if (videoId === null || pos === null || punto === null) return invalido;
+    const sidecarId = videos.sidecarId(videoId);
+    if (!sidecarId.ok) return sidecarId;
+    const { resultado } = await sidecar.pedir(
+      { tipo: 'seguir_video', video_id: sidecarId.datos, posicion: pos, ...punto },
+      LIMITE_SEGUIR_MS,
+    );
+    if (!resultado.ok) return resultado;
+    const seguido = esquemaSeguido.parse(resultado.datos);
+    return {
+      ok: true,
+      datos: {
+        pistaId: seguido.pista_id,
+        framesRevisar: seguido.frames_revisar,
+        posicionesRevisar: seguido.posiciones_revisar,
+        framesConObjeto: seguido.frames_con_objeto,
+        framesRastreados: seguido.frames_rastreados,
+      },
+    };
+  });
+
+  manejar(CANALES.quitarPista, undefined, async (id: unknown, pistaId: unknown): Promise<void> => {
+    const videoId = validar(esquemaVideoId, id);
+    const pista = validar(esquemaPistaId, pistaId);
+    if (videoId === null || pista === null) return;
+    const sidecarId = videos.sidecarId(videoId);
+    if (sidecarId.ok) await sidecar.pedir({ tipo: 'quitar_pista', video_id: sidecarId.datos, pista_id: pista });
+  });
+
+  manejar(CANALES.exportarVideo, FALLO, async (id: unknown, pistas: unknown): Promise<Resultado<unknown>> => {
+    const videoId = validar(esquemaVideoId, id);
+    const lista = validar(esquemaListaPistas, pistas);
+    if (videoId === null || lista === null || ventana === null) return invalido;
+    const original = videos.ruta(videoId);
+    if (original === undefined) return invalido;
+    const sidecarId = videos.sidecarId(videoId);
+    if (!sidecarId.ok) return sidecarId;
+    const { name } = parse(original);
+    const elegido = await dialog.showSaveDialog(ventana, {
+      title: 'Guardar copia del video sin metadatos',
+      defaultPath: join(dirname(original), `${name}-copia.mp4`),
+      filters: [{ name: 'MP4', extensions: ['mp4'] }],
+    });
+    if (elegido.canceled || elegido.filePath === '') return { ok: true, datos: null };
+    const { resultado } = await sidecar.pedir(
+      {
+        tipo: 'exportar_video',
+        video_id: sidecarId.datos,
+        pistas: lista,
+        ruta_destino: elegido.filePath,
+        // El diálogo de Windows ya pidió confirmar si el archivo existe.
+        sobrescribir: existsSync(elegido.filePath),
+      },
+      LIMITE_EXPORTAR_VIDEO_MS,
+    );
+    if (!resultado.ok) return resultado;
+    const exportado = esquemaVideoExportado.parse(resultado.datos);
+    return {
+      ok: true,
+      datos: { nombre: basename(elegido.filePath), pistasOcultas: exportado.pistas_ocultas, framesRevisar: exportado.frames_revisar },
+    };
+  });
+
+  manejar(CANALES.cerrarVideo, undefined, async (id: unknown): Promise<void> => {
+    const videoId = validar(esquemaVideoId, id);
+    if (videoId !== null) await videos.cerrar(videoId);
+  });
+}
+
+/**
+ * Crea la llave de safeStorage al arrancar. Chromium la guarda en disco unos segundos después de
+ * crearla: si se creara al guardar la primera decisión y la app se cerrara de golpe en ese momento,
+ * la recuperación quedaría cifrada con una llave perdida y no se podría leer.
+ */
+function prepararCifrado(): void {
+  void safeStorage.encryptStringAsync('preparar').catch((e: unknown) => {
+    recuperacionSegura = false;
+    registrar(`No se pudo preparar el cifrado: ${e instanceof Error ? e.name : 'desconocido'}`);
   });
 }
 
@@ -440,20 +592,36 @@ function crearVentana(): void {
     e.preventDefault();
   });
   nueva.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  nueva.webContents.on('unresponsive', () => {
+    rendererResponde = false;
+  });
+  nueva.webContents.on('responsive', () => {
+    rendererResponde = true;
+  });
   nueva.on('close', (e) => {
     if (!hayCambios || confirmoCierre) return;
+    e.preventDefault();
+    // El aviso es de la app, no de Windows: se ve con su marca y las pruebas lo pueden contestar.
+    // Si la interfaz se cayó o no responde, no hay dónde mostrarlo y se usa el de Windows para no
+    // dejar una ventana imposible de cerrar.
+    const interfazLista = rendererResponde && !nueva.webContents.isCrashed() && !nueva.webContents.isLoading();
+    if (interfazLista) {
+      cierrePendiente = true;
+      nueva.webContents.send(CANALES.pedirCierre, { recuperacionSegura } satisfies AvisoCierre);
+      return;
+    }
     const eleccion = dialog.showMessageBoxSync(nueva, {
       type: 'question',
       buttons: ['Cerrar de todos modos', 'Seguir revisando'],
       defaultId: 1,
       cancelId: 1,
-      title: 'Tienes cambios sin exportar',
-      message: recuperacionSegura
-        ? 'Si cierras ahora, tus decisiones no se exportan. La próxima vez que abras podrás recuperarlas.'
-        : 'Si cierras ahora, tus decisiones no se exportan y se perderán, porque no pudimos guardarlas.',
+      title: TITULO_CIERRE,
+      message: textoCierre(recuperacionSegura),
     });
-    if (eleccion === 1) e.preventDefault();
-    else confirmoCierre = true;
+    if (eleccion === 0) {
+      confirmoCierre = true;
+      nueva.close();
+    }
   });
   nueva.on('closed', () => {
     ventana = null;
@@ -475,6 +643,7 @@ if (!app.requestSingleInstanceLock()) {
     app.quit();
   });
   void app.whenReady().then(() => {
+    prepararCifrado();
     aplicarTema(leerTema());
     endurecerSesion();
     registrarCanales();

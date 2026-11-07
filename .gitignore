@@ -19,3 +19,9 @@ tests-ui/capturas/
 test-results/
 coverage/
 playwright-report/
+.pytest_cache/
+.ruff_cache/
+.eslintcache
+*.tmp
+*.temp
+Thumbs.db
