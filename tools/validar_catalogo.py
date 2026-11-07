@@ -20,7 +20,7 @@ CATEGORIAS = {
     "caras_terceros", "posibles_menores", "documentos_identidad", "informacion_financiera",
     "boletos_viajes", "ubicacion", "matriculas", "objetos_valor", "pantallas",
     "contacto_personal", "informacion_medica", "codigos",
-    "desnudez", "contenido_sugerente", "armas", "extremismo",
+    "desnudez", "contenido_sugerente", "armas", "extremismo", "espacios_intimos",
 }
 # Mínimos del brief para cada categoría.
 PALABRAS_PROHIBIDAS = re.compile(r"peligro|ilegal|delito|seguro para publicar|!", re.IGNORECASE)

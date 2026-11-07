@@ -1,5 +1,5 @@
 {
-  "version": "0.6.0",
+  "version": "0.7.0",
   "fecha_actualizacion": "2026-11-06",
   "aviso": "{app} es una herramienta orientativa y no constituye asesoría legal.",
   "marco_general": [
@@ -63,7 +63,7 @@
       "id": "CAR-01",
       "categoria": "caras_terceros",
       "que_detecta": "Caras de personas que no eres tú",
-      "nivel_riesgo": "medio",
+      "nivel_riesgo": "bajo",
       "por_que": "Se ve la cara de otra persona. Puede que no quiera aparecer en redes, así que conviene preguntarle u ocultarla.",
       "fuentes": [
         {
@@ -537,6 +537,18 @@
       "nota": "La SSPC respalda lo que un gafete revela, pero no menciona gafetes."
     },
     {
+      "id": "UBI-06",
+      "categoria": "ubicacion",
+      "que_detecta": "Ventanas con vista al exterior",
+      "nivel_riesgo": "bajo",
+      "por_que": "Se ve una ventana. Si por ella se ven la calle, edificios o el paisaje, alguien podría deducir dónde estás.",
+      "fuentes": [],
+      "aplica_a": "ambos",
+      "estado": "pendiente_de_verificar",
+      "nota": "Sin fuente oficial directa sobre ventanas en fotos. Lo que una vista puede revelar es la ubicación, como en UBI-02 y UBI-04.",
+      "texto_aviso": "Podría verse el exterior por una ventana"
+    },
+    {
       "id": "MAT-01",
       "categoria": "matriculas",
       "que_detecta": "Placas de autos y motos",
@@ -603,7 +615,7 @@
       "id": "PAN-01",
       "categoria": "pantallas",
       "que_detecta": "Celulares, monitores o TV con contenido legible",
-      "nivel_riesgo": "medio",
+      "nivel_riesgo": "bajo",
       "por_que": "Se ve una pantalla con texto. Podría mostrar mensajes o datos que no quieres compartir, así que conviene ocultarla.",
       "fuentes": [
         {
@@ -732,7 +744,7 @@
       "id": "COD-01",
       "categoria": "codigos",
       "que_detecta": "Códigos QR y de barras legibles",
-      "nivel_riesgo": "medio",
+      "nivel_riesgo": "bajo",
       "por_que": "Se ve un código que se puede leer. Podría guardar datos que no se ven a simple vista, así que conviene ocultarlo.",
       "fuentes": [],
       "aplica_a": "ambos",
@@ -803,6 +815,18 @@
       "estado": "pendiente_de_verificar",
       "nota": "Sin fuente directa sobre contenido sugerente: Meta regula categorías afines, y que algo sea sugerente depende del criterio de cada persona.",
       "texto_aviso": "Podría ser contenido sugerente"
+    },
+    {
+      "id": "INT-01",
+      "categoria": "espacios_intimos",
+      "que_detecta": "Fotos tomadas en un baño",
+      "nivel_riesgo": "bajo",
+      "por_que": "La foto parece tomada en un baño. Revisa que no se vea nada que prefieras guardar, sobre todo si aparece otra persona o una niña o un niño.",
+      "fuentes": [],
+      "aplica_a": "ambos",
+      "estado": "pendiente_de_verificar",
+      "nota": "Sin fuente oficial directa sobre fotos en baños. El blog de la AEPD sobre sharenting (2024, citado en MEN-01) pide cuidar la imagen y la intimidad de los menores, pero no menciona baños. Si la persona dice que hay menores, la app lo trata como riesgo alto.",
+      "texto_aviso": "Podría ser una foto tomada en un baño"
     },
     {
       "id": "ARM-01",
