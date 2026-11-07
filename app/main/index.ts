@@ -22,7 +22,10 @@ import {
   esquemaVideoExportado,
   esquemaTrazo,
   esquemaTema,
+  textoCierre,
+  TITULO_CIERRE,
   type ArchivoCargado,
+  type AvisoCierre,
   type Edicion,
   type Recuperacion,
   type Resultado,
@@ -78,6 +81,9 @@ function registrar(mensaje: string): void {
 let ventana: BrowserWindow | null = null;
 let hayCambios = false;
 let confirmoCierre = false;
+/** Main pidió confirmar el cierre y el renderer aún no contesta. Sin esto, nadie puede cerrar desde la UI. */
+let cierrePendiente = false;
+let rendererResponde = true;
 
 const sidecar = new Sidecar({
   ejecutable: join(raiz, 'sidecar', '.venv', 'Scripts', 'python.exe'),
@@ -395,6 +401,17 @@ function registrarCanales(): void {
     rmSync(rutaRecuperacion(), { force: true });
     hayCambios = false;
   });
+
+  manejar(CANALES.confirmarCierre, undefined, (): void => {
+    // Solo vale como respuesta a un aviso de main: el renderer no puede cerrar la app por su cuenta.
+    if (!cierrePendiente || ventana === null) {
+      registrar('Se rechazó un cierre que no se había pedido');
+      return;
+    }
+    cierrePendiente = false;
+    confirmoCierre = true;
+    ventana.close();
+  });
 }
 
 const esquemaVideoId = esquemaArchivoId;
@@ -575,20 +592,36 @@ function crearVentana(): void {
     e.preventDefault();
   });
   nueva.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  nueva.webContents.on('unresponsive', () => {
+    rendererResponde = false;
+  });
+  nueva.webContents.on('responsive', () => {
+    rendererResponde = true;
+  });
   nueva.on('close', (e) => {
     if (!hayCambios || confirmoCierre) return;
+    e.preventDefault();
+    // El aviso es de la app, no de Windows: se ve con su marca y las pruebas lo pueden contestar.
+    // Si la interfaz se cayó o no responde, no hay dónde mostrarlo y se usa el de Windows para no
+    // dejar una ventana imposible de cerrar.
+    const interfazLista = rendererResponde && !nueva.webContents.isCrashed() && !nueva.webContents.isLoading();
+    if (interfazLista) {
+      cierrePendiente = true;
+      nueva.webContents.send(CANALES.pedirCierre, { recuperacionSegura } satisfies AvisoCierre);
+      return;
+    }
     const eleccion = dialog.showMessageBoxSync(nueva, {
       type: 'question',
       buttons: ['Cerrar de todos modos', 'Seguir revisando'],
       defaultId: 1,
       cancelId: 1,
-      title: 'Tienes cambios sin exportar',
-      message: recuperacionSegura
-        ? 'Si cierras ahora, tus decisiones no se exportan. La próxima vez que abras podrás recuperarlas.'
-        : 'Si cierras ahora, tus decisiones no se exportan y se perderán, porque no pudimos guardarlas.',
+      title: TITULO_CIERRE,
+      message: textoCierre(recuperacionSegura),
     });
-    if (eleccion === 1) e.preventDefault();
-    else confirmoCierre = true;
+    if (eleccion === 0) {
+      confirmoCierre = true;
+      nueva.close();
+    }
   });
   nueva.on('closed', () => {
     ventana = null;

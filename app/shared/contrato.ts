@@ -27,6 +27,21 @@ export type Efecto = z.infer<typeof esquemaEfecto>;
 export const esquemaTema = z.enum(['sistema', 'claro', 'oscuro']);
 export type Tema = z.infer<typeof esquemaTema>;
 
+/** Lo que main avisa al renderer cuando se quiere cerrar con cambios sin exportar. */
+export const esquemaAvisoCierre = z.strictObject({
+  /** Falso si el último guardado de la recuperación falló: cerrar perdería las decisiones. */
+  recuperacionSegura: z.boolean(),
+});
+export type AvisoCierre = z.infer<typeof esquemaAvisoCierre>;
+
+export const TITULO_CIERRE = 'Tienes cambios sin exportar';
+/** Lo usan el aviso de la app y el de Windows, que solo aparece si la interfaz no responde. */
+export function textoCierre(recuperacionSegura: boolean): string {
+  return recuperacionSegura
+    ? 'Si cierras ahora, tus decisiones no se exportan. La próxima vez que abras podrás recuperarlas.'
+    : 'Si cierras ahora, tus decisiones no se exportan y se perderán, porque no pudimos guardarlas.';
+}
+
 const enteroEnRango = (min: number, max: number) => z.number().int().min(min).max(max);
 
 export const esquemaOcultamiento = z.strictObject({
@@ -276,6 +291,10 @@ export interface ApiRevisor {
   quitarPista(id: string, pistaId: string): Promise<void>;
   exportarVideo(id: string, pistas: PistaElegida[]): Promise<Resultado<VideoExportado | null>>;
   cerrarVideo(id: string): Promise<void>;
+  /** Avisa cuando se quiere cerrar con cambios sin exportar. Devuelve la función para dejar de escuchar. */
+  alPedirCierre(avisar: (aviso: unknown) => void): () => void;
+  /** Solo cierra si main pidió confirmación antes. */
+  confirmarCierre(): Promise<void>;
 }
 
 export const ERROR_INTERNO: ErrorApp = {

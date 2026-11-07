@@ -650,6 +650,49 @@ test('el diálogo de recuperación no se borra si la app vuelve a cerrarse', asy
   expect(existsSync(join(datos, 'recuperacion.json'))).toBe(true);
 });
 
+test('al cerrar con cambios sin exportar, el aviso es de la app y se puede contestar', async () => {
+  test.setTimeout(180_000);
+  sesion = await lanzar();
+  const { pagina, datos, app } = sesion;
+  await abrir(sesion, [m('cara con ñ.jpg')]);
+  await expect(veredicto(pagina)).toBeVisible({ timeout: 60_000 });
+  await pagina.getByRole('button', { name: /^Ocultar zona/ }).click();
+  await expect.poll(() => existsSync(join(datos, 'recuperacion.json'))).toBe(true);
+  // El de Windows no se puede contestar desde la prueba: si apareciera, se cuenta y se cancela.
+  await app.evaluate(({ dialog }) => {
+    const g = globalThis as unknown as { avisosWindows: number };
+    g.avisosWindows = 0;
+    dialog.showMessageBoxSync = () => {
+      g.avisosWindows += 1;
+      return 1;
+    };
+  });
+  const pedirCierre = (): Promise<void> => app.evaluate(({ BrowserWindow }) => { BrowserWindow.getAllWindows()[0]?.close(); });
+  const aviso = pagina.getByRole('dialog').filter({ hasText: 'Tienes cambios sin exportar' });
+
+  await pedirCierre();
+  await expect(aviso).toContainText('podrás recuperarlas');
+  await expect(aviso.getByRole('button', { name: 'Seguir revisando' })).toBeFocused();
+  await sinViolaciones(pagina);
+  // Con el aviso abierto no se puede usar el selector de tema: se cambia por la API.
+  for (const tema of ['claro', 'oscuro'] as const) {
+    await pagina.evaluate((t) => window.revisor.definirTema(t), tema);
+    await pagina.screenshot({ path: join(CAPTURAS, `aviso-cierre-${tema}.png`) });
+  }
+  await aviso.getByRole('button', { name: 'Seguir revisando' }).click();
+  await expect(aviso).toHaveCount(0);
+  expect(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length)).toBe(1);
+
+  await pedirCierre();
+  await expect(aviso).toBeVisible();
+  expect(await app.evaluate(() => (globalThis as unknown as { avisosWindows: number }).avisosWindows)).toBe(0);
+  const cerrada = app.waitForEvent('close');
+  // Clic diferido: la ventana se cierra antes de que Playwright termine un clic normal.
+  await aviso.getByRole('button', { name: 'Cerrar de todos modos' }).evaluate((b: HTMLElement) => { setTimeout(() => { b.click(); }, 0); });
+  await cerrada;
+  expect(existsSync(join(datos, 'recuperacion.json')), 'cerrar no borra lo que se puede recuperar').toBe(true);
+});
+
 test('si el archivo cambió en disco, no exporta otra foto con las cajas viejas', async () => {
   const carpeta = mkdtempSync(join(tmpdir(), 'revisor-cambio-'));
   const foto = join(carpeta, 'foto.jpg');

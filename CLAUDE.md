@@ -86,4 +86,5 @@ npm run limpiar                                         # cachés y compilados; 
 - Identificadores de dominio y documentos en español; TypeScript `strict` + `noImplicitReturns`; pyright estricto.
 - Git: no subas al remoto sin que el responsable lo pida. El repo es público.
 - Terminado significa: tests en verde en Windows local y CI, matriz de la fase ejecutada, cero errores de linter y tipado, y app ejecutada con capturas revisadas en claro y oscuro. Lo manual pendiente se marca pendiente, nunca aprobado.
+- Pruebas proporcionales al cambio: tipos y lint siempre; las unitarias y E2E del área que tocaste (`-g` en Playwright, `-k` en pytest). La suite completa y todas las E2E solo con cambios grandes o al cerrar una fase. La CI decide qué correr con `.github/scripts/que_probar.sh`.
 - No uses user-agents falsos ni intentes saltar bloqueos de sitios. Si un sitio no se deja leer, la fuente queda pendiente y se revisa a mano.

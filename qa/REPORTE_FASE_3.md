@@ -57,6 +57,23 @@ Corrida parcial anterior, de 10 s, detenida al cambiar la decisión: SAM 2.1 tar
 
 Corrida del 6 de noviembre de 2026 en el i5-10210U. **CI no ha corrido** porque no hay commit.
 
+## CI (6 de noviembre de 2026)
+
+Por qué fallaba, en orden de frecuencia:
+
+1. **E2E de recuperación colgadas** (corregido en `fab7c56`): las ramas que no tienen ese commit, incluida `main` antes de este merge, siguen fallando en "E2E y accesibilidad" tras unos 22 minutos.
+2. **Descargas** en "Herramientas y catálogo": réplicas de SourceForge sin certificado intermedio y fallos momentáneos de Hugging Face o GitHub. Los modelos se bajaban con un solo intento.
+3. **Una etiqueta de acción que no existe** (`setup-uv@v10`, corregido en `5a5f1fd`): falla en "Set up job".
+4. **Fallas ocultas:** en Windows cada paso corría en PowerShell, que solo toma el código del último comando. Un `ruff`, `pyright`, `tipos` o `lint` fallido no ponía la CI en rojo.
+
+Qué cambió:
+
+- Los pasos corren en bash con `-eo pipefail`: cualquier comando que falle detiene el paso.
+- Los modelos, FFmpeg y exiftool se guardan en caché entre corridas, con llave en el hash de `descargar_modelos.py`; el script vuelve a comprobar cada hash. Todas las descargas tienen 3 intentos.
+- `.github/scripts/que_probar.sh` decide qué corre según los archivos que cambiaron desde la base de `main`: con solo `docs/`, `qa/` o `.md` no corre nada; las E2E (unos 20 min) corren en el PR, en `main` y cada semana, no en cada push a una rama. Un push a una rama con PR abierto no duplica la corrida del PR. Un cambio en `.github/` prueba todo.
+- Un push nuevo cancela la corrida anterior de la misma rama o PR.
+- Revisiones rápidas y E2E van en trabajos separados y en paralelo.
+
 ## Bloqueos
 
 1. **Ejecutar FFmpeg y exiftool reales:** el sistema de permisos bloqueó ejecutar los binarios descargados. Sin eso no se ha confirmado que la salida real de FFmpeg (`-map_metadata -1 -fflags +bitexact`) pase el verificador MP4, ni probado ffprobe con videos reales. Si no pasa, la exportación falla cerrada y se ajusta la lista. Las pruebas de tuberías usan un Python verificado por hash como FFmpeg falso.

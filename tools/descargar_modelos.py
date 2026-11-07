@@ -108,21 +108,31 @@ REPLICA_SOURCEFORGE = "phoenixnap"
 REINTENTOS_GENERICOS = 4
 
 
+# Hugging Face y GitHub fallan a veces por un momento (sobre todo en la CI): se reintenta igual.
+REINTENTOS = 3
+ESPERA_REINTENTO_S = 5.0
+
+
 def _direcciones(url: str) -> list[str]:
     if "downloads.sourceforge.net" not in url:
-        return [url]
+        return [url] * REINTENTOS
     return [f"{url}?use_mirror={REPLICA_SOURCEFORGE}"] + [url] * REINTENTOS_GENERICOS
 
 
 def _descargar(nombre: str, url: str) -> bytes | None:
     errores: list[str] = []
-    for direccion in _direcciones(url):
+    for intento, direccion in enumerate(_direcciones(url)):
+        if intento > 0:
+            time.sleep(ESPERA_REINTENTO_S)
         try:
             with urllib.request.urlopen(direccion, timeout=600) as respuesta:
                 return respuesta.read()
-        except (urllib.error.URLError, TimeoutError) as e:
+        except (urllib.error.URLError, TimeoutError, ConnectionError) as e:
             errores.append(type(e).__name__)
-    print(f"ERROR: no se pudo descargar {nombre} ({', '.join(errores)}). Bájalo a mano y usa --zips CARPETA.")
+    print(
+        f"ERROR: no se pudo descargar {nombre} ({', '.join(errores)}). Revisa tu conexión y vuelve a intentarlo;"
+        " para FFmpeg y exiftool también puedes bajar el zip a mano y usar --zips CARPETA."
+    )
     return None
 
 
@@ -203,8 +213,9 @@ def main() -> int:
         if destino.exists() and hashlib.sha256(destino.read_bytes()).hexdigest() == esperado:
             print(f"OK: {nombre} ya estaba")
             continue
-        with urllib.request.urlopen(url, timeout=120) as respuesta:
-            datos = respuesta.read()
+        datos = _descargar(nombre, url)
+        if datos is None:
+            return 1
         if nombre in DENTRO_DE_ZIP:
             with zipfile.ZipFile(io.BytesIO(datos)) as paquete:
                 datos = paquete.read(DENTRO_DE_ZIP[nombre])
