@@ -1,4 +1,24 @@
-import { BookOpen, Film, FolderOpen, Image as IconoFoto, Redo2, Save, Undo2, X } from 'lucide-react';
+import {
+  BookOpen,
+  Car,
+  CheckCircle2,
+  CreditCard,
+  Film,
+  FolderOpen,
+  IdCard,
+  Image as IconoFoto,
+  Lock,
+  MapPin,
+  QrCode,
+  Redo2,
+  Save,
+  Shield,
+  ShieldCheck,
+  Sparkles,
+  Undo2,
+  Users,
+  X,
+} from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import logoClaro from '../../../brand/logo/horizontal-claro.svg';
 import logoOscuro from '../../../brand/logo/horizontal-oscuro.svg';
@@ -511,32 +531,83 @@ export function App(): React.JSX.Element {
       {vista === 'video' ? null : vista === 'guia' ? <Guia /> : (
       <div className="cuerpo">
         <nav className="lista-archivos" aria-label="Fotos abiertas">
-          <h2>Fotos</h2>
-          {archivos.length === 0 && <p className="suave">Abre una foto o arrástrala aquí.</p>}
-          <ul>
-            {archivos.map((a) => (
-              <li key={a.info.id} className={a.info.id === seleccion ? 'activo' : ''}>
-                <button type="button" className="archivo" aria-current={a.info.id === seleccion ? 'true' : undefined} onClick={() => { setSeleccion(a.info.id); }}>
-                  <span className="nombre">{a.info.nombre}</span>
-                  <span className="suave estado">{textoEstado(a)}</span>
-                </button>
-                <button type="button" className="boton chico" aria-label={`Cerrar ${a.info.nombre}`} onClick={() => { cerrarArchivo(a.info.id); }}>
-                  <X aria-hidden="true" />
-                </button>
-              </li>
-            ))}
-          </ul>
+          <div className="cabecera-seccion">
+            <h2>Fotos</h2>
+            {archivos.length > 0 && <span className="chip-conteo">{archivos.length}</span>}
+          </div>
+          {archivos.length === 0 ? (
+            <div className="tarjeta-vacia-lateral">
+              <IconoFoto className="icono-lateral-vacio" aria-hidden="true" />
+              <p className="suave">Abre una foto o arrástrala aquí.</p>
+            </div>
+          ) : (
+            <ul>
+              {archivos.map((a) => (
+                <li key={a.info.id} className={a.info.id === seleccion ? 'activo' : ''}>
+                  <button type="button" className="archivo" aria-current={a.info.id === seleccion ? 'true' : undefined} onClick={() => { setSeleccion(a.info.id); }}>
+                    <span className="nombre">{a.info.nombre}</span>
+                    <span className="suave estado">{textoEstado(a)}</span>
+                  </button>
+                  <button type="button" className="boton chico" aria-label={`Cerrar ${a.info.nombre}`} onClick={() => { cerrarArchivo(a.info.id); }}>
+                    <X aria-hidden="true" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
           {analizando && <button type="button" className="boton" onClick={cancelar}>Cancelar revisión</button>}
         </nav>
 
         <main id="principal" tabIndex={-1} className="principal">
           {actual === null ? (
             <div className="vacio">
-              <h1>Revisa tus fotos antes de publicarlas</h1>
-              <p>Todo se analiza en tu computadora. Ninguna foto sale de aquí.</p>
-              <button type="button" className="boton primario" onClick={() => { void abrir(); }}>
-                <FolderOpen aria-hidden="true" /> Abrir fotos
-              </button>
+              <div className="vacio-tarjeta">
+                <div className="vacio-icono-aura" aria-hidden="true">
+                  <div className="aura-brillo" />
+                  <div className="icono-escudo-wrapper">
+                    <ShieldCheck className="icono-escudo-svg" />
+                  </div>
+                </div>
+                <h1 className="vacio-titulo">Revisa tus fotos antes de publicarlas</h1>
+                <p className="vacio-subtitulo">Todo se analiza en tu computadora. Ninguna foto sale de aquí.</p>
+
+                <div className="vacio-acciones">
+                  <button type="button" className="boton primario boton-destacado" onClick={() => { void abrir(); }}>
+                    <FolderOpen aria-hidden="true" /> Abrir fotos
+                  </button>
+                  <span className="suave vacio-arrastrar">o arrastra tus fotos a esta ventana</span>
+                </div>
+
+                <div className="caracteristicas-grid" aria-label="Garantías de privacidad">
+                  <div className="caracteristica-tarjeta">
+                    <div className="caracteristica-icono-caja">
+                      <Lock aria-hidden="true" />
+                    </div>
+                    <div>
+                      <strong>100% Local</strong>
+                      <p className="suave">Sin nubes ni rastreo externo</p>
+                    </div>
+                  </div>
+                  <div className="caracteristica-tarjeta">
+                    <div className="caracteristica-icono-caja">
+                      <Sparkles aria-hidden="true" />
+                    </div>
+                    <div>
+                      <strong>Detección local</strong>
+                      <p className="suave">Caras, identificaciones y texto</p>
+                    </div>
+                  </div>
+                  <div className="caracteristica-tarjeta">
+                    <div className="caracteristica-icono-caja">
+                      <CheckCircle2 aria-hidden="true" />
+                    </div>
+                    <div>
+                      <strong>Copia limpia</strong>
+                      <p className="suave">Sin metadatos EXIF ni GPS</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           ) : (
             <>
@@ -559,7 +630,29 @@ export function App(): React.JSX.Element {
         </main>
 
         <aside className="panel" aria-label="Advertencias">
-          {actual === null && <h2>Advertencias</h2>}
+          {actual === null && (
+            <div className="panel-vacio-card">
+              <div className="cabecera-seccion">
+                <h2>Advertencias</h2>
+              </div>
+              <div className="panel-vacio-contenido">
+                <div className="panel-vacio-icono-caja" aria-hidden="true">
+                  <Shield />
+                </div>
+                <p className="suave">
+                  Abre o selecciona una foto para ver las advertencias detectadas y decidir qué zonas ocultar antes de publicar.
+                </p>
+                <div className="pilas-categorias-info" aria-hidden="true">
+                  <span className="pildora-cat"><Users /> Caras y menores</span>
+                  <span className="pildora-cat"><MapPin /> Ubicación GPS</span>
+                  <span className="pildora-cat"><IdCard /> Documentos</span>
+                  <span className="pildora-cat"><CreditCard /> Tarjetas</span>
+                  <span className="pildora-cat"><Car /> Matrículas</span>
+                  <span className="pildora-cat"><QrCode /> Códigos QR</span>
+                </div>
+              </div>
+            </div>
+          )}
           {actual?.estado.tipo === 'en_cola' && <p>Esta foto está en espera de revisión.</p>}
           {actual?.estado.tipo === 'analizando' && <p>Revisando esta foto…</p>}
           {actual?.estado.tipo === 'error' && (

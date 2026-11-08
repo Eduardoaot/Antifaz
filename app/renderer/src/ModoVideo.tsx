@@ -1,4 +1,4 @@
-import { Crosshair, FolderOpen, Save, X } from 'lucide-react';
+import { Crosshair, Film, FolderOpen, Save, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState, type PointerEvent, type SyntheticEvent } from 'react';
 import { ERROR_INTERNO, esquemaEfecto, type Efecto, type PistaElegida, type VideoInfo } from '../../shared/contrato';
 import { aPuntoDeImagen } from '../../shared/logica';
@@ -227,12 +227,22 @@ export function ModoVideo({ activo, alAnunciar, alFallar }: Props): React.JSX.El
       <div className="cuerpo cuerpo-solo">
       <main id={idPrincipal} tabIndex={-1} className="principal modo-video">
         <div className="vacio">
-          <h1>Revisa un video antes de publicarlo</h1>
-          <p>En esta versión beta revisamos videos de hasta 3 segundos. Todo se procesa en tu computadora.</p>
-          <p className="suave">Todavía no detectamos nada solos en video: tú eliges qué ocultar con un clic y lo seguimos en todo el video.</p>
-          <button type="button" className="boton primario" disabled={ocupado !== null} onClick={() => { void abrir(); }}>
-            <FolderOpen aria-hidden="true" /> {ocupado === 'abriendo' ? 'Abriendo…' : 'Abrir video'}
-          </button>
+          <div className="vacio-tarjeta">
+            <div className="vacio-icono-aura" aria-hidden="true">
+              <div className="aura-brillo" />
+              <div className="icono-escudo-wrapper">
+                <Film className="icono-escudo-svg" />
+              </div>
+            </div>
+            <h1 className="vacio-titulo">Revisa un video antes de publicarlo</h1>
+            <p className="vacio-subtitulo">En esta versión beta revisamos videos de hasta 3 segundos. Todo se procesa en tu computadora.</p>
+            <p className="suave">Todavía no detectamos nada solos en video: tú eliges qué ocultar con un clic y lo seguimos en todo el video.</p>
+            <div className="vacio-acciones">
+              <button type="button" className="boton primario boton-destacado" disabled={ocupado !== null} onClick={() => { void abrir(); }}>
+                <FolderOpen aria-hidden="true" /> {ocupado === 'abriendo' ? 'Abriendo…' : 'Abrir video'}
+              </button>
+            </div>
+          </div>
         </div>
       </main>
       </div>
