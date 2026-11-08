@@ -1,4 +1,4 @@
-"""Emojis incluidos para ocultar zonas. Se dibujan sobre bloque sólido: no conservan nada de la foto.
+"""Emojis incluidos para ocultar zonas. No conservan nada de la foto dentro de su caja.
 
 Origen y licencia en sidecar/recursos/emojis/ORIGEN.md.
 """
@@ -10,6 +10,7 @@ from functools import lru_cache
 from pathlib import Path
 
 import numpy as np
+from numpy.typing import NDArray
 from PIL import Image
 
 from .caras import ModeloNoDisponible
@@ -41,3 +42,25 @@ def cargar(emoji: TipoEmoji) -> Pixeles:
     # Se comparte entre llamadas por la caché: nadie debe poder modificarlo.
     pixeles.setflags(write=False)
     return pixeles
+
+
+@lru_cache(maxsize=len(ARCHIVOS))
+def opaco(emoji: TipoEmoji) -> NDArray[np.bool_]:
+    """Dónde el emoji tapa por completo. Solo ahí puede quedar sobre la foto sin nada debajo."""
+    mascara = cargar(emoji)[:, :, 3] == 255
+    mascara.setflags(write=False)
+    return mascara
+
+
+@lru_cache(maxsize=len(ARCHIVOS))
+def color_principal(emoji: TipoEmoji) -> tuple[int, int, int]:
+    """El color más frecuente de su parte opaca. Rellena lo que el emoji no alcance a cubrir."""
+    pixeles = cargar(emoji)
+    opacos = pixeles[pixeles[:, :, 3] == 255][:, :3].astype(np.int64)
+    if opacos.size == 0:
+        raise ErrorRevisor(Codigo.MODELO_NO_DISPONIBLE, f"emoji {emoji} sin parte opaca")
+    grupos = opacos // 32
+    claves = grupos[:, 0] * 64 + grupos[:, 1] * 8 + grupos[:, 2]
+    elegidos = opacos[claves == int(np.bincount(claves).argmax())]
+    r, g, b = (int(round(float(v))) for v in elegidos.mean(axis=0))
+    return (r, g, b)

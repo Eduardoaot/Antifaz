@@ -129,6 +129,8 @@ export function construirOcultamientos(r: Revision, hallazgos: readonly Hallazgo
       dilatacion_px: LIMITES.dilatacionPx.porDefecto,
       dilatacion_pct: LIMITES.dilatacionPct.porDefecto,
       mascara_id: null,
+      // Con el margen de las caras, el óvalo contiene toda la cara detectada: el emoji puede ajustarse a ella.
+      forma: h.regla_id === 'CAR-01' ? 'elipse' : 'caja',
     });
   }
   for (const z of r.manuales) {
@@ -144,6 +146,8 @@ export function construirOcultamientos(r: Revision, hallazgos: readonly Hallazgo
       // La silueta del modelo puede quedarse corta, así que lleva el margen completo.
       dilatacion_pct: z.origen === 'silueta' ? LIMITES.dilatacionPct.porDefecto : 0,
       mascara_id: z.mascara_id,
+      // Lo que dibujaste a mano se tapa completo; con silueta, el emoji se ajusta a ella en el sidecar.
+      forma: 'caja',
     });
   }
   return salida;

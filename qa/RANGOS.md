@@ -51,7 +51,9 @@ Cada parámetro de este archivo tiene pruebas parametrizadas de mínimo-1, míni
 | `efecto.sigma_px` | decimal, px | 25 | 1000 | max(25, 25% del lado corto de la región) | Estándar |
 | `efecto.pixel_px` | entero, px | 8 (propuesta) | 256 (propuesta) | max(16, 10% del lado corto de la región) (propuesta) | Estándar. Cada bloque toma el color promedio de lo que cubre |
 | `efecto.color_solido` | enum de colores fijos | n/a | n/a | Negro | Estándar. Nunca se usa el promedio de la región: es lo que lo hace irreversible |
-| `efecto.emoji` | Cada emoji es un valor de `efecto.tipo` (ver `sidecar/recursos/emojis/ORIGEN.md`) | n/a | n/a | Ninguno: la persona lo elige | Estándar. Se dibuja sobre relleno sólido, centrado y cubriendo la caja completa aunque haya silueta. Un PNG con hash distinto detiene la operación |
+| `efecto.emoji` | Cada emoji es un valor de `efecto.tipo` (ver `sidecar/recursos/emojis/ORIGEN.md`) | n/a | n/a | Ninguno: la persona lo elige | Estándar. Tapa lo que se oculta (ver `efecto.forma`): primero se rellena con el color principal del emoji y luego el emoji, centrado, crece hasta que su parte opaca lo cubre. Fuera de eso, lo transparente deja ver la foto. Un PNG con hash distinto detiene la operación |
+| `efecto.forma` | enum: `caja`, `elipse` | n/a | n/a | `elipse` en caras (CAR-01); `caja` en todo lo demás, incluidas las zonas manuales | Estándar. Solo la usa el emoji. Con silueta, el emoji tapa la silueta. `elipse` tapa el óvalo inscrito en la zona con margen, que con el margen de caras (×1.3, 10 % y 8 px) contiene toda la caja del detector; si la caja toca la orilla de la foto, se tapa la caja completa |
+| `efecto.emoji_escala_max` | decimal, veces el lado mayor de la caja | 1 | 2 | 2 | Constante (`EMOJI_ESCALA_MAX` en `efectos.py`), no configurable. Si el emoji no alcanza a tapar la caja con ese tamaño, lo que falta queda con su color principal |
 
 ## Máscaras
 

@@ -44,6 +44,9 @@ class Ocultamiento(Estricto):
     dilatacion_pct: Annotated[float, Field(ge=0, le=50)] = 10.0
     # Silueta guardada en el sidecar. Si ya no está, se oculta toda la caja.
     mascara_id: Annotated[str | None, Field(min_length=1, max_length=64)] = None
+    # Solo la usa el emoji: "elipse" (caras) tapa el óvalo de la zona con margen para ajustarse a la cara;
+    # "caja" tapa el rectángulo completo. Con silueta, manda la silueta.
+    forma: Literal["caja", "elipse"] = "caja"
 
 
 class Ping(Estricto):

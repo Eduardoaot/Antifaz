@@ -70,6 +70,8 @@ export const esquemaOcultamiento = z.strictObject({
   dilatacion_px: enteroEnRango(LIMITES.dilatacionPx.min, LIMITES.dilatacionPx.max),
   dilatacion_pct: z.number().min(LIMITES.dilatacionPct.min).max(LIMITES.dilatacionPct.max),
   mascara_id: z.string().min(1).max(64).nullable(),
+  /** Solo la usa el emoji: en caras tapa el óvalo para ajustarse a la cara; si no, el rectángulo completo. */
+  forma: z.enum(['caja', 'elipse']),
 });
 export type Ocultamiento = z.infer<typeof esquemaOcultamiento>;
 

@@ -150,10 +150,22 @@ describe('emoji', () => {
     expect(esquemaEfecto.safeParse(malo).success).toBe(false);
   });
 
-  it('una cara con emoji sale tal cual hacia el sidecar', () => {
+  it('una cara con emoji sale tal cual hacia el sidecar, con forma de óvalo para ajustarse', () => {
     const r = elegirEfecto(decidir(REVISION_INICIAL, 'a', 'ocultar'), 'a', 'emoji_gato');
     expect(efectoDe(r, cara('a'))).toBe('emoji_gato');
-    expect(construirOcultamientos(r, [cara('a')])[0]?.efecto).toBe('emoji_gato');
+    expect(construirOcultamientos(r, [cara('a')])[0]).toMatchObject({ efecto: 'emoji_gato', forma: 'elipse' });
+  });
+
+  it('solo las caras van con óvalo: lo demás y lo manual se tapa completo', () => {
+    const placa: Hallazgo = { ...cara('p'), regla_id: 'MAT-01' };
+    let r = ocultarTodo(REVISION_INICIAL, [placa]);
+    r = agregarManual(r, 'm', { x: 1, y: 1, ancho: 10, alto: 10 }, null, 'rectangulo');
+    expect(construirOcultamientos(r, [placa]).map((o) => o.forma)).toEqual(['caja', 'caja']);
+  });
+
+  it.each([undefined, 'circulo', 'ELIPSE', null])('rechaza la forma %j', (mala) => {
+    const base = construirOcultamientos(decidir(REVISION_INICIAL, 'a', 'ocultar'), [cara('a')])[0];
+    expect(esquemaOcultamiento.safeParse({ ...base, forma: mala }).success).toBe(false);
   });
 
   it('una zona manual también acepta emoji', () => {
