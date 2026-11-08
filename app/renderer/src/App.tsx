@@ -52,6 +52,7 @@ import {
   type Revision,
 } from '../../shared/logica';
 import { Advertencias, Cobertura } from './Advertencias';
+import { AnimacionInicio } from './AnimacionInicio';
 import { Confirmacion } from './Dialogos';
 import { Guia } from './Guia';
 import { Manual } from './Manual';
@@ -457,6 +458,7 @@ export function App(): React.JSX.Element {
 
   return (
     <div className="app" onDragOver={(e) => { e.preventDefault(); }} onDrop={alSoltar}>
+      <AnimacionInicio />
       <a className="saltar" href="#principal">Saltar al contenido</a>
       <header className="cabecera">
         <picture>
