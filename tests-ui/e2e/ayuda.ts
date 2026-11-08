@@ -5,7 +5,9 @@ import { join, resolve } from 'node:path';
 import { _electron, type ElectronApplication, type Page } from '@playwright/test';
 
 export const RAIZ = resolve(__dirname, '..', '..');
-const PYTHON = join(RAIZ, 'sidecar', '.venv', 'Scripts', 'python.exe');
+export const PYTHON = process.platform === 'win32'
+  ? join(RAIZ, 'sidecar', '.venv', 'Scripts', 'python.exe')
+  : join(RAIZ, 'sidecar', '.venv', 'bin', 'python');
 
 const GENERADOR = `
 import sys, shutil
