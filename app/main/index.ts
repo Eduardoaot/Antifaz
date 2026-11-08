@@ -85,8 +85,12 @@ let confirmoCierre = false;
 let cierrePendiente = false;
 let rendererResponde = true;
 
+const ejecutablePython = process.platform === 'win32'
+  ? join(raiz, 'sidecar', '.venv', 'Scripts', 'python.exe')
+  : join(raiz, 'sidecar', '.venv', 'bin', 'python');
+
 const sidecar = new Sidecar({
-  ejecutable: join(raiz, 'sidecar', '.venv', 'Scripts', 'python.exe'),
+  ejecutable: ejecutablePython,
   argumentos: ['-m', 'revisor', '--modelos', join(raiz, 'sidecar', 'modelos'), '--logs', carpetaLogs],
   cwd: join(raiz, 'sidecar'),
   registrar,

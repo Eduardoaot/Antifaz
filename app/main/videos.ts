@@ -9,6 +9,8 @@ import { basename } from 'node:path';
 import { esquemaVideoAbierto, type ErrorApp, type Resultado, type VideoInfo } from '../shared/contrato';
 import type { RespuestaSidecar } from './sidecar';
 
+const nombreDeRuta = (ruta: string): string => ruta.split(/[/\\]/).pop() || basename(ruta);
+
 export const ERROR_VIDEO_NO_ABIERTO: ErrorApp = {
   codigo: 'VIDEO_NO_ABIERTO',
   mensaje: 'Este video ya no está abierto. Vuelve a abrirlo; lo que habías elegido se perdió.',
@@ -46,7 +48,7 @@ export class Videos {
       ok: true,
       datos: {
         id,
-        nombre: basename(ruta),
+        nombre: nombreDeRuta(ruta),
         ancho: datos.ancho,
         alto: datos.alto,
         duracion: datos.duracion_s,
@@ -73,7 +75,7 @@ export class Videos {
 
   nombre(id: string): string | undefined {
     const ruta = this.ruta(id);
-    return ruta === undefined ? undefined : basename(ruta);
+    return ruta === undefined ? undefined : nombreDeRuta(ruta);
   }
 
   alReiniciarSidecar(): void {

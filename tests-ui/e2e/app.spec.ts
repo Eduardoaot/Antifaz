@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 import marca from '../../brand/brand.json';
-import { abrir, cerrar, crearMuestras, entorno, lanzar, llaveGuardada, matarArbol, RAIZ, simularGuardar, type Sesion } from './ayuda';
+import { abrir, cerrar, crearMuestras, entorno, lanzar, llaveGuardada, matarArbol, PYTHON, RAIZ, simularGuardar, type Sesion } from './ayuda';
 
 const CAPTURAS = join(RAIZ, 'tests-ui', 'capturas');
 mkdirSync(CAPTURAS, { recursive: true });
@@ -98,7 +98,7 @@ test('flujo completo: cara, ¿Por qué?, ocultar y exportar sin metadatos', asyn
   const bytes = readFileSync(salida);
   for (const secreto of ['Telefono secreto', 'Comentario secreto', 'Exif', 'GPS']) expect(bytes.includes(secreto)).toBe(false);
   const reanalisis = execFileSync(
-    join(RAIZ, 'sidecar', '.venv', 'Scripts', 'python.exe'),
+    PYTHON,
     ['-c', 'import sys;from pathlib import Path;from revisor import cargador;from revisor.caras import DetectorCaras;i=cargador.abrir(sys.argv[1]);print(len(DetectorCaras(Path("modelos")).detectar(i.pixeles,0.25)),i.tiene_gps)', salida],
     { cwd: join(RAIZ, 'sidecar') },
   ).toString().trim();
@@ -163,7 +163,7 @@ test('texto y código: los encuentra, los tapa y el dato no sale en la copia', a
   await pagina.getByRole('button', { name: 'Exportar copia' }).click();
   await expect(pagina.getByTestId('anuncio')).toContainText('sin metadatos', { timeout: 60_000 });
   const lectura = execFileSync(
-    join(RAIZ, 'sidecar', '.venv', 'Scripts', 'python.exe'),
+    PYTHON,
     ['-c', 'import sys;from revisor import cargador,texto,codigos;i=cargador.abrir(sys.argv[1]);print(len(texto.buscar(i.pixeles)),len(codigos.buscar(i.pixeles)))', salida],
     { cwd: join(RAIZ, 'sidecar') },
   ).toString().trim();
@@ -281,7 +281,7 @@ test('clic en un objeto: SAM da la silueta y la cara deja de verse en la copia',
   await pagina.getByRole('button', { name: 'Exportar copia' }).click();
   await expect(pagina.getByTestId('anuncio')).toContainText('sin metadatos', { timeout: 60_000 });
   const lectura = execFileSync(
-    join(RAIZ, 'sidecar', '.venv', 'Scripts', 'python.exe'),
+    PYTHON,
     ['-c', 'import sys;from pathlib import Path;from revisor import cargador;from revisor.caras import DetectorCaras;i=cargador.abrir(sys.argv[1]);print(len([c for c in DetectorCaras(Path("modelos")).detectar(i.pixeles,0.25) if c.confianza>=0.6]))', salida],
     { cwd: join(RAIZ, 'sidecar') },
   ).toString().trim().split(/\s+/).at(-1);
@@ -322,7 +322,7 @@ test('pincel: el trazo se oculta en la copia, solo donde se pintó, y se puede d
   await pagina.getByRole('button', { name: 'Exportar copia' }).click();
   await expect(pagina.getByTestId('anuncio')).toContainText('con 1 zona oculta', { timeout: 60_000 });
   const colores = execFileSync(
-    join(RAIZ, 'sidecar', '.venv', 'Scripts', 'python.exe'),
+    PYTHON,
     ['-c', 'import sys;from PIL import Image;i=Image.open(sys.argv[1]).convert("RGB");print(*[i.getpixel(p) for p in ((320,240),(150,240),(320,100),(320,400),(40,240))],sep="|")', salida],
   ).toString().trim().split('|');
   const negro = '(0, 0, 0)';

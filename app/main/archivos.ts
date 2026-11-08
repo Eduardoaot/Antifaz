@@ -35,6 +35,7 @@ interface Registro {
 type Pedir = (comando: Record<string, unknown>) => Promise<RespuestaSidecar>;
 
 const claveDeRuta = (ruta: string): string => normalize(ruta).toLowerCase();
+export const nombreDeRuta = (ruta: string): string => ruta.split(/[/\\]/).pop() || basename(ruta);
 
 export interface PlanLote {
   /** Rutas a abrir, en el orden elegido: las ya abiertas y las nuevas que caben. */
@@ -92,7 +93,7 @@ export class Archivos {
       datos: {
         sidecarId: datos.imagen_id,
         huella: datos.huella,
-        archivo: { nombre: basename(ruta), ancho: datos.ancho, alto: datos.alto, formato: datos.formato },
+        archivo: { nombre: nombreDeRuta(ruta), ancho: datos.ancho, alto: datos.alto, formato: datos.formato },
       },
     };
   }
@@ -105,7 +106,7 @@ export class Archivos {
       }
     }
     const abierto = await this.abrirEnSidecar(ruta);
-    if (!abierto.ok) return { ok: false, nombre: basename(ruta), error: abierto.error };
+    if (!abierto.ok) return { ok: false, nombre: nombreDeRuta(ruta), error: abierto.error };
     const archivo: ArchivoAbierto = { ...abierto.datos.archivo, id: randomUUID(), duplicado: false };
     this.registros.set(archivo.id, { ruta, huella: abierto.datos.huella, sidecarId: abierto.datos.sidecarId, reapertura: null, archivo });
     return { ok: true, archivo };
