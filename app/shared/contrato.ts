@@ -21,8 +21,24 @@ export const LIMITES = {
   videoProxyLadoMax: 4096,
 } as const;
 
-export const esquemaEfecto = z.enum(['solido', 'difuminado', 'pixelado']);
+/**
+ * Cada emoji es un efecto propio: así la recuperación, las zonas manuales y el video lo aceptan igual.
+ * Coinciden con TipoEmoji de sidecar/revisor/esquemas.py. Se dibujan sobre bloque sólido.
+ */
+export const EMOJIS = ['emoji_sonrisa', 'emoji_lentes', 'emoji_gato', 'emoji_estrella'] as const;
+export type Emoji = (typeof EMOJIS)[number];
+
+export const esquemaEfecto = z.enum(['solido', 'difuminado', 'pixelado', ...EMOJIS] as const);
 export type Efecto = z.infer<typeof esquemaEfecto>;
+
+export const esEmoji = (e: Efecto): e is Emoji => (EMOJIS as readonly string[]).includes(e);
+
+export const ETIQUETA_EMOJI: Readonly<Record<Emoji, string>> = {
+  emoji_sonrisa: '😀 Carita sonriente',
+  emoji_lentes: '😎 Carita con lentes',
+  emoji_gato: '🐱 Gato',
+  emoji_estrella: '⭐ Estrella',
+};
 
 export const esquemaTema = z.enum(['sistema', 'claro', 'oscuro']);
 export type Tema = z.infer<typeof esquemaTema>;

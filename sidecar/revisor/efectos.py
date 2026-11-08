@@ -2,7 +2,8 @@
 
 Decisión del responsable (2026-11-06): el difuminado y el pixelado usan los colores de la imagen,
 porque se ven naturales, aunque técnicas de reconstrucción podrían recuperar parte del contenido
-(ver docs/INVESTIGACION.md). Solo el bloque sólido no depende de lo que había debajo.
+(ver docs/INVESTIGACION.md). Solo el bloque sólido y el emoji no dependen de lo que había debajo:
+el emoji se dibuja sobre un bloque sólido, así que sus orillas transparentes muestran negro.
 """
 
 from __future__ import annotations
@@ -15,9 +16,10 @@ import cv2
 import numpy as np
 from numpy.typing import NDArray
 
+from . import emojis
 from .cargador import Pixeles
 from .errores import Codigo, ErrorRevisor
-from .esquemas import Ocultamiento, TipoEfecto
+from .esquemas import Ocultamiento, TipoEfecto, TipoEmoji, es_emoji
 
 COLOR_SOLIDO = (0, 0, 0)
 SIGMA_MIN = 25.0
@@ -78,6 +80,18 @@ def _pixelar(salida: Pixeles, fuente: Pixeles, x0: int, y0: int, x1: int, y1: in
     salida[y0:y1, x0:x1, :3] = cv2.resize(colores, (ancho, alto), interpolation=cv2.INTER_NEAREST)
 
 
+def _pegar_emoji(salida: Pixeles, emoji: TipoEmoji, x0: int, y0: int, x1: int, y1: int) -> None:
+    """Centrado y del mayor tamaño que cabe. Lo que no cubre ya es negro: nada de la foto queda."""
+    ancho, alto = x1 - x0, y1 - y0
+    lado = max(1, min(ancho, alto))
+    chico = cv2.resize(emojis.cargar(emoji), (lado, lado), interpolation=cv2.INTER_AREA)
+    ox, oy = x0 + (ancho - lado) // 2, y0 + (alto - lado) // 2
+    alfa = chico[:, :, 3:4].astype(np.float32) / 255.0
+    fondo = salida[oy : oy + lado, ox : ox + lado, :3].astype(np.float32)
+    mezcla = chico[:, :, :3].astype(np.float32) * alfa + fondo * (1.0 - alfa)
+    salida[oy : oy + lado, ox : ox + lado, :3] = np.clip(np.rint(mezcla), 0, 255).astype(np.uint8)
+
+
 def _aplicar_efecto(
     salida: Pixeles,
     fuente: Pixeles,
@@ -95,6 +109,10 @@ def _aplicar_efecto(
             _difuminar(salida, fuente, x0, y0, x1, y1, intensidad)
         case "pixelado":
             _pixelar(salida, fuente, x0, y0, x1, y1, intensidad)
+        case "emoji_sonrisa" | "emoji_lentes" | "emoji_gato" | "emoji_estrella":
+            # Primero el bloque: es lo que lo hace irreversible.
+            salida[y0:y1, x0:x1, :3] = COLOR_SOLIDO
+            _pegar_emoji(salida, efecto, x0, y0, x1, y1)
         case _ as inalcanzable:
             assert_never(inalcanzable)
     if salida.shape[2] == 4:
@@ -136,11 +154,16 @@ def aplicar(
     siluetas = mascaras if mascaras is not None else {}
     alto, ancho = pixeles.shape[:2]
     regiones = [region_dilatada(o, alto, ancho) for o in ocultamientos]
-    # Los bloques sólidos van primero: un difuminado vecino no debe tomar color de lo que tapan.
+    # Un emoji cubre su caja completa: recortarlo a la silueta se vería mal, y cubrir de más no destapa nada.
+    recortes = [
+        None if es_emoji(o.efecto) else _silueta(o, r, siluetas)
+        for o, r in zip(ocultamientos, regiones, strict=True)
+    ]
+    # Los bloques sólidos (y los emojis, que van sobre uno) primero: un difuminado vecino no debe
+    # tomar color de lo que tapan.
     fuente = pixeles.copy()
-    recortes = [_silueta(o, r, siluetas) for o, r in zip(ocultamientos, regiones, strict=True)]
     for o, (x0, y0, x1, y1), silueta in zip(ocultamientos, regiones, recortes, strict=True):
-        if o.efecto == "solido":
+        if o.efecto == "solido" or es_emoji(o.efecto):
             if silueta is None:
                 fuente[y0:y1, x0:x1, :3] = COLOR_SOLIDO
             else:

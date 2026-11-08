@@ -1,9 +1,10 @@
 import { Crosshair, FolderOpen, Save, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState, type PointerEvent, type SyntheticEvent } from 'react';
-import { ERROR_INTERNO, esquemaEfecto, type Efecto, type PistaElegida, type VideoInfo } from '../../shared/contrato';
+import { ERROR_INTERNO, esEmoji, esquemaEfecto, type Efecto, type PistaElegida, type VideoInfo } from '../../shared/contrato';
 import { aPuntoDeImagen } from '../../shared/logica';
 import { leerEnRango } from '../../shared/numeros';
 import { Confirmacion } from './Dialogos';
+import { OpcionesEmoji } from './OpcionesEmoji';
 
 interface Pista {
   id: string;
@@ -328,14 +329,15 @@ export function ModoVideo({ activo, alAnunciar, alFallar }: Props): React.JSX.El
                       <option value="solido">Bloque sólido</option>
                       <option value="difuminado">Difuminado</option>
                       <option value="pixelado">Pixelado</option>
+                      <OpcionesEmoji />
                     </select>
                   </label>
                   <button type="button" className="boton" disabled={ocupado !== null} onClick={() => { quitar(p.id); }}>
                     <X aria-hidden="true" /> Quitar<span className="solo-lector"> el objeto {i + 1}</span>
                   </button>
                 </div>
-                {p.efecto !== 'solido' && (
-                  <p className="suave">El difuminado y el pixelado conservan los colores del video, y con herramientas especiales alguien podría reconstruir parte. Para la máxima protección, usa Bloque sólido.</p>
+                {p.efecto !== 'solido' && !esEmoji(p.efecto) && (
+                  <p className="suave">El difuminado y el pixelado conservan los colores del video, y con herramientas especiales alguien podría reconstruir parte. Para la máxima protección, usa Bloque sólido o un emoji.</p>
                 )}
               </li>
             ))}

@@ -284,6 +284,8 @@ Al ejecutar un caso, el Estado pasa a `automatizado` o `manual`, con enlace a su
 | INT-025 | 2 | Trazo muy largo | Más de 5000 puntos | Toma la primera parte y avisa | automatizado: tests-ui/unit/logica.test.ts, sidecar/tests/test_pincel.py (el aviso en pantalla no tiene E2E) |
 | INT-026 | 2 | Pincel en sus extremos | Tamaño 1 y 512, puntos en las esquinas | Máscara válida; fuera de rango se rechaza | automatizado: sidecar/tests/test_pincel.py, tests-ui/unit/logica.test.ts |
 | INT-027 | 2 | Trazo tras reiniciar el sidecar o recuperar | Recuperar una edición con un trazo | Se oculta toda la caja del trazo y sigue diciendo "trazo a mano" | automatizado: sidecar/tests/test_segmentar.py (máscara perdida), tests-ui/unit/logica.test.ts (origen recuperado) |
+| INT-028 | 3 | Ocultar con emoji | Elegir cada emoji en una cara, una zona manual y un objeto de video; exportar a JPG y PNG | El emoji tapa la caja con negro en las orillas; la exportación pasa la verificación | automatizado: sidecar/tests/test_exportar.py, tests-ui/unit/logica.test.ts. Falta revisar en pantalla, en claro y oscuro (manual) |
+| INT-029 | 3 | Emoji tras recuperar | Elegir un emoji, cerrar de golpe y recuperar | El emoji elegido se conserva | automatizado: tests-ui/unit/logica.test.ts (sin E2E) |
 
 ## Seguridad y privacidad (SEG)
 
@@ -303,6 +305,8 @@ Al ejecutar un caso, el Estado pasa a `automatizado` o `manual`, con enlace a su
 | SEG-012 | 6 | "Reportar un problema" sin datos sensibles | Generar el archivo y revisarlo | Sin imágenes; logs anonimizados; solo sale si lo mandas tú | pendiente |
 | SEG-013 | 4 | Embeddings fuera del disco | Cerrar proyecto sin elegir guardar y buscar restos | Nada en disco | pendiente |
 | SEG-014 | 1 | Sin estimación de edad | Revisar la salida, reportes y logs | Ningún dato de edad | automatizado: sidecar/tests/test_analisis.py |
+| SEG-015 | 3 | Emoji irreversible | Dos entradas distintas bajo cada emoji, con y sin silueta, y un difuminado vecino | Misma salida: las orillas transparentes muestran el relleno sólido, la caja completa queda tapada y el vecino no toma color de lo oculto | automatizado: sidecar/tests/test_efectos.py |
+| SEG-016 | 3 | Emoji alterado o ausente | Cambiar el hash esperado o el nombre de un PNG de `sidecar/recursos/emojis` | Error tipado `MODELO_NO_DISPONIBLE`; nunca se oculta con otra cosa ni se exporta | automatizado: sidecar/tests/test_efectos.py |
 
 ## Regla 1: validación de entradas (VAL)
 

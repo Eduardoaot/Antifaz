@@ -1,7 +1,7 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { catalogo, etiquetaNivel, reglaDe, urlsDeFuentes, type Nivel } from '../../app/shared/catalogo';
-import { esquemaAvisoCierre, esquemaEdicion, esquemaOcultamiento, esquemaTrazo, LIMITES, textoCierre, type Analisis, type Hallazgo, type Motivo, type Punto } from '../../app/shared/contrato';
+import { EMOJIS, ETIQUETA_EMOJI, esEmoji, esquemaAvisoCierre, esquemaEdicion, esquemaEfecto, esquemaOcultamiento, esquemaTrazo, LIMITES, textoCierre, type Analisis, type Hallazgo, type Motivo, type Punto } from '../../app/shared/contrato';
 import {
   HISTORIAL_PASOS,
   REVISION_INICIAL,
@@ -128,11 +128,45 @@ describe('ocultamientos', () => {
 
   it('todo ocultamiento cumple el contrato con el sidecar', () => {
     fc.assert(
-      fc.property(fc.integer({ min: 1, max: 100 }), fc.constantFrom('solido', 'difuminado', 'pixelado') as fc.Arbitrary<'solido'>, (intensidad, efecto) => {
+      fc.property(fc.integer({ min: 1, max: 100 }), fc.constantFrom(...esquemaEfecto.options), (intensidad, efecto) => {
         const r = elegirEfecto({ ...decidir(REVISION_INICIAL, 'a', 'ocultar'), intensidad }, 'a', efecto);
         return construirOcultamientos(r, [cara('a')]).every((o) => esquemaOcultamiento.safeParse(o).success);
       }),
     );
+  });
+});
+
+describe('emoji', () => {
+  it('cada emoji es un efecto válido con su nombre para lectores de pantalla', () => {
+    for (const e of EMOJIS) {
+      expect(esquemaEfecto.safeParse(e).success).toBe(true);
+      expect(esEmoji(e)).toBe(true);
+      expect(ETIQUETA_EMOJI[e].length).toBeGreaterThan(2);
+    }
+    for (const otro of ['solido', 'difuminado', 'pixelado'] as const) expect(esEmoji(otro)).toBe(false);
+  });
+
+  it.each(['emoji', 'emoji_perro', 'EMOJI_GATO', '😀', ''])('rechaza el efecto %j', (malo) => {
+    expect(esquemaEfecto.safeParse(malo).success).toBe(false);
+  });
+
+  it('una cara con emoji sale tal cual hacia el sidecar', () => {
+    const r = elegirEfecto(decidir(REVISION_INICIAL, 'a', 'ocultar'), 'a', 'emoji_gato');
+    expect(efectoDe(r, cara('a'))).toBe('emoji_gato');
+    expect(construirOcultamientos(r, [cara('a')])[0]?.efecto).toBe('emoji_gato');
+  });
+
+  it('una zona manual también acepta emoji', () => {
+    const r = agregarManual(REVISION_INICIAL, 'm', { x: 1, y: 1, ancho: 10, alto: 10 }, null, 'rectangulo');
+    const conEmoji = efectoDeManual(r, 'm', 'emoji_estrella');
+    expect(conEmoji.manuales[0]?.efecto).toBe('emoji_estrella');
+    expect(construirOcultamientos(conEmoji, []).every((o) => esquemaOcultamiento.safeParse(o).success)).toBe(true);
+  });
+
+  it('la recuperación tras un cierre conserva el emoji elegido', () => {
+    const r = elegirEfecto(decidir(REVISION_INICIAL, 'a', 'ocultar'), 'a', 'emoji_lentes');
+    const guardada = esquemaEdicion.parse(JSON.parse(JSON.stringify(aEdicion('3f2b6c1e-8a4d-4b7e-9c2a-1d5e6f7a8b9c', r))));
+    expect(desdeEdicion(guardada).efectos.a).toBe('emoji_lentes');
   });
 });
 

@@ -1,5 +1,6 @@
 import { useState, type SyntheticEvent } from 'react';
 import { esquemaEfecto, LIMITES } from '../../shared/contrato';
+import { OpcionesEmoji } from './OpcionesEmoji';
 import { efectoManual, leerCaja, leerPunto, textoOrigen, type Herramienta, type Caja, type Revision, type ZonaManual } from '../../shared/logica';
 
 interface Props {
@@ -106,6 +107,7 @@ export function Manual({ ancho, alto, herramienta, tamanoPincel, revision, ocupa
                     <option value="solido">Bloque sólido</option>
                     <option value="difuminado">Difuminado</option>
                     <option value="pixelado">Pixelado</option>
+                    <OpcionesEmoji />
                   </select>
                 </label>
                 <button type="button" className="boton" onClick={() => { alQuitar(z.id); }}>Quitar<span className="solo-lector"> tu zona {i + 1}</span></button>

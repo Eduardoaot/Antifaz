@@ -18,6 +18,7 @@ import {
 } from '../../shared/logica';
 import { leerEnRango } from '../../shared/numeros';
 import { DialogoPorQue } from './Dialogos';
+import { OpcionesEmoji } from './OpcionesEmoji';
 
 function IconoNivel({ nivel }: { nivel: Nivel }): React.JSX.Element {
   switch (nivel) {
@@ -161,6 +162,7 @@ export function Advertencias({ hallazgos, revision, alCambiar, alOcultarTodo, al
                       <option value="difuminado">Difuminado</option>
                       <option value="pixelado">Pixelado</option>
                       <option value="solido">Bloque sólido</option>
+                      <OpcionesEmoji />
                     </select>
                   </label>
                 </div>
@@ -194,7 +196,7 @@ export function Advertencias({ hallazgos, revision, alCambiar, alOcultarTodo, al
           <p id="ayuda-intensidad" className={leida.ok ? 'suave' : 'error-campo'} role={leida.ok ? undefined : 'alert'}>
             {!leida.ok && 'Escribe un número entero del 1 al 100. Se conserva el último valor válido.'}
             {baja && 'Con poca intensidad es más fácil reconocer lo que hay debajo. '}
-            {leida.ok && 'El difuminado y el pixelado conservan los colores de tu foto, y con herramientas especiales alguien podría reconstruir parte. Para la máxima protección, usa Bloque sólido.'}
+            {leida.ok && 'El difuminado y el pixelado conservan los colores de tu foto, y con herramientas especiales alguien podría reconstruir parte. Para la máxima protección, usa Bloque sólido o un emoji.'}
           </p>
         </div>
       )}

@@ -17,6 +17,7 @@ from .conftest import DATOS, MODELOS, oculto
 
 EFECTOS = ["solido", "difuminado", "pixelado"]
 CON_COLOR = ["difuminado", "pixelado"]
+EMOJIS = ["emoji_sonrisa", "emoji_lentes", "emoji_gato", "emoji_estrella"]
 
 
 def _imagen(alto: int = 200, ancho: int = 300, canales: int = 3, valor: int | None = None) -> np.ndarray:
@@ -91,7 +92,7 @@ def test_es_determinista_para_que_la_vista_previa_coincida() -> None:
     assert np.array_equal(efectos.aplicar(a, lista)[0], efectos.aplicar(a, lista)[0])
 
 
-@pytest.mark.parametrize("efecto", EFECTOS)
+@pytest.mark.parametrize("efecto", EFECTOS + EMOJIS)
 def test_fuera_de_la_zona_no_cambia_y_entrada_intacta(efecto: str) -> None:
     a = _imagen()
     copia = a.copy()
@@ -227,7 +228,7 @@ def test_rgb_bajo_alfa_parcial_se_conserva() -> None:
 
 @given(
     imagen=arrays(np.uint8, st.tuples(st.integers(1, 80), st.integers(1, 80), st.just(3))),
-    efecto=st.sampled_from(EFECTOS),
+    efecto=st.sampled_from(EFECTOS + EMOJIS),
     datos=st.tuples(st.floats(0, 0.9), st.floats(0, 0.9), st.floats(0.05, 1), st.floats(0.05, 1)),
     intensidad=st.integers(1, 100),
 )
@@ -247,3 +248,85 @@ def test_propiedad_cualquier_mascara_valida(
     assert np.array_equal(salida[fuera], imagen[fuera])
     if efecto == "solido":
         assert salida[y0:y1, x0:x1].max() == 0
+
+
+# --- Emoji: se dibuja sobre bloque sólido, así que es tan irreversible como él ----------------------
+
+
+@pytest.mark.parametrize("efecto", EMOJIS)
+def test_emoji_es_irreversible_el_contenido_no_influye(efecto: str) -> None:
+    """Las orillas del emoji son transparentes: debajo debe haber negro, nunca la foto."""
+    a = _imagen()
+    b = a.copy()
+    b[52:128, 72:188] = 255 - b[52:128, 72:188]
+    o = oculto(80, 60, 100, 60, efecto)
+    salida_a, regiones = efectos.aplicar(a, [o])
+    salida_b, _ = efectos.aplicar(b, [o])
+    assert np.array_equal(salida_a, salida_b), "lo original se filtró a la salida"
+    x0, y0, x1, y1 = regiones[0]
+    assert salida_a[y0:y1, x0:x1].max() > 0, "no se dibujó el emoji"
+
+
+@pytest.mark.parametrize("efecto", EMOJIS)
+def test_emoji_cubre_toda_la_caja_aunque_haya_silueta(efecto: str) -> None:
+    """Con silueta, los demás efectos respetan su forma; el emoji tapa la caja completa."""
+    a = _imagen()
+    b = a.copy()
+    b[52:128, 72:188] = 255 - b[52:128, 72:188]
+    silueta = np.zeros((60, 100), dtype=bool)
+    silueta[20:40, 30:70] = True
+    o = oculto(80, 60, 100, 60, efecto, mascara_id="m")
+    salida_a, _ = efectos.aplicar(a, [o], {"m": silueta})
+    salida_b, _ = efectos.aplicar(b, [o], {"m": silueta})
+    assert np.array_equal(salida_a, salida_b)
+
+
+def test_difuminado_no_toma_color_de_un_emoji_vecino() -> None:
+    a = _imagen(100, 400, valor=0)
+    b = a.copy()
+    b[32:68, 82:118] = 255
+    lista = [oculto(40, 40, 20, 20, "difuminado"), oculto(90, 40, 20, 20, "emoji_gato")]
+    assert np.array_equal(efectos.aplicar(a, lista)[0], efectos.aplicar(b, lista)[0])
+
+
+@pytest.mark.parametrize("efecto", EMOJIS)
+def test_emoji_vuelve_opaca_la_zona(efecto: str) -> None:
+    a = _imagen(60, 60, canales=4)
+    a[:, :, 3] = 0
+    salida, regiones = efectos.aplicar(a, [oculto(20, 20, 20, 20, efecto)])
+    x0, y0, x1, y1 = regiones[0]
+    assert (salida[y0:y1, x0:x1, 3] == 255).all()
+
+
+@pytest.mark.parametrize(("ancho", "alto"), [(1, 1), (90, 1), (1, 90), (300, 200)])
+def test_emoji_en_cajas_extremas(ancho: int, alto: int) -> None:
+    a = _imagen(alto, ancho)
+    salida, _ = efectos.aplicar(a, [oculto(0, 0, ancho, alto, "emoji_sonrisa")])
+    assert salida.shape == a.shape
+
+
+def test_los_emojis_del_esquema_tienen_archivo() -> None:
+    from typing import get_args
+
+    from revisor import emojis
+    from revisor.esquemas import TipoEmoji
+
+    assert set(emojis.ARCHIVOS) == set(get_args(TipoEmoji)) == set(EMOJIS)
+
+
+@pytest.mark.parametrize("cambio", ["hash", "archivo"])
+def test_emoji_alterado_o_ausente_detiene_sin_ocultar_con_otra_cosa(
+    cambio: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from revisor import emojis
+
+    nombre, sha256 = emojis.ARCHIVOS["emoji_sonrisa"]
+    malo = (nombre, "0" * 64) if cambio == "hash" else ("no_existe.png", sha256)
+    emojis.cargar.cache_clear()
+    monkeypatch.setitem(emojis.ARCHIVOS, "emoji_sonrisa", malo)
+    try:
+        with pytest.raises(ErrorRevisor) as e:
+            efectos.aplicar(_imagen(), [oculto(80, 60, 100, 60, "emoji_sonrisa")])
+        assert e.value.codigo is Codigo.MODELO_NO_DISPONIBLE
+    finally:
+        emojis.cargar.cache_clear()

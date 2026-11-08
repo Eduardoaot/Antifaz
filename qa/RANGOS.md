@@ -45,13 +45,13 @@ Cada parámetro de este archivo tiene pruebas parametrizadas de mínimo-1, míni
 
 | Parámetro | Tipo | Mín | Máx | Default | Ante un valor inválido |
 |---|---|---|---|---|---|
-| `efecto.tipo` | enum: `solido`, `difuminado`, `pixelado`, `emoji` | n/a | n/a | `solido` para texto, códigos, documentos y matrículas; `difuminado` para caras | Estándar. Un tipo desconocido nunca cae en "sin efecto" |
+| `efecto.tipo` | enum: `solido`, `difuminado`, `pixelado`, `emoji_sonrisa`, `emoji_lentes`, `emoji_gato`, `emoji_estrella` | n/a | n/a | `solido` para texto, códigos, documentos y matrículas; `difuminado` para caras | Estándar. Un tipo desconocido nunca cae en "sin efecto" |
 | `efecto.intensidad` | entero, % | 1 | 100 | 80 | Estándar. En difuminado y pixelado, menos intensidad es más fácil de reconocer |
 | `efecto.aviso_intensidad_baja` | entero, % | 1 | 100 | 30 (propuesta) | Estándar. Por debajo de este valor se avisa: "Con poca intensidad es más fácil reconocer lo que hay debajo" |
 | `efecto.sigma_px` | decimal, px | 25 | 1000 | max(25, 25% del lado corto de la región) | Estándar |
 | `efecto.pixel_px` | entero, px | 8 (propuesta) | 256 (propuesta) | max(16, 10% del lado corto de la región) (propuesta) | Estándar. Cada bloque toma el color promedio de lo que cubre |
 | `efecto.color_solido` | enum de colores fijos | n/a | n/a | Negro | Estándar. Nunca se usa el promedio de la región: es lo que lo hace irreversible |
-| `efecto.emoji` | enum de emojis incluidos | n/a | n/a | Primero de la lista | Estándar. Se dibuja sobre relleno sólido |
+| `efecto.emoji` | Cada emoji es un valor de `efecto.tipo` (ver `sidecar/recursos/emojis/ORIGEN.md`) | n/a | n/a | Ninguno: la persona lo elige | Estándar. Se dibuja sobre relleno sólido, centrado y cubriendo la caja completa aunque haya silueta. Un PNG con hash distinto detiene la operación |
 
 ## Máscaras
 

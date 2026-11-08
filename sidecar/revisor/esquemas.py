@@ -5,7 +5,7 @@ Los límites vienen de qa/RANGOS.md. Si cambias uno, cambia también ese documen
 
 from __future__ import annotations
 
-from typing import Annotated, Literal
+from typing import Annotated, Literal, get_args
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -23,7 +23,14 @@ class Estricto(BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid", allow_inf_nan=False)
 
 
-TipoEfecto = Literal["solido", "difuminado", "pixelado"]
+# Cada emoji es un efecto propio: así la recuperación, las zonas manuales y el video lo aceptan igual.
+# Coinciden con EMOJIS de app/shared/contrato.ts y con los archivos de revisor/emojis.py.
+TipoEmoji = Literal["emoji_sonrisa", "emoji_lentes", "emoji_gato", "emoji_estrella"]
+TipoEfecto = Literal["solido", "difuminado", "pixelado"] | TipoEmoji
+
+
+def es_emoji(efecto: str) -> bool:
+    return efecto in get_args(TipoEmoji)
 
 
 class Ocultamiento(Estricto):
