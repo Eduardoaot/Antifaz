@@ -83,10 +83,10 @@ Valores en `brand/tokens.json`. Compruébalos con `tools/revisar_contraste.py`.
 
 ## Tipografía
 
-Máximo dos familias, ambas OFL 1.1 e incluidas en la app, sin CDN.
+Una sola familia en la interfaz, OFL 1.1 e incluida en la app, sin CDN. Decisión del responsable (2026-11-08): antes la interfaz usaba Atkinson Hyperlegible Next e Inter solo para cifras.
 
-- **Atkinson Hyperlegible Next:** toda la interfaz.
-- **Inter:** cifras y tiempos, con numerales tabulares. "Inter" es nombre reservado según su README: se distribuye sin modificar ni crear subconjuntos.
+- **Inter:** toda la interfaz. Cifras y tiempos con numerales tabulares. "Inter" es nombre reservado según su README: se distribuye sin modificar ni crear subconjuntos.
+- **Atkinson Hyperlegible Next:** ya no se usa en la interfaz. Se conserva en `brand/fonts/` porque `tools/generar_logo.py` dibuja con ella el texto del logotipo, y las pruebas de OCR y las muestras E2E la usan para dibujar texto.
 
 Archivos y licencias en `brand/fonts/`. Comprobado con fontTools: ambas incluyen `ñ á é í ó ú ü ¿ ¡` y sus mayúsculas.
 

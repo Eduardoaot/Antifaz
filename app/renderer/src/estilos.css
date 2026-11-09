@@ -1,9 +1,4 @@
-@font-face {
-  font-family: 'Atkinson Hyperlegible Next';
-  src: url('../../../brand/fonts/AtkinsonHyperlegibleNext-Variable.ttf') format('truetype');
-  font-weight: 200 800;
-  font-display: swap;
-}
+/* Una sola familia en toda la interfaz. Va dentro de la app: sin CDN ni internet. */
 @font-face {
   font-family: 'Inter';
   src: url('../../../brand/fonts/Inter-Variable.ttf') format('truetype');
@@ -16,7 +11,7 @@ html, body, #raiz { height: 100%; margin: 0; }
 body {
   background: var(--fondo);
   color: var(--texto);
-  font: 400 1rem/1.5 'Atkinson Hyperlegible Next', 'Segoe UI', system-ui, sans-serif;
+  font: 400 1rem/1.5 'Inter', 'Segoe UI', system-ui, sans-serif;
 }
 h1, h2, h3, p { margin: 0; }
 h1 { font-size: 1.5rem; line-height: 1.2; }
