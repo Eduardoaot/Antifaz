@@ -16,6 +16,10 @@ export const LIMITES = {
   pincel: { min: 1, max: 512, porDefecto: 32 },
   /** Zoom del visor: 1 es "ajustar a la ventana". Solo cambia la vista, nunca la exportación. */
   zoom: { min: 1, max: 8, porDefecto: 1 },
+  /** Comparar antes y después: porcentaje del ancho que muestra la original. Solo cambia la vista. */
+  comparacion: { min: 0, max: 100, porDefecto: 50 },
+  /** Si una zona empieza a menos de esto del borde superior (en % del alto), su número va abajo. */
+  margenEtiqueta: 8,
   /** Al ajustar a la ventana, una foto chica no se estira más de esto: se vería suave y con artefactos. */
   ajusteMaxEscala: 2,
   puntosTrazo: 5000,

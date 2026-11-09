@@ -509,6 +509,27 @@ export function pasoZoom(actual: number, direccion: 1 | -1): number {
 
 export const textoZoom = (z: number): string => `${Math.round(limitarZoom(z) * 100)} %`;
 
+/** Corte de la comparación antes/después, en % del ancho. Un valor no finito vuelve a la mitad. */
+export function limitarCorte(v: number): number {
+  if (!Number.isFinite(v)) return LIMITES.comparacion.porDefecto;
+  return Math.min(LIMITES.comparacion.max, Math.max(LIMITES.comparacion.min, Math.round(v)));
+}
+
+/** Dónde va el número de una zona para no tapar lo que marca. */
+export type LadoEtiqueta = 'arriba' | 'abajo' | 'dentro';
+
+/**
+ * Por defecto, encima de la zona. Si la zona toca el borde superior, debajo. Si ocupa casi todo el
+ * alto, dentro, porque fuera de la imagen no se vería. Las medidas van en píxeles de la foto.
+ */
+export function ladoEtiqueta(caja: Caja, altoImagen: number): LadoEtiqueta {
+  if (!(altoImagen > 0)) return 'dentro';
+  const margen = (LIMITES.margenEtiqueta / 100) * altoImagen;
+  if (caja.y >= margen) return 'arriba';
+  if (caja.y + caja.alto <= altoImagen - margen) return 'abajo';
+  return 'dentro';
+}
+
 /**
  * Ancho en pantalla de la imagen al 100 %: lo más grande que cabe. Sin alto disponible, manda el ancho.
  * Una foto chica no se estira más de `maxEscala` veces su tamaño real; para verla más grande está el zoom.

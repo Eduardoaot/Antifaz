@@ -870,6 +870,55 @@ for (const tema of ['claro', 'oscuro'] as const) {
   });
 }
 
+for (const tema of ['claro', 'oscuro'] as const) {
+  test(`visor: comparar antes y después y números fuera de la zona, tema ${tema}`, async () => {
+    sesion = await lanzar();
+    const { pagina } = sesion;
+    await pagina.getByLabel('Tema').selectOption(tema);
+    await abrir(sesion, [m('cara con ñ.jpg')]);
+    await expect(veredicto(pagina)).toBeVisible({ timeout: 60_000 });
+    const fila = pagina.locator('[data-regla="CAR-01"]');
+    await fila.getByRole('button', { name: /^Ocultar/ }).click();
+    const zona = await fila.getAttribute('data-zona');
+    if (zona === null) throw new Error('la fila de la cara no tiene zona');
+    const marca = pagina.locator(`[data-marca="${zona}"]`);
+    await expect(marca).toHaveClass(/ocultar/);
+
+    // El número no tapa la cara: queda fuera de la caja de la zona.
+    const caja = await marca.boundingBox();
+    const numero = await marca.locator('span').boundingBox();
+    if (caja === null || numero === null) throw new Error('sin marca');
+    expect(numero.y + numero.height <= caja.y || numero.y >= caja.y + caja.height).toBe(true);
+
+    // Comparar: aparece la original, se ocultan las marcas y las herramientas no actúan.
+    const comparar = pagina.getByRole('button', { name: 'Comparar antes y después' });
+    await comparar.click();
+    await expect(comparar).toHaveAttribute('aria-pressed', 'true');
+    const original = pagina.locator('img.original');
+    await expect(original).toBeVisible();
+    await expect(pagina.locator('.marca')).toHaveCount(0);
+    const corte = pagina.getByLabel('Original a la izquierda, tu copia a la derecha');
+    await corte.fill('20');
+    await expect(original).toHaveAttribute('style', /inset\(0px 80%|inset\(0 80%/);
+    await sinViolaciones(pagina);
+    await pagina.screenshot({ path: join(CAPTURAS, `${tema}-visor-comparar.png`) });
+
+    await pagina.getByRole('button', { name: 'Dibujar rectángulo' }).click();
+    const lienzo = await pagina.getByTestId('lienzo').boundingBox();
+    if (lienzo === null) throw new Error('sin lienzo');
+    await pagina.mouse.move(lienzo.x + lienzo.width * 0.6, lienzo.y + lienzo.height * 0.6);
+    await pagina.mouse.down();
+    await pagina.mouse.move(lienzo.x + lienzo.width * 0.9, lienzo.y + lienzo.height * 0.9, { steps: 5 });
+    await pagina.mouse.up();
+    await expect(pagina.locator('[data-manual]')).toHaveCount(0);
+
+    // Al salir, vuelven las marcas y la original desaparece.
+    await comparar.click();
+    await expect(original).toHaveCount(0);
+    await expect(marca).toBeVisible();
+  });
+}
+
 test('cambiar el tema con la app abierta cambia los colores sin reiniciar', async () => {
   sesion = await lanzar();
   const { pagina } = sesion;

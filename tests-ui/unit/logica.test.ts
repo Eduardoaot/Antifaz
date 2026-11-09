@@ -48,6 +48,8 @@ import {
   NIVELES_ZOOM,
   anchoAjustado,
   desplazamientoAnclado,
+  ladoEtiqueta,
+  limitarCorte,
   limitarZoom,
   pasoZoom,
   textoZoom,
@@ -640,6 +642,23 @@ describe('visor: zoom', () => {
         return z >= LIMITES.zoom.min && z <= LIMITES.zoom.max && (NIVELES_ZOOM as readonly number[]).includes(z);
       }),
     );
+  });
+
+  it.each([
+    [-1, 0], [0, 0], [0.4, 0], [50, 50], [99.6, 100], [100, 100], [101, 100],
+    [Number.NaN, 50], [Number.POSITIVE_INFINITY, 50], [Number.NEGATIVE_INFINITY, 50],
+  ])('limitarCorte(%s) = %s', (entrada, esperado) => {
+    expect(limitarCorte(entrada)).toBe(esperado);
+  });
+
+  it('el número de una zona va arriba, abajo si toca el borde superior, y dentro si no cabe fuera', () => {
+    // Imagen de 1000 px de alto: el margen es 80 px.
+    expect(ladoEtiqueta({ x: 0, y: 80, ancho: 10, alto: 10 }, 1000)).toBe('arriba');
+    expect(ladoEtiqueta({ x: 0, y: 79, ancho: 10, alto: 10 }, 1000)).toBe('abajo');
+    expect(ladoEtiqueta({ x: 0, y: 0, ancho: 10, alto: 920 }, 1000)).toBe('abajo');
+    expect(ladoEtiqueta({ x: 0, y: 0, ancho: 10, alto: 921 }, 1000)).toBe('dentro');
+    expect(ladoEtiqueta({ x: 0, y: 0, ancho: 10, alto: 10 }, 0)).toBe('dentro');
+    expect(ladoEtiqueta({ x: 0, y: 0, ancho: 10, alto: 10 }, Number.NaN)).toBe('dentro');
   });
 
   it('muestra el nivel en porcentaje', () => {

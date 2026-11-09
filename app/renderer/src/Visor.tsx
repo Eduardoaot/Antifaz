@@ -1,4 +1,4 @@
-import { Maximize, ZoomIn, ZoomOut } from 'lucide-react';
+import { Maximize, SquareSplitHorizontal, ZoomIn, ZoomOut } from 'lucide-react';
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import { LIMITES, type Hallazgo, type Ocultamiento, type Punto } from '../../shared/contrato';
 import {
@@ -7,6 +7,8 @@ import {
   aPuntoDeImagen,
   cajaEntre,
   desplazamientoAnclado,
+  ladoEtiqueta,
+  limitarCorte,
   limitarZoom,
   pasoZoom,
   textoZoom,
@@ -78,6 +80,12 @@ export function Visor({ archivo, hallazgos, ocultamientos, revision, herramienta
   const [zoom, setZoom] = useState<number>(LIMITES.zoom.porDefecto);
   const [ajuste, setAjuste] = useState<number | null>(null);
   const [arrastrando, setArrastrando] = useState(false);
+  // Comparar antes y después. La original se pide al sidecar con cero ocultamientos, solo al comparar.
+  const [comparando, setComparando] = useState(false);
+  const [urlOriginal, setUrlOriginal] = useState<string | null>(null);
+  const [errorOriginal, setErrorOriginal] = useState<string | null>(null);
+  const [corte, setCorte] = useState<number>(LIMITES.comparacion.porDefecto);
+  const moviendoCorte = useRef(false);
   const lienzo = useRef<HTMLDivElement | null>(null);
   const ventana = useRef<HTMLDivElement | null>(null);
   const ancla = useRef<{ fx: number; fy: number; vx: number; vy: number } | null>(null);
@@ -104,6 +112,41 @@ export function Visor({ archivo, hallazgos, ocultamientos, revision, herramienta
       if (creada !== null) URL.revokeObjectURL(creada);
     };
   }, [id, clave]);
+
+  // La original no cambia con las decisiones: se pide una vez y se libera al salir de esta foto.
+  const pedirOriginal = comparando && urlOriginal === null && errorOriginal === null;
+  useEffect(() => {
+    if (!pedirOriginal) return undefined;
+    let vigente = true;
+    window.revisor.vista(id, []).then((resultado) => {
+      if (!vigente) return;
+      if (resultado.ok) {
+        setUrlOriginal(URL.createObjectURL(new Blob([new Uint8Array(resultado.datos.datos)], { type: resultado.datos.mime })));
+      } else {
+        setErrorOriginal(resultado.error.mensaje);
+      }
+    }, () => {
+      if (vigente) setErrorOriginal('Inténtalo de nuevo en un momento.');
+    });
+    return () => {
+      vigente = false;
+    };
+  }, [id, pedirOriginal]);
+  useEffect(() => () => {
+    if (urlOriginal !== null) URL.revokeObjectURL(urlOriginal);
+  }, [urlOriginal]);
+
+  const alternarComparar = (): void => {
+    setComparando((c) => !c);
+    // Si falló antes, al volver a pedir la comparación se intenta otra vez.
+    setErrorOriginal(null);
+  };
+
+  const corteEn = (clienteX: number): void => {
+    const rect = lienzo.current?.getBoundingClientRect();
+    if (rect === undefined || rect.width <= 0) return;
+    setCorte(limitarCorte(((clienteX - rect.left) / rect.width) * 100));
+  };
 
   // Tamaño al 100 %: lo más grande que cabe en la ventana. Se vuelve a medir si la ventana cambia.
   useEffect(() => {
@@ -210,7 +253,7 @@ export function Visor({ archivo, hallazgos, ocultamientos, revision, herramienta
 
   const alBajar = (e: PointerEvent): void => {
     // Botón central siempre, o "Solo ver" con el principal: mover la imagen.
-    if (e.button === 1 || (herramienta === 'ninguna' && e.button === 0)) {
+    if (e.button === 1 || (!comparando && herramienta === 'ninguna' && e.button === 0)) {
       const v = ventana.current;
       if (v === null) return;
       if (e.button === 1) e.preventDefault();
@@ -219,6 +262,13 @@ export function Visor({ archivo, hallazgos, ocultamientos, revision, herramienta
       return;
     }
     if (e.button !== 0) return;
+    // Al comparar, las herramientas no actúan: el botón principal mueve la línea.
+    if (comparando) {
+      moviendoCorte.current = true;
+      corteEn(e.clientX);
+      e.currentTarget.setPointerCapture(e.pointerId);
+      return;
+    }
     if (herramienta === 'rectangulo') {
       const p = punto(e);
       setInicio(p);
@@ -247,6 +297,10 @@ export function Visor({ archivo, hallazgos, ocultamientos, revision, herramienta
       }
       return;
     }
+    if (comparando) {
+      if (moviendoCorte.current) corteEn(e.clientX);
+      return;
+    }
     if (trazo !== null) {
       const rect = lienzo.current?.getBoundingClientRect();
       // Al salirse con el pincel, el trazo sigue por el borde: no se pinta fuera de la imagen.
@@ -272,6 +326,10 @@ export function Visor({ archivo, hallazgos, ocultamientos, revision, herramienta
         const zona = p === null ? null : zonaEnPunto(p.x, p.y, zonas);
         if (zona !== null) alElegirZona(zona);
       }
+      return;
+    }
+    if (comparando) {
+      moviendoCorte.current = false;
       return;
     }
     if (herramienta === 'clic') {
@@ -305,7 +363,11 @@ export function Visor({ archivo, hallazgos, ocultamientos, revision, herramienta
 
   const dibujo = inicio !== null && actual !== null ? cajaEntre(inicio, actual) : null;
   const claseMarca = (zona: string): string => (resaltado?.id === zona ? ' resaltada' : '');
-  const sobreZona = herramienta === 'ninguna' && resaltado?.origen === 'imagen';
+  const sobreZona = !comparando && herramienta === 'ninguna' && resaltado?.origen === 'imagen';
+  // Mientras se dibuja o pinta, los números se apartan para no estorbar.
+  const dibujando = inicio !== null || trazo !== null;
+  const etiqueta = (caja: Caja): string => `etiqueta-${ladoEtiqueta(caja, alto)}`;
+  const original = comparando ? urlOriginal : null;
 
   if (error !== null) return <p role="alert">No pudimos mostrar la vista previa. {error}</p>;
   if (url === null) return <p className="suave">Preparando la vista previa…</p>;
@@ -322,10 +384,16 @@ export function Visor({ archivo, hallazgos, ocultamientos, revision, herramienta
         <button type="button" className="boton compacto" disabled={!ampliada} onClick={() => { cambiarZoom(LIMITES.zoom.min); }}>
           <Maximize aria-hidden="true" /> Ajustar
         </button>
+        <span className="separador" aria-hidden="true" />
+        <button type="button" className="boton compacto" aria-pressed={comparando} onClick={alternarComparar}>
+          <SquareSplitHorizontal aria-hidden="true" /> Comparar antes y después
+        </button>
         <span className="suave pista-zoom" id="pista-zoom">
-          {ampliada
-            ? herramienta === 'ninguna' ? 'Arrastra la imagen para moverte.' : 'Muévete con la rueda, las barras o el botón central del mouse.'
-            : 'Ctrl + rueda o las teclas + y − para acercar.'}
+          {comparando
+            ? 'Arrastra la línea o usa el control de abajo. Las herramientas están en pausa.'
+            : ampliada
+              ? herramienta === 'ninguna' ? 'Arrastra la imagen para moverte.' : 'Muévete con la rueda, las barras o el botón central del mouse.'
+              : 'Ctrl + rueda o las teclas + y − para acercar.'}
         </span>
       </div>
       <div
@@ -339,28 +407,37 @@ export function Visor({ archivo, hallazgos, ocultamientos, revision, herramienta
       >
         <div
           ref={lienzo}
-          className={`lienzo herramienta-${herramienta}${arrastrando ? ' arrastrando' : ''}${sobreZona ? ' sobre-zona' : ''}`}
+          className={`lienzo ${comparando ? 'comparando' : `herramienta-${herramienta}`}${arrastrando ? ' arrastrando' : ''}${sobreZona ? ' sobre-zona' : ''}${dibujando ? ' dibujando' : ''}`}
           style={{ aspectRatio: `${ancho} / ${alto}`, width: ajuste === null ? '100%' : `${Math.round(ajuste * zoom)}px` }}
           data-testid="lienzo"
           onPointerDown={alBajar}
           onPointerMove={alMover}
           onPointerUp={alSoltar}
           onPointerLeave={() => { if (resaltado?.origen === 'imagen') alResaltar?.(null); }}
-          onPointerCancel={() => { arrastre.current = null; setArrastrando(false); setTrazo(null); setInicio(null); setActual(null); }}
+          onPointerCancel={() => { arrastre.current = null; moviendoCorte.current = false; setArrastrando(false); setTrazo(null); setInicio(null); setActual(null); }}
         >
           <img src={url} draggable={false} alt={`Vista previa de ${nombre}. El detalle está en el panel de advertencias.`} />
-          {conCaja.map((h, i) => {
+          {original !== null && (
+            <>
+              {/* La parte izquierda muestra la original; la derecha, la copia con lo que decidiste ocultar. */}
+              <img className="original" src={original} draggable={false} alt={`Original de ${nombre}, sin ocultar nada, en el ${corte} % izquierdo.`} style={{ clipPath: `inset(0 ${100 - corte}% 0 0)` }} />
+              <div className="corte" aria-hidden="true" style={{ left: `${corte}%` }}><span /></div>
+              {corte >= 15 && <span className="rotulo antes" aria-hidden="true">Original</span>}
+              {corte <= 85 && <span className="rotulo despues" aria-hidden="true">Tu copia</span>}
+            </>
+          )}
+          {!comparando && conCaja.map((h, i) => {
             const caja = h.caja;
             if (caja === null) return null;
             return (
               <div key={h.id} aria-hidden="true" data-marca={h.id} className={`marca ${revision?.decisiones[h.id] ?? 'sin-decidir'}${claseMarca(h.id)}`} style={porcentajes(caja, ancho, alto)}>
-                <span>{i + 1}</span>
+                <span className={etiqueta(caja)}>{i + 1}</span>
               </div>
             );
           })}
-          {revision?.manuales.map((z, i) => (
+          {!comparando && revision?.manuales.map((z, i) => (
             <div key={z.id} aria-hidden="true" data-marca={z.id} className={`marca ocultar manual${claseMarca(z.id)}`} style={porcentajes(z, ancho, alto)}>
-              <span>T{i + 1}</span>
+              <span className={etiqueta(z)}>T{i + 1}</span>
             </div>
           ))}
           {dibujo !== null && <div aria-hidden="true" className="marca sin-decidir" style={porcentajes(dibujo, ancho, alto)} />}
@@ -377,6 +454,28 @@ export function Visor({ archivo, hallazgos, ocultamientos, revision, herramienta
           )}
         </div>
       </div>
+      {comparando && (
+        <div className="barra-comparar">
+          {errorOriginal !== null ? (
+            <p role="alert">No pudimos mostrar la original. {errorOriginal}</p>
+          ) : urlOriginal === null ? (
+            <p className="suave" role="status">Preparando la original…</p>
+          ) : (
+            <>
+              <label htmlFor="corte-comparacion">Original a la izquierda, tu copia a la derecha</label>
+              <input
+                id="corte-comparacion"
+                type="range"
+                min={LIMITES.comparacion.min}
+                max={LIMITES.comparacion.max}
+                value={corte}
+                aria-valuetext={`${corte} % original`}
+                onChange={(e) => { setCorte(limitarCorte(Number(e.target.value))); }}
+              />
+            </>
+          )}
+        </div>
+      )}
       <figcaption className="suave">{ancho} × {alto} px · {archivo.info.formato}</figcaption>
     </figure>
   );
