@@ -114,22 +114,24 @@ input[aria-invalid='true'] { border: 2px solid var(--riesgo-alto); }
 .visor { margin: 0; display: grid; gap: 0.75rem; min-width: 0; }
 .visor figcaption { margin-top: -0.25rem; }
 /*
- * Área de trabajo: gris medio-oscuro sin tinte, igual en los dos temas, como en los editores de fotos.
- * Ocupa todo el ancho de la columna y se adapta al alto de la foto hasta un tope, así una foto
- * apaisada no deja bandas vacías. Al acercarla, se mueve dentro sin mover la página.
+ * Área de trabajo: gris neutro casi igual al fondo, para que no se note como un bloque. Ocupa todo el
+ * ancho de la columna y se adapta al alto de la foto hasta un tope, así una foto apaisada no deja
+ * bandas vacías. Al acercarla, se mueve dentro sin mover la página.
  */
 .ventana-lienzo {
   display: flex; min-width: 0; max-height: calc(100vh - 16rem); min-height: 15rem;
   overflow: auto; border-radius: 12px;
   padding: 1.5rem; background: var(--lienzo);
-  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.06);
 }
 /* El espacio de la barra se reserva solo cuando hay barra: al 100 % el margen queda parejo. */
 .ventana-lienzo.ampliada { scrollbar-gutter: stable; }
-/* La foto es un objeto sobre la mesa: esquinas rectas, un contorno tenue y una sombra. */
+/* La foto se separa del área solo con una sombra suave; en oscuro, con un contorno tenue. */
 .lienzo {
   position: relative; flex: none; margin: auto;
-  box-shadow: 0 0 0 1px rgb(255 255 255 / 0.08), 0 4px 16px rgb(0 0 0 / 0.35);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.08), 0 4px 14px rgb(0 0 0 / 0.08);
+}
+@media (prefers-color-scheme: dark) {
+  .lienzo { box-shadow: 0 0 0 1px rgb(255 255 255 / 0.06), 0 4px 16px rgb(0 0 0 / 0.4); }
 }
 .lienzo img { display: block; width: 100%; height: 100%; }
 .visor figcaption { font: 400 0.875rem 'Inter', 'Segoe UI', sans-serif; font-variant-numeric: tabular-nums; }

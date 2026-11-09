@@ -29,7 +29,7 @@ PARES = [
     # superficie-2: filas y campos dentro de un panel.
     ("texto", "superficie-2", 4.5), ("texto-suave", "superficie-2", 4.5), ("marca", "superficie-2", 4.5),
     ("borde-control", "superficie-2", 3), ("foco", "superficie-2", 3),
-    # lienzo: gris medio-oscuro sin tinte detrás de la foto, igual en los dos temas. No tiene mínimo: es una
+    # lienzo: gris neutro detrás de la foto, casi igual al fondo en cada tema. No tiene mínimo: es una
     # región decorativa y la foto ya la identifica (WCAG 1.4.11 pide 3:1 solo a lo necesario para reconocer
     # un control o su estado). Sobre él solo hay foto y marcas con doble contorno blanco y negro, que se ven
     # sobre cualquier color. El anillo de foco del área se dibuja por fuera (outline-offset), sobre el
