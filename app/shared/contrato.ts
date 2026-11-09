@@ -14,6 +14,8 @@ export const LIMITES = {
   jpegCalidad: { min: 60, max: 100, porDefecto: 92 },
   ladoVista: 1600,
   pincel: { min: 1, max: 512, porDefecto: 32 },
+  /** Zoom del visor: 1 es "ajustar a la ventana". Solo cambia la vista, nunca la exportación. */
+  zoom: { min: 1, max: 8, porDefecto: 1 },
   puntosTrazo: 5000,
   // Video (Fase 3). Coinciden con sidecar/revisor/esquemas.py.
   videoPistas: 50,

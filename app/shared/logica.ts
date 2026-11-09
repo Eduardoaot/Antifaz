@@ -482,3 +482,57 @@ export function hayCambios(r: Revision): boolean {
     r.intensidad !== LIMITES.intensidad.porDefecto
   );
 }
+
+// --- Visor: zoom y zona resaltada ---------------------------------------------------------------
+
+/** Niveles del zoom del visor. El 1 es "ajustar a la ventana". */
+export const NIVELES_ZOOM = [1, 1.5, 2, 3, 4, 6, 8] as const;
+
+/** Lo que está resaltado a la vez en la imagen y en el panel, y de dónde vino. */
+export interface Resaltado {
+  id: string;
+  /** Solo "foco" (teclado) mueve la imagen para mostrar la zona: con el mouse sería brusco. */
+  origen: 'mouse' | 'foco' | 'imagen';
+}
+
+export function limitarZoom(z: number): number {
+  if (!Number.isFinite(z)) return LIMITES.zoom.porDefecto;
+  return Math.min(LIMITES.zoom.max, Math.max(LIMITES.zoom.min, z));
+}
+
+/** El siguiente nivel hacia arriba o hacia abajo. En los extremos se queda donde está. */
+export function pasoZoom(actual: number, direccion: 1 | -1): number {
+  const z = limitarZoom(actual);
+  if (direccion === 1) return NIVELES_ZOOM.find((n) => n > z + 1e-9) ?? LIMITES.zoom.max;
+  return [...NIVELES_ZOOM].reverse().find((n) => n < z - 1e-9) ?? LIMITES.zoom.min;
+}
+
+export const textoZoom = (z: number): string => `${Math.round(limitarZoom(z) * 100)} %`;
+
+/** Ancho en pantalla de la imagen al 100 %: lo más grande que cabe. Sin alto disponible, manda el ancho. */
+export function anchoAjustado(disponibleAncho: number, disponibleAlto: number | null, ancho: number, alto: number): number | null {
+  if (!(disponibleAncho > 0) || ancho <= 0 || alto <= 0) return null;
+  const porAlto = disponibleAlto !== null && disponibleAlto > 0 ? (disponibleAlto * ancho) / alto : Number.POSITIVE_INFINITY;
+  return Math.max(1, Math.floor(Math.min(disponibleAncho, porAlto)));
+}
+
+/**
+ * Desplazamiento para que el punto que estaba bajo el cursor siga ahí después del zoom.
+ * `fraccion` es dónde cae el punto en la imagen (0 a 1) y `enVentana`, dónde cae en la parte visible.
+ */
+export function desplazamientoAnclado(fraccion: number, enVentana: number, tamanoNuevo: number, visible: number): number {
+  const maximo = Math.max(0, tamanoNuevo - visible);
+  const ideal = fraccion * tamanoNuevo - enVentana;
+  return Number.isFinite(ideal) ? Math.min(maximo, Math.max(0, ideal)) : 0;
+}
+
+/** La zona bajo un punto de la imagen. Si hay varias, la más chica: es la que se quiso señalar. */
+export function zonaEnPunto(x: number, y: number, zonas: readonly { id: string; caja: Caja }[]): string | null {
+  let elegida: { id: string; area: number } | null = null;
+  for (const { id, caja } of zonas) {
+    const dentro = x >= caja.x && y >= caja.y && x < caja.x + caja.ancho && y < caja.y + caja.alto;
+    const area = caja.ancho * caja.alto;
+    if (dentro && (elegida === null || area < elegida.area)) elegida = { id, area };
+  }
+  return elegida?.id ?? null;
+}

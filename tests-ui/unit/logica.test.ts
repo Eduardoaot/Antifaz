@@ -45,6 +45,13 @@ import {
   tituloVeredicto,
   veredicto,
   type Veredicto,
+  NIVELES_ZOOM,
+  anchoAjustado,
+  desplazamientoAnclado,
+  limitarZoom,
+  pasoZoom,
+  textoZoom,
+  zonaEnPunto,
 } from '../../app/shared/logica';
 
 const cara = (id: string, x = 10): Hallazgo => ({
@@ -598,5 +605,89 @@ describe('aviso de cierre con cambios sin exportar', () => {
   it('acepta ambos valores válidos', () => {
     expect(esquemaAvisoCierre.parse({ recuperacionSegura: true })).toEqual({ recuperacionSegura: true });
     expect(esquemaAvisoCierre.parse({ recuperacionSegura: false })).toEqual({ recuperacionSegura: false });
+  });
+});
+
+describe('visor: zoom', () => {
+  it('los niveles van de 1 a 8 en orden y coinciden con los límites', () => {
+    expect(NIVELES_ZOOM[0]).toBe(LIMITES.zoom.min);
+    expect(NIVELES_ZOOM.at(-1)).toBe(LIMITES.zoom.max);
+    expect([...NIVELES_ZOOM].sort((a, b) => a - b)).toEqual([...NIVELES_ZOOM]);
+  });
+
+  it.each([
+    [0, 1], [0.99, 1], [1, 1], [8, 8], [8.01, 8], [100, 8], [-1, 1],
+    [Number.NaN, 1], [Number.POSITIVE_INFINITY, 1], [Number.NEGATIVE_INFINITY, 1],
+  ])('limitarZoom(%s) = %s', (entrada, esperado) => {
+    expect(limitarZoom(entrada)).toBe(esperado);
+  });
+
+  it('acerca y aleja por niveles, y en los extremos se queda', () => {
+    expect(pasoZoom(1, 1)).toBe(1.5);
+    expect(pasoZoom(1.5, -1)).toBe(1);
+    expect(pasoZoom(1, -1)).toBe(1);
+    expect(pasoZoom(8, 1)).toBe(8);
+    expect(pasoZoom(2.5, 1)).toBe(3);
+    expect(pasoZoom(2.5, -1)).toBe(2);
+    expect(pasoZoom(Number.NaN, 1)).toBe(1.5);
+  });
+
+  it('propiedad: cualquier serie de pasos queda dentro de los límites', () => {
+    fc.assert(
+      fc.property(fc.array(fc.constantFrom(1 as const, -1 as const), { maxLength: 40 }), (pasos) => {
+        let z: number = LIMITES.zoom.porDefecto;
+        for (const p of pasos) z = pasoZoom(z, p);
+        return z >= LIMITES.zoom.min && z <= LIMITES.zoom.max && (NIVELES_ZOOM as readonly number[]).includes(z);
+      }),
+    );
+  });
+
+  it('muestra el nivel en porcentaje', () => {
+    expect(textoZoom(1)).toBe('100 %');
+    expect(textoZoom(1.5)).toBe('150 %');
+    expect(textoZoom(99)).toBe('800 %');
+  });
+
+  it('ajusta la imagen a lo que cabe, por ancho o por alto', () => {
+    expect(anchoAjustado(800, 600, 4000, 3000)).toBe(800);
+    expect(anchoAjustado(800, 300, 4000, 3000)).toBe(400);
+    expect(anchoAjustado(800, null, 1000, 4000)).toBe(800);
+    expect(anchoAjustado(800.9, null, 10, 10)).toBe(800);
+    expect(anchoAjustado(0, 600, 10, 10)).toBeNull();
+    expect(anchoAjustado(800, 600, 0, 10)).toBeNull();
+    expect(anchoAjustado(Number.NaN, 600, 10, 10)).toBeNull();
+    expect(anchoAjustado(0.2, null, 10, 10)).toBe(1);
+  });
+
+  it('el punto bajo el cursor se queda bajo el cursor, sin pasarse de los bordes', () => {
+    expect(desplazamientoAnclado(0.5, 200, 1600, 400)).toBe(600);
+    expect(desplazamientoAnclado(0, 200, 1600, 400)).toBe(0);
+    expect(desplazamientoAnclado(1, 0, 1600, 400)).toBe(1200);
+    expect(desplazamientoAnclado(0.5, 200, 300, 400)).toBe(0);
+    expect(desplazamientoAnclado(Number.NaN, 200, 1600, 400)).toBe(0);
+  });
+});
+
+describe('visor: zona bajo el puntero', () => {
+  const zonas = [
+    { id: 'grande', caja: { x: 0, y: 0, ancho: 100, alto: 100 } },
+    { id: 'chica', caja: { x: 40, y: 40, ancho: 10, alto: 10 } },
+  ];
+
+  it('elige la zona que contiene el punto y, si hay varias, la más chica', () => {
+    expect(zonaEnPunto(5, 5, zonas)).toBe('grande');
+    expect(zonaEnPunto(45, 45, zonas)).toBe('chica');
+  });
+
+  it('los bordes: incluye el primer píxel y excluye el que sigue al último', () => {
+    expect(zonaEnPunto(40, 40, zonas)).toBe('chica');
+    expect(zonaEnPunto(49, 49, zonas)).toBe('chica');
+    expect(zonaEnPunto(50, 50, zonas)).toBe('grande');
+    expect(zonaEnPunto(100, 0, zonas)).toBeNull();
+    expect(zonaEnPunto(-1, 0, zonas)).toBeNull();
+  });
+
+  it('sin zonas no elige nada', () => {
+    expect(zonaEnPunto(1, 1, [])).toBeNull();
   });
 });

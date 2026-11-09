@@ -1,7 +1,8 @@
 import { useState, type SyntheticEvent } from 'react';
 import { esquemaEfecto, LIMITES } from '../../shared/contrato';
 import { OpcionesEmoji } from './OpcionesEmoji';
-import { efectoManual, leerCaja, leerPunto, textoOrigen, type Herramienta, type Caja, type Revision, type ZonaManual } from '../../shared/logica';
+import { eventosResaltar } from './resaltar';
+import { efectoManual, leerCaja, leerPunto, textoOrigen, type Herramienta, type Caja, type Resaltado, type Revision, type ZonaManual } from '../../shared/logica';
 
 interface Props {
   ancho: number;
@@ -16,6 +17,9 @@ interface Props {
   alBuscarEnPunto: (x: number, y: number) => void;
   alQuitar: (id: string) => void;
   alCambiarEfecto: (id: string, efecto: ZonaManual['efecto']) => void;
+  /** Zona resaltada a la vez aquí y en la imagen. */
+  resaltado?: Resaltado | null;
+  alResaltar?: (r: Resaltado | null) => void;
 }
 
 const HERRAMIENTAS: readonly { valor: Herramienta; texto: string }[] = [
@@ -25,7 +29,7 @@ const HERRAMIENTAS: readonly { valor: Herramienta; texto: string }[] = [
   { valor: 'pincel', texto: 'Pintar con pincel' },
 ];
 
-export function Manual({ ancho, alto, herramienta, tamanoPincel, revision, ocupado, alElegirHerramienta, alCambiarTamano, alAgregarCaja, alBuscarEnPunto, alQuitar, alCambiarEfecto }: Props): React.JSX.Element {
+export function Manual({ ancho, alto, herramienta, tamanoPincel, revision, ocupado, alElegirHerramienta, alCambiarTamano, alAgregarCaja, alBuscarEnPunto, alQuitar, alCambiarEfecto, resaltado = null, alResaltar }: Props): React.JSX.Element {
   const [valores, setValores] = useState({ x: '', y: '', ancho: '', alto: '' });
   const [error, setError] = useState<string | null>(null);
 
@@ -95,7 +99,13 @@ export function Manual({ ancho, alto, herramienta, tamanoPincel, revision, ocupa
       {revision.manuales.length > 0 && (
         <ul className="advertencias">
           {revision.manuales.map((z, i) => (
-            <li key={z.id} className="advertencia bajo" data-manual={z.id}>
+            <li
+              key={z.id}
+              className={`advertencia bajo${resaltado?.id === z.id ? ' resaltada' : ''}`}
+              data-manual={z.id}
+              data-zona={z.id}
+              {...eventosResaltar(z.id, resaltado, alResaltar)}
+            >
               <p>
                 <strong>Tu zona {i + 1}</strong>
                 {` (${textoOrigen(z.origen)})`}

@@ -28,6 +28,7 @@ import {
   type Caja,
   type Herramienta,
   type Historial,
+  type Resaltado,
   type Revision,
 } from '../../shared/logica';
 import { Advertencias, Cobertura } from './Advertencias';
@@ -35,6 +36,7 @@ import { Confirmacion } from './Dialogos';
 import { Guia } from './Guia';
 import { Manual } from './Manual';
 import { ModoVideo } from './ModoVideo';
+import { irAFila } from './resaltar';
 import { Visor } from './Visor';
 
 export type EstadoAnalisis =
@@ -85,8 +87,13 @@ export function App(): React.JSX.Element {
   const [tamanoPincel, setTamanoPincel] = useState<number>(LIMITES.pincel.porDefecto);
   const [zonaTotal, setZonaTotal] = useState<ZonaNueva | null>(null);
   const [avisoCierre, setAvisoCierre] = useState<AvisoCierre | null>(null);
+  // Zona resaltada a la vez en la imagen y en el panel. Solo es visual: no cambia ninguna decisión.
+  // Se guarda con su foto, porque los ids de zona ("cara-0") se repiten entre fotos.
+  const [resaltadoDe, setResaltadoDe] = useState<{ archivoId: string | null; resaltado: Resaltado | null }>({ archivoId: null, resaltado: null });
   const colaOcupada = useRef(false);
   const seleccion = elegido ?? archivos[0]?.info.id ?? null;
+  const resaltado = resaltadoDe.archivoId === seleccion ? resaltadoDe.resaltado : null;
+  const setResaltado = useCallback((r: Resaltado | null): void => { setResaltadoDe({ archivoId: seleccion, resaltado: r }); }, [seleccion]);
 
   const actual = useMemo(() => archivos.find((a) => a.info.id === seleccion) ?? null, [archivos, seleccion]);
   const analisis = actual?.estado.tipo === 'listo' ? actual.estado.analisis : null;
@@ -552,6 +559,9 @@ export function App(): React.JSX.Element {
                 alDibujar={pedirCaja}
                 alPintar={(puntos) => { void pintar(puntos); }}
                 alFuera={() => { setAnuncio('Ese punto queda fuera de la imagen.'); }}
+                resaltado={resaltado}
+                alResaltar={setResaltado}
+                alElegirZona={irAFila}
               />
             </>
           )}
@@ -580,6 +590,8 @@ export function App(): React.JSX.Element {
                 alCambiar={(cambio) => { cambiarRevision(actual.info.id, cambio); }}
                 alOcultarTodo={() => { cambiarRevision(actual.info.id, (r) => ocultarTodo(r, hallazgos)); setAnuncio('Marcamos para ocultar todo lo detectado.'); }}
                 alOcultarAlto={() => { cambiarRevision(actual.info.id, (r) => ocultarRiesgoAlto(r, hallazgos)); setAnuncio('Marcamos para ocultar lo de riesgo alto.'); }}
+                resaltado={resaltado}
+                alResaltar={setResaltado}
               />
               <Manual
                 key={`manual-${actual.info.id}`}
@@ -595,6 +607,8 @@ export function App(): React.JSX.Element {
                 alBuscarEnPunto={(x, y) => { void buscarEnPunto(x, y); }}
                 alQuitar={(id) => { cambiarRevision(actual.info.id, (r) => quitarManual(r, id)); setAnuncio('Quitamos tu zona.'); }}
                 alCambiarEfecto={(id, efecto) => { cambiarRevision(actual.info.id, (r) => efectoDeManual(r, id, efecto)); }}
+                resaltado={resaltado}
+                alResaltar={setResaltado}
               />
               </fieldset>
               <section aria-labelledby="titulo-resumen" className="resumen">

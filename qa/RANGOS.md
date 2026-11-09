@@ -148,7 +148,7 @@ Los límites de Instagram cambian, y sus propias fuentes se contradicen (4:5 o 3
 
 | Parámetro | Tipo | Mín | Máx | Default | Ante un valor inválido |
 |---|---|---|---|---|---|
-| `vista.zoom_pct` | entero, % | 10 | 1600 | Ajustar a la ventana | Estándar |
+| `vista.zoom` | decimal, veces el tamaño ajustado a la ventana; niveles 1, 1.5, 2, 3, 4, 6 y 8 | 1 (100 %) | 8 (800 %) | 1: ajustar a la ventana | Se ajusta al límite más cercano; NaN o infinito vuelven a 1. Solo cambia la vista, nunca la exportación. Menos de 100 % no aporta, porque la imagen ya cabe completa; más de 800 % solo agranda la vista previa, que mide como máximo 1600 px (`ladoVista`) |
 | `historial.pasos` | entero | 1 | 500 (propuesta) | 100 (propuesta) | Estándar. Deshacer sin historial queda desactivado y no hace nada |
 | `tema` | enum: `sistema`, `claro`, `oscuro` | n/a | n/a | `sistema` | Se usa `sistema` y se registra el error |
 | `proyecto.nombre` | texto | 1 carácter | 120 caracteres | Nombre sin extensión del primer archivo | Estándar |

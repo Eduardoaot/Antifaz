@@ -14,10 +14,12 @@ import {
   textoRevisado,
   tituloVeredicto,
   veredicto,
+  type Resaltado,
   type Revision,
 } from '../../shared/logica';
 import { leerEnRango } from '../../shared/numeros';
 import { DialogoPorQue } from './Dialogos';
+import { eventosResaltar } from './resaltar';
 import { OpcionesEmoji } from './OpcionesEmoji';
 
 function IconoNivel({ nivel }: { nivel: Nivel }): React.JSX.Element {
@@ -95,9 +97,12 @@ interface Props {
   alCambiar: (cambio: (r: Revision) => Revision) => void;
   alOcultarTodo: () => void;
   alOcultarAlto: () => void;
+  /** Zona resaltada a la vez aquí y en la imagen. */
+  resaltado?: Resaltado | null;
+  alResaltar?: (r: Resaltado | null) => void;
 }
 
-export function Advertencias({ hallazgos, revision, alCambiar, alOcultarTodo, alOcultarAlto }: Props): React.JSX.Element | null {
+export function Advertencias({ hallazgos, revision, alCambiar, alOcultarTodo, alOcultarAlto, resaltado = null, alResaltar }: Props): React.JSX.Element | null {
   const [porQue, setPorQue] = useState<Regla | null>(null);
   const [intensidadTexto, setIntensidadTexto] = useState<string | null>(null);
   if (hallazgos.length === 0) return null;
@@ -122,7 +127,13 @@ export function Advertencias({ hallazgos, revision, alCambiar, alOcultarTodo, al
           const numero = numeros.get(h.id);
           const decision = revision.decisiones[h.id];
           return (
-            <li key={h.id} className={`advertencia ${regla.nivel_riesgo}`} data-regla={h.regla_id}>
+            <li
+              key={h.id}
+              className={`advertencia ${regla.nivel_riesgo}${h.caja !== null && resaltado?.id === h.id ? ' resaltada' : ''}`}
+              data-regla={h.regla_id}
+              data-zona={h.caja !== null ? h.id : undefined}
+              {...(h.caja !== null ? eventosResaltar(h.id, resaltado, alResaltar) : {})}
+            >
               <p className="nivel">
                 <IconoNivel nivel={regla.nivel_riesgo} /> {etiquetaNivel(regla.nivel_riesgo)}
                 <IconoCategoria regla={regla} />
