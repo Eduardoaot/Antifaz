@@ -16,6 +16,8 @@ export const LIMITES = {
   pincel: { min: 1, max: 512, porDefecto: 32 },
   /** Zoom del visor: 1 es "ajustar a la ventana". Solo cambia la vista, nunca la exportación. */
   zoom: { min: 1, max: 8, porDefecto: 1 },
+  /** Al ajustar a la ventana, una foto chica no se estira más de esto: se vería suave y con artefactos. */
+  ajusteMaxEscala: 2,
   puntosTrazo: 5000,
   // Video (Fase 3). Coinciden con sidecar/revisor/esquemas.py.
   videoPistas: 50,

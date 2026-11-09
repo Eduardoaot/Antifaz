@@ -652,11 +652,22 @@ describe('visor: zoom', () => {
     expect(anchoAjustado(800, 600, 4000, 3000)).toBe(800);
     expect(anchoAjustado(800, 300, 4000, 3000)).toBe(400);
     expect(anchoAjustado(800, null, 1000, 4000)).toBe(800);
-    expect(anchoAjustado(800.9, null, 10, 10)).toBe(800);
+    expect(anchoAjustado(800.9, null, 1000, 1000)).toBe(800);
     expect(anchoAjustado(0, 600, 10, 10)).toBeNull();
     expect(anchoAjustado(800, 600, 0, 10)).toBeNull();
     expect(anchoAjustado(Number.NaN, 600, 10, 10)).toBeNull();
     expect(anchoAjustado(0.2, null, 10, 10)).toBe(1);
+  });
+
+  it('una foto chica no se estira más del 200 % al ajustar', () => {
+    // La playa: 470 px de ancho en una columna de 980 px se queda en 940, no en 980.
+    expect(anchoAjustado(980, 600, 470, 210)).toBe(940);
+    expect(anchoAjustado(980, 600, 470, 210, 1)).toBe(470);
+    expect(anchoAjustado(800, 600, 10, 10)).toBe(20);
+    // Si el tope no es válido, no limita.
+    expect(anchoAjustado(980, 600, 470, 210, Number.NaN)).toBe(980);
+    expect(anchoAjustado(980, 600, 470, 210, 0)).toBe(980);
+    expect(LIMITES.ajusteMaxEscala).toBe(2);
   });
 
   it('el punto bajo el cursor se queda bajo el cursor, sin pasarse de los bordes', () => {

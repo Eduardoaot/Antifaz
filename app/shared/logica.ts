@@ -509,11 +509,21 @@ export function pasoZoom(actual: number, direccion: 1 | -1): number {
 
 export const textoZoom = (z: number): string => `${Math.round(limitarZoom(z) * 100)} %`;
 
-/** Ancho en pantalla de la imagen al 100 %: lo más grande que cabe. Sin alto disponible, manda el ancho. */
-export function anchoAjustado(disponibleAncho: number, disponibleAlto: number | null, ancho: number, alto: number): number | null {
+/**
+ * Ancho en pantalla de la imagen al 100 %: lo más grande que cabe. Sin alto disponible, manda el ancho.
+ * Una foto chica no se estira más de `maxEscala` veces su tamaño real; para verla más grande está el zoom.
+ */
+export function anchoAjustado(
+  disponibleAncho: number,
+  disponibleAlto: number | null,
+  ancho: number,
+  alto: number,
+  maxEscala: number = LIMITES.ajusteMaxEscala,
+): number | null {
   if (!(disponibleAncho > 0) || ancho <= 0 || alto <= 0) return null;
   const porAlto = disponibleAlto !== null && disponibleAlto > 0 ? (disponibleAlto * ancho) / alto : Number.POSITIVE_INFINITY;
-  return Math.max(1, Math.floor(Math.min(disponibleAncho, porAlto)));
+  const porTamano = Number.isFinite(maxEscala) && maxEscala > 0 ? ancho * maxEscala : Number.POSITIVE_INFINITY;
+  return Math.max(1, Math.floor(Math.min(disponibleAncho, porAlto, porTamano)));
 }
 
 /**

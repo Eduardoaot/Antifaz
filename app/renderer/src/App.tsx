@@ -445,14 +445,17 @@ export function App(): React.JSX.Element {
     <div className="app" onDragOver={(e) => { e.preventDefault(); }} onDrop={alSoltar}>
       <a className="saltar" href="#principal">Saltar al contenido</a>
       <header className="cabecera">
-        <picture>
-          <source srcSet={logoOscuro} media="(prefers-color-scheme: dark)" />
-          <img className="logo" src={logoClaro} alt={MARCA.nombre} />
-        </picture>
-        <p className="eslogan">{MARCA.eslogan}</p>
+        <div className="identidad">
+          <picture>
+            <source srcSet={logoOscuro} media="(prefers-color-scheme: dark)" />
+            <img className="logo" src={logoClaro} alt={MARCA.nombre} />
+          </picture>
+          <p className="eslogan">{MARCA.eslogan}</p>
+        </div>
+        {/* Una sola acción principal a la vista: Exportar. Abrir es secundaria; la pantalla vacía tiene la suya. */}
         <div className="acciones">
           {enFotos ? (
-            <button type="button" className="boton primario" onClick={() => { void abrir(); }}>
+            <button type="button" className="boton" onClick={() => { void abrir(); }}>
               <FolderOpen aria-hidden="true" /> Abrir fotos
             </button>
           ) : (
@@ -460,23 +463,25 @@ export function App(): React.JSX.Element {
               <IconoFoto aria-hidden="true" /> Fotos
             </button>
           )}
-          <button type="button" className="boton" aria-pressed={vista === 'video'} onClick={() => { setVista((v) => (v === 'video' ? 'revision' : 'video')); }}>
+          <button type="button" className="boton fantasma" aria-pressed={vista === 'video'} onClick={() => { setVista((v) => (v === 'video' ? 'revision' : 'video')); }}>
             <Film aria-hidden="true" /> Video
           </button>
-          <button type="button" className="boton" aria-pressed={vista === 'guia'} onClick={() => { setVista((v) => (v === 'guia' ? 'revision' : 'guia')); }}>
+          <button type="button" className="boton fantasma" aria-pressed={vista === 'guia'} onClick={() => { setVista((v) => (v === 'guia' ? 'revision' : 'guia')); }}>
             <BookOpen aria-hidden="true" /> Guía de privacidad
           </button>
           {enFotos && (<>
-          <button type="button" className="boton" disabled={!actual || exportando || actual.historial.pasado.length === 0} onClick={() => { moverHistorial(deshacer, 'Se deshizo el último cambio.'); }}>
+          <span className="separador" aria-hidden="true" />
+          <button type="button" className="boton fantasma" disabled={!actual || exportando || actual.historial.pasado.length === 0} onClick={() => { moverHistorial(deshacer, 'Se deshizo el último cambio.'); }}>
             <Undo2 aria-hidden="true" /> Deshacer
           </button>
-          <button type="button" className="boton" disabled={!actual || exportando || actual.historial.futuro.length === 0} onClick={() => { moverHistorial(rehacer, 'Se rehizo el cambio.'); }}>
+          <button type="button" className="boton fantasma" disabled={!actual || exportando || actual.historial.futuro.length === 0} onClick={() => { moverHistorial(rehacer, 'Se rehizo el cambio.'); }}>
             <Redo2 aria-hidden="true" /> Rehacer
           </button>
           <button type="button" className="boton primario" disabled={analisis === null || exportando} onClick={pedirExportar}>
             <Save aria-hidden="true" /> {exportando ? 'Guardando…' : 'Exportar copia'}
           </button>
           </>)}
+          <span className="separador" aria-hidden="true" />
           <label className="campo-tema">
             Tema
             <select

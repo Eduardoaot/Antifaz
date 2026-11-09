@@ -14,9 +14,10 @@ body {
   font: 400 1rem/1.5 'Inter', 'Segoe UI', system-ui, sans-serif;
 }
 h1, h2, h3, p { margin: 0; }
-h1 { font-size: 1.5rem; line-height: 1.2; }
-h2 { font-size: 1.125rem; }
-h3 { font-size: 1rem; }
+/* Escala corta: 24 / 17 / 16 / 15 / 14 px. Los títulos pesan por grosor, no por tamaño. */
+h1 { font-size: 1.5rem; line-height: 1.2; font-weight: 700; letter-spacing: -0.01em; text-wrap: balance; }
+h2 { font-size: 1.0625rem; line-height: 1.3; font-weight: 650; text-wrap: balance; }
+h3 { font-size: 1rem; font-weight: 600; }
 ul { margin: 0; padding: 0; list-style: none; }
 svg { width: 1.125rem; height: 1.125rem; flex: none; }
 
@@ -31,54 +32,77 @@ svg { width: 1.125rem; height: 1.125rem; flex: none; }
 
 .app { display: flex; flex-direction: column; min-height: 100%; }
 .cabecera {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1rem;
-  padding: 0.5rem 1rem; background: var(--superficie); border-bottom: 1px solid var(--borde-control);
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.75rem 1.5rem;
+  min-height: 4rem; padding: 0.75rem 1.5rem;
+  background: var(--superficie); border-bottom: 1px solid var(--borde-sutil);
 }
-.logo { display: block; height: 2rem; width: auto; }
-.eslogan { color: var(--texto-suave); flex: 1 1 12rem; min-width: 0; }
-.acciones { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
-.campo-tema { display: inline-flex; align-items: center; gap: 0.375rem; }
+.identidad { display: flex; align-items: center; gap: 1rem; min-width: 0; }
+.logo { display: block; height: 1.75rem; width: auto; }
+.eslogan { color: var(--texto-suave); font-size: 0.875rem; min-width: 0; }
+.acciones { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 0.25rem 0.5rem; }
+/* Separa los grupos de acciones: navegación · historial y exportar · ajustes. */
+.separador { width: 1px; height: 1.5rem; margin-inline: 0.25rem; background: var(--borde-sutil); }
+.campo-tema { display: inline-flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; color: var(--texto-suave); }
+.campo-tema select { color: var(--texto); }
 
+/*
+ * Botones en tres jerarquías:
+ * - primario: relleno índigo, una sola acción principal a la vista;
+ * - secundario (por defecto): superficie con borde de control (3:1);
+ * - fantasma: sin borde, para navegación y acciones frecuentes de poco peso.
+ * 40 px de alto (objetivo cómodo, por encima de WCAG 2.5.8), 16 px de relleno lateral, ícono de 16 px.
+ */
 .boton {
-  display: inline-flex; align-items: center; justify-content: center; gap: 0.375rem;
-  min-height: 2.5rem; padding: 0.375rem 0.75rem;
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
+  min-height: 2.5rem; padding: 0.375rem 1rem;
   background: var(--superficie); color: var(--texto);
-  border: 1px solid var(--borde-control); border-radius: 6px;
-  font: inherit; cursor: pointer;
+  border: 1px solid var(--borde-control); border-radius: 8px;
+  font: inherit; font-size: 0.9375rem; font-weight: 500; line-height: 1.2; cursor: pointer;
+  transition: background-color 120ms ease-out, border-color 120ms ease-out, box-shadow 120ms ease-out;
 }
-.boton:not(.primario):hover:not(:disabled):not([aria-pressed='true']) { background: var(--fondo); }
-.boton:disabled { color: var(--texto-suave); cursor: not-allowed; border-style: dashed; }
-.boton.primario:not(:disabled) { background: var(--marca); border-color: var(--marca); color: var(--sobre-marca); font-weight: 700; }
-.boton.primario:hover:not(:disabled) { filter: brightness(1.1); }
-.boton[aria-pressed='true'] { background: var(--marca); border-color: var(--marca); color: var(--sobre-marca); font-weight: 700; }
+.boton svg { width: 1rem; height: 1rem; }
+.boton:not(.primario):hover:not(:disabled):not([aria-pressed='true']) { background: var(--superficie-2); }
+.boton:disabled { opacity: 0.5; cursor: not-allowed; }
+.boton.primario:not(:disabled) {
+  background: var(--marca); border-color: var(--marca); color: var(--sobre-marca); font-weight: 600;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.18);
+}
+.boton.primario:hover:not(:disabled) { filter: brightness(1.08); }
+.boton.fantasma { background: transparent; border-color: transparent; }
+.boton[aria-pressed='true'] { background: var(--marca); border-color: var(--marca); color: var(--sobre-marca); font-weight: 600; }
 .boton.chico { min-height: 2rem; min-width: 2rem; padding: 0.25rem; flex: none; }
 .enlace { justify-self: start; background: none; border: 0; padding: 0.25rem 0; min-height: 1.75rem; color: var(--marca); font: inherit; text-decoration: underline; cursor: pointer; }
 select, input[type='text'] {
-  min-height: 2.25rem; padding: 0.25rem 0.5rem; font: inherit;
-  background: var(--superficie); color: var(--texto);
-  border: 1px solid var(--borde-control); border-radius: 6px;
+  min-height: 2.5rem; padding: 0.25rem 0.75rem; font: inherit; font-size: 0.9375rem;
+  background: var(--superficie-2); color: var(--texto);
+  border: 1px solid var(--borde-control); border-radius: 8px;
 }
 input[aria-invalid='true'] { border: 2px solid var(--riesgo-alto); }
 
-.fallos { padding: 0.5rem 1rem 0; display: grid; gap: 0.25rem; }
+.fallos { padding: 1rem 1.5rem 0; display: grid; gap: 0.5rem; }
 .fallos li {
   display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;
-  padding: 0.25rem 0.75rem; border: 1px solid var(--borde-control); border-left-width: 4px;
-  background: var(--superficie); border-radius: 6px; overflow-wrap: anywhere;
+  padding: 0.5rem 0.5rem 0.5rem 1rem; border: 1px solid var(--borde-sutil); border-left: 4px solid var(--borde-control);
+  background: var(--superficie); border-radius: 10px; overflow-wrap: anywhere;
 }
 
 .cuerpo {
-  flex: 1; display: grid; gap: 1rem; padding: 1rem; align-items: start;
-  grid-template-columns: minmax(11rem, 15rem) minmax(0, 1fr) minmax(18rem, 24rem);
+  flex: 1; display: grid; gap: 1.5rem; padding: 1.5rem; align-items: start;
+  grid-template-columns: minmax(11rem, 15rem) minmax(0, 1fr) minmax(19rem, 24rem);
 }
-.lista-archivos, .panel { display: grid; gap: 0.75rem; min-width: 0; }
+.lista-archivos, .panel { display: grid; gap: 1rem; min-width: 0; }
 .lista-archivos ul { display: grid; gap: 0.25rem; }
-.lista-archivos li { display: flex; align-items: center; gap: 0.25rem; border: 1px solid transparent; border-radius: 6px; }
+.lista-archivos li {
+  display: flex; align-items: center; gap: 0.25rem; padding-right: 0.25rem;
+  border: 1px solid transparent; border-radius: 10px; transition: background-color 120ms ease-out;
+}
+.lista-archivos li:hover { background: var(--superficie-2); }
 .lista-archivos li.activo { border-color: var(--marca); background: var(--superficie); }
 .archivo {
-  flex: 1; min-width: 0; display: grid; text-align: left; gap: 0;
-  background: none; border: 0; padding: 0.375rem 0.5rem; font: inherit; color: inherit; cursor: pointer;
+  flex: 1; min-width: 0; display: grid; text-align: left; gap: 0.125rem;
+  background: none; border: 0; padding: 0.5rem 0.75rem; font: inherit; color: inherit; cursor: pointer;
 }
+.archivo .nombre { font-weight: 500; }
 .nombre { overflow-wrap: anywhere; }
 .estado { font-size: 0.875rem; }
 
@@ -86,18 +110,33 @@ input[aria-invalid='true'] { border: 2px solid var(--riesgo-alto); }
 .principal:focus { outline: none; }
 .titulo-foto { font-size: 1.125rem; overflow-wrap: anywhere; }
 .vacio { display: grid; gap: 0.75rem; justify-items: start; padding: 2rem 0; }
-.visor { margin: 0; display: grid; gap: 0.375rem; min-width: 0; }
-/* La imagen vive en su propia ventana: al acercarla, se mueve dentro sin mover la página. */
+/* Barra de zoom a 12 px del área; el pie, más cerca (8 px), porque describe la foto. */
+.visor { margin: 0; display: grid; gap: 0.75rem; min-width: 0; }
+.visor figcaption { margin-top: -0.25rem; }
+/*
+ * Área de trabajo: gris medio-oscuro sin tinte, igual en los dos temas, como en los editores de fotos.
+ * Ocupa todo el ancho de la columna y se adapta al alto de la foto hasta un tope, así una foto
+ * apaisada no deja bandas vacías. Al acercarla, se mueve dentro sin mover la página.
+ */
 .ventana-lienzo {
-  display: flex; min-width: 0; max-height: calc(100vh - 16rem);
-  overflow: auto; scrollbar-gutter: stable; border-radius: 8px;
+  display: flex; min-width: 0; max-height: calc(100vh - 16rem); min-height: 15rem;
+  overflow: auto; border-radius: 12px;
+  padding: 1.5rem; background: var(--lienzo);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.06);
 }
-.ventana-lienzo.ampliada { background: var(--superficie); box-shadow: inset 0 0 0 1px var(--borde-control); }
-.lienzo { position: relative; flex: none; margin: auto; }
+/* El espacio de la barra se reserva solo cuando hay barra: al 100 % el margen queda parejo. */
+.ventana-lienzo.ampliada { scrollbar-gutter: stable; }
+/* La foto es un objeto sobre la mesa: esquinas rectas, un contorno tenue y una sombra. */
+.lienzo {
+  position: relative; flex: none; margin: auto;
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 0.08), 0 4px 16px rgb(0 0 0 / 0.35);
+}
 .lienzo img { display: block; width: 100%; height: 100%; }
 .visor figcaption { font: 400 0.875rem 'Inter', 'Segoe UI', sans-serif; font-variant-numeric: tabular-nums; }
 .marca { position: absolute; border: 2px solid #fff; outline: 2px solid #000; pointer-events: none; }
-.marca.ignorar { border-style: dotted; }
+/* Lo que decidiste dejar visible pasa a segundo plano. */
+.marca.ignorar { border-style: dotted; opacity: 0.6; }
+.marca.ignorar.resaltada { opacity: 1; }
 .lienzo { touch-action: none; }
 .herramienta-clic, .herramienta-rectangulo, .herramienta-pincel { cursor: crosshair; }
 /* Invierte los colores de debajo: el trazo se ve sobre fotos claras y oscuras. */
@@ -106,24 +145,40 @@ input[aria-invalid='true'] { border: 2px solid var(--riesgo-alto); }
 .campo-pincel { display: grid; gap: 0.25rem; }
 .campo-pincel input { width: 100%; }
 .marca.sin-decidir { border-style: dashed; }
-.marca span { position: absolute; left: -2px; top: -2px; padding: 0 0.3rem; background: #000; color: #fff; font-size: 0.8125rem; font-weight: 700; }
+.marca span {
+  position: absolute; left: -2px; top: -2px; display: grid; place-items: center;
+  min-width: 20px; height: 20px; padding: 0 4px; background: #000; color: #fff;
+  font-size: 0.75rem; font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums;
+}
 
 .caja-veredicto, .caja-parcial {
-  display: grid; gap: 0.375rem; padding: 0.75rem;
-  background: var(--superficie); border: 1px solid var(--borde-control); border-radius: 6px;
+  display: grid; gap: 0.5rem; padding: 1rem;
+  background: var(--superficie); border: 1px solid var(--borde-sutil); border-radius: 10px;
 }
-.caja-parcial { border-width: 2px; border-left-width: 6px; }
+.caja-parcial { border: 2px solid var(--borde-control); border-left-width: 6px; }
 details ul { padding: 0.25rem 0 0 1.125rem; list-style: disc; }
 summary { cursor: pointer; min-height: 1.75rem; }
 .grupo-acciones, .controles, .fila-botones { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
-.grupo-acciones { margin-bottom: 0.75rem; }
-.controles label { display: inline-flex; align-items: center; gap: 0.375rem; }
-.advertencias { display: grid; gap: 0.5rem; }
+.grupo-acciones { margin-bottom: 1rem; }
+/* Acciones masivas: a todo lo ancho del panel, una debajo de otra, con el mismo peso. */
+.acciones-masivas { display: grid; grid-template-columns: minmax(0, 1fr); }
+/* Herramientas: cuadrícula de 2 × 2, como un control segmentado. */
+.manual .grupo-acciones { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-bottom: 0; }
+.manual .grupo-acciones .boton { padding-inline: 0.5rem; }
+/* El menú de efecto va en su propia fila, alineado con los botones. */
+.controles label { display: flex; align-items: center; gap: 0.5rem; flex-basis: 100%; }
+.controles label select { flex: 1; min-width: 0; }
+.advertencias { display: grid; gap: 0.75rem; }
 .advertencia {
-  display: grid; gap: 0.375rem; padding: 0.625rem 0.75rem;
-  background: var(--superficie); border: 1px solid var(--borde-control); border-left-width: 6px; border-radius: 6px;
+  display: grid; gap: 0.625rem; padding: 0.875rem 1rem;
+  background: var(--superficie); border: 1px solid var(--borde-sutil); border-left-width: 4px; border-radius: 10px;
 }
-.nivel { display: flex; flex-wrap: wrap; align-items: center; gap: 0.375rem; font-weight: 700; padding: 0.125rem 0.375rem; border-radius: 4px; }
+/* Tus zonas van dentro de la caja de "Tapar algo más": un nivel más de superficie. */
+.manual .advertencia { background: var(--superficie-2); }
+.nivel {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0.375rem;
+  font-size: 0.875rem; font-weight: 650; padding: 0.25rem 0.5rem; border-radius: 6px;
+}
 .numero { margin-left: auto; font-weight: 400; }
 .advertencia.alto { border-left-color: var(--riesgo-alto); }
 .advertencia.alto .nivel { color: var(--riesgo-alto); background: var(--riesgo-alto-fondo); }
@@ -133,24 +188,31 @@ summary { cursor: pointer; min-height: 1.75rem; }
 .advertencia.bajo .nivel { color: var(--riesgo-bajo); background: var(--riesgo-bajo-fondo); }
 .pregunta { border: 0; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.5rem; }
 .pregunta legend { padding: 0 0 0.25rem; font-weight: 700; }
-.intensidad { display: grid; gap: 0.25rem; margin-top: 0.75rem; }
+/* Intensidad y resumen: tarjetas como las demás, para que el panel tenga un solo ritmo. */
+.intensidad, .resumen {
+  display: grid; gap: 0.5rem; padding: 1rem;
+  background: var(--superficie); border: 1px solid var(--borde-sutil); border-radius: 10px;
+}
+.intensidad { margin-top: 1rem; }
 .intensidad input { width: 6rem; }
+.intensidad p, .resumen p { font-size: 0.9375rem; }
 .error-campo { color: var(--riesgo-alto); font-weight: 700; }
 .sin-marco { border: 0; margin: 0; padding: 0; min-width: 0; }
 .guia { padding: 1rem; display: grid; gap: 1rem; max-width: 56rem; margin-inline: auto; }
 .guia section { display: grid; gap: 0.5rem; }
-.manual { margin-top: 0.75rem; }
+.manual { margin-top: 1rem; }
+.manual > .suave { font-size: 0.9375rem; }
 .coordenadas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.5rem; padding-top: 0.5rem; }
 .coordenadas p { grid-column: 1 / -1; }
 .coordenadas label { display: grid; gap: 0.125rem; min-width: 0; }
 .coordenadas input { width: 100%; }
-.resumen { display: grid; gap: 0.25rem; }
-.pie { padding: 0.5rem 1rem; border-top: 1px solid var(--borde-control); color: var(--texto-suave); font-size: 0.875rem; }
+.pie { padding: 0.75rem 1.5rem; border-top: 1px solid var(--borde-sutil); color: var(--texto-suave); font-size: 0.875rem; }
 
 .dialogo {
   max-width: min(32rem, calc(100vw - 2rem)); padding: 1.25rem;
   background: var(--superficie); color: var(--texto);
-  border: 1px solid var(--borde-control); border-radius: 8px;
+  border: 1px solid var(--borde-sutil); border-radius: 12px;
+  box-shadow: 0 12px 32px rgb(0 0 0 / 0.28);
 }
 .dialogo.ancho { max-width: min(44rem, calc(100vw - 2rem)); }
 .dialogo > * + * { margin-top: 0.75rem; }
@@ -167,9 +229,10 @@ summary { cursor: pointer; min-height: 1.75rem; }
 /* Ventana chica, zoom del 200% o pantalla dividida: todo se apila, nada se corta. */
 @media (max-width: 1000px) {
   .cuerpo { grid-template-columns: minmax(0, 1fr); }
-  .ventana-lienzo { max-height: none; }
+  /* Angosta: la foto usa todo el ancho y el área crece con ella. */
+  .ventana-lienzo { max-height: none; min-height: 0; padding: 1rem; }
   /* Ampliada, la imagen se limita para no empujar el panel fuera de la vista. */
-  .ventana-lienzo.ampliada { max-height: 75vh; }
+  .ventana-lienzo.ampliada { height: 75vh; }
 }
 
 /* Zoom del visor */
@@ -201,6 +264,7 @@ summary { cursor: pointer; min-height: 1.75rem; }
   .advertencia { border-left-color: CanvasText; }
   .nivel { background: none; color: CanvasText; }
   .marca { border-color: Highlight; outline-color: CanvasText; }
+  .ventana-lienzo { border: 1px solid CanvasText; }
   .trazo { mix-blend-mode: normal; }
   .trazo polyline { stroke: Highlight; }
 }

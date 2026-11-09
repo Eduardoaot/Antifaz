@@ -116,7 +116,7 @@ export function Advertencias({ hallazgos, revision, alCambiar, alOcultarTodo, al
   return (
     <section aria-label="Lista de advertencias">
       {visibles.length > 0 && (
-        <div className="grupo-acciones">
+        <div className="grupo-acciones acciones-masivas">
           <button type="button" className="boton" onClick={alOcultarAlto}>Ocultar todo lo de riesgo alto</button>
           <button type="button" className="boton" onClick={alOcultarTodo}>Ocultar todo lo detectado</button>
         </div>

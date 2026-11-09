@@ -26,6 +26,15 @@ PARES = [
     ("riesgo-alto", "riesgo-alto-fondo", 4.5), ("riesgo-medio", "riesgo-medio-fondo", 4.5),
     ("riesgo-bajo", "riesgo-bajo-fondo", 4.5),
     ("riesgo-alto", "superficie", 4.5), ("riesgo-medio", "superficie", 4.5), ("riesgo-bajo", "superficie", 4.5),
+    # superficie-2: filas y campos dentro de un panel.
+    ("texto", "superficie-2", 4.5), ("texto-suave", "superficie-2", 4.5), ("marca", "superficie-2", 4.5),
+    ("borde-control", "superficie-2", 3), ("foco", "superficie-2", 3),
+    # lienzo: gris medio-oscuro sin tinte detrás de la foto, igual en los dos temas. No tiene mínimo: es una
+    # región decorativa y la foto ya la identifica (WCAG 1.4.11 pide 3:1 solo a lo necesario para reconocer
+    # un control o su estado). Sobre él solo hay foto y marcas con doble contorno blanco y negro, que se ven
+    # sobre cualquier color. El anillo de foco del área se dibuja por fuera (outline-offset), sobre el
+    # fondo, y ese par ya se revisa arriba.
+    # borde-sutil es decorativo: separa cajas que ya se distinguen por su contenido, así que no tiene mínimo.
 ]
 
 

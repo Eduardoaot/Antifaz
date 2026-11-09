@@ -80,6 +80,12 @@ Valores en `brand/tokens.json`. Compruébalos con `tools/revisar_contraste.py`.
 - **Marca:** índigo profundo, `#3A3590` en claro y `#B5B0FF` en oscuro.
 - **Riesgo, reservado solo para advertencias:** alto rojo, medio ámbar, bajo gris. Elegí gris y no azul para no confundirlo con el índigo.
 - **Nunca solo color:** el riesgo siempre lleva ícono y texto. La simulación lo justifica: en modo claro con deuteranopia, rojo y ámbar quedan a solo 4.1 ΔE.
+- **Neutros (ajuste del 8 de noviembre de 2026, decisión del responsable):** el índigo y el riesgo no cambian.
+  - Superficies casi neutras en oscuro (`#121219`, `#1B1B26`): el violeta saturado en áreas grandes cansaba la vista. El índigo se queda en lo que se acciona: botón principal, foco y selección.
+  - `superficie-2` para campos y filas dentro de un panel.
+  - Dos bordes: `borde-control` (3:1) solo en botones y campos; `borde-sutil`, decorativo y sin mínimo, en cajas y separadores.
+  - `lienzo`: gris medio-oscuro sin tinte detrás de la foto, `#2B2B2E` en los dos temas, como en los editores de fotos. Un fondo con tinte desplaza cómo se perciben la piel y los tonos, y uno claro hace que la foto se vea más apagada. Es decorativo: no tiene mínimo de contraste.
+  - Una confirmación positiva, como "copia guardada", va en índigo con ícono, nunca en verde: el verde se lee como "seguro", y la marca no promete eso.
 
 ## Tipografía
 

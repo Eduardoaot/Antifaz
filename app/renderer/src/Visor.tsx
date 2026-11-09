@@ -48,6 +48,15 @@ const UMBRAL_ARRASTRE = 4;
 /** En ventanas angostas la imagen usa todo el ancho; al acercarla, la ventana de la imagen se limita. */
 const CONSULTA_ANGOSTA = '(max-width: 1000px)';
 
+/** Relleno horizontal y vertical total de un elemento, en píxeles. */
+function rellenoDe(estilo: CSSStyleDeclaration): { x: number; y: number } {
+  const px = (valor: string): number => Number.parseFloat(valor) || 0;
+  return {
+    x: px(estilo.paddingLeft) + px(estilo.paddingRight),
+    y: px(estilo.paddingTop) + px(estilo.paddingBottom),
+  };
+}
+
 interface Arrastre {
   x: number;
   y: number;
@@ -101,9 +110,15 @@ export function Visor({ archivo, hallazgos, ocultamientos, revision, herramienta
     const v = ventana.current;
     if (v === null) return undefined;
     const medir = (): void => {
+      const estilo = getComputedStyle(v);
+      const relleno = rellenoDe(estilo);
       const angosta = window.matchMedia(CONSULTA_ANGOSTA).matches;
-      const maximo = angosta ? Number.NaN : Number.parseFloat(getComputedStyle(v).maxHeight);
-      setAjuste(anchoAjustado(v.clientWidth, Number.isFinite(maximo) ? maximo : null, ancho, alto));
+      // En ventana ancha el área se adapta a la foto hasta un tope (max-height, que incluye el relleno
+      // por box-sizing: border-box). El tope no cambia al acercar, así el tamaño base no brinca.
+      // En angosta manda el ancho.
+      const tope = Number.parseFloat(estilo.maxHeight);
+      const disponibleAlto = angosta || !Number.isFinite(tope) ? null : tope - relleno.y;
+      setAjuste(anchoAjustado(v.clientWidth - relleno.x, disponibleAlto, ancho, alto));
     };
     medir();
     const observador = new ResizeObserver(medir);
@@ -122,8 +137,16 @@ export function Visor({ archivo, hallazgos, ocultamientos, revision, herramienta
     const l = lienzo.current;
     if (a === null || v === null || l === null) return;
     ancla.current = null;
-    v.scrollLeft = desplazamientoAnclado(a.fx, a.vx, l.offsetWidth, v.clientWidth);
-    v.scrollTop = desplazamientoAnclado(a.fy, a.vy, l.offsetHeight, v.clientHeight);
+    // El contenido desplazable es la imagen más el relleno gris de cada lado.
+    const relleno = rellenoDe(getComputedStyle(v));
+    const total = (lado: number, rellenoLado: number, fraccion: number): [number, number] => [
+      (rellenoLado / 2 + fraccion * lado) / (lado + rellenoLado),
+      lado + rellenoLado,
+    ];
+    const [fx, anchoTotal] = total(l.offsetWidth, relleno.x, a.fx);
+    const [fy, altoTotal] = total(l.offsetHeight, relleno.y, a.fy);
+    v.scrollLeft = desplazamientoAnclado(fx, a.vx, anchoTotal, v.clientWidth);
+    v.scrollTop = desplazamientoAnclado(fy, a.vy, altoTotal, v.clientHeight);
   }, [zoom]);
 
   const cambiarZoom = (nuevo: number, cliente?: { x: number; y: number }): void => {

@@ -783,7 +783,7 @@ for (const tema of ['claro', 'oscuro'] as const) {
       const desborde = await pagina.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
       expect(desborde, 'scroll horizontal').toBeLessThanOrEqual(0);
       const fondo = await pagina.evaluate(() => getComputedStyle(document.body).backgroundColor);
-      expect(fondo).toBe(tema === 'oscuro' ? 'rgb(19, 18, 42)' : 'rgb(247, 247, 251)');
+      expect(fondo).toBe(tema === 'oscuro' ? 'rgb(18, 18, 25)' : 'rgb(246, 246, 249)');
       await sinViolaciones(pagina);
       await pagina.screenshot({ path: join(CAPTURAS, `${tema}-${nombre}.png`), fullPage: true });
     });
@@ -875,9 +875,9 @@ test('cambiar el tema con la app abierta cambia los colores sin reiniciar', asyn
   const { pagina } = sesion;
   const fondo = (): Promise<string> => pagina.evaluate(() => getComputedStyle(document.body).backgroundColor);
   await pagina.getByLabel('Tema').selectOption('claro');
-  await expect.poll(fondo).toBe('rgb(247, 247, 251)');
+  await expect.poll(fondo).toBe('rgb(246, 246, 249)');
   await pagina.getByLabel('Tema').selectOption('oscuro');
-  await expect.poll(fondo).toBe('rgb(19, 18, 42)');
+  await expect.poll(fondo).toBe('rgb(18, 18, 25)');
   await pagina.getByLabel('Tema').selectOption('sistema');
   await expect(pagina.getByLabel('Tema')).toHaveValue('sistema');
 });
