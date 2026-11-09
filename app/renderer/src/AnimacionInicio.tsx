@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { MARCA } from '../../shared/catalogo';
 
 interface Props {
@@ -63,20 +63,23 @@ function reproducirIntroSonido(): void {
 }
 
 export function AnimacionInicio({ alTerminar }: Props): React.JSX.Element | null {
-  const [fase, setFase] = useState<'entrada' | 'resplandor' | 'salida' | 'cerrado'>(() => {
-    if (typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      return 'cerrado';
-    }
-    return 'entrada';
-  });
+  const [fase, setFase] = useState<'entrada' | 'resplandor' | 'salida' | 'cerrado'>('entrada');
 
   const omitir = useCallback((): void => {
     setFase('cerrado');
     alTerminar?.();
   }, [alTerminar]);
 
+  const omitirRef = useRef(omitir);
   useEffect(() => {
-    if (fase === 'cerrado') return;
+    omitirRef.current = omitir;
+  }, [omitir]);
+
+  const cerrado = fase === 'cerrado';
+
+  // Solo depende de `cerrado` para que la secuencia corra una vez y no se reinicie en cada fase.
+  useEffect(() => {
+    if (cerrado) return;
 
     // Iniciar sonido y etapas de animación
     reproducirIntroSonido();
@@ -90,7 +93,7 @@ export function AnimacionInicio({ alTerminar }: Props): React.JSX.Element | null
     }, 1900);
 
     const t3 = setTimeout(() => {
-      omitir();
+      omitirRef.current();
     }, 2400);
 
     return () => {
@@ -98,7 +101,7 @@ export function AnimacionInicio({ alTerminar }: Props): React.JSX.Element | null
       clearTimeout(t2);
       clearTimeout(t3);
     };
-  }, [fase, omitir]);
+  }, [cerrado]);
 
   useEffect(() => {
     if (fase === 'cerrado') return;

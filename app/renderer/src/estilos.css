@@ -452,7 +452,7 @@ summary { cursor: pointer; min-height: 1.75rem; font-weight: 500; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  * { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
+  *:not(.intro-cortinilla, .intro-cortinilla *) { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
 }
 
 /* Video (Fase 3) */
