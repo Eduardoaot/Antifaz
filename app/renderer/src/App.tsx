@@ -10,6 +10,7 @@ import {
   aplicarCambio,
   aplicarDecisionesIniciales,
   construirOcultamientos,
+  contarAdvertencias,
   cubreTodo,
   desdeEdicion,
   deshacer,
@@ -683,8 +684,10 @@ function textoEstado(a: Archivo): string {
     case 'listo': {
       if (!a.estado.analisis.cobertura.completa) return a.exportado ? 'Exportada, con revisión parcial' : 'Revisión parcial';
       if (a.exportado) return 'Exportada';
-      const n = a.estado.analisis.hallazgos.length;
-      return n === 0 ? 'Sin hallazgos' : `${n} ${n === 1 ? 'advertencia' : 'advertencias'}`;
+      const n = contarAdvertencias(a.estado.analisis.hallazgos);
+      const preguntas = a.estado.analisis.hallazgos.length - n;
+      if (n === 0) return preguntas === 0 ? 'Sin hallazgos' : 'Una pregunta para ti';
+      return `${n} ${n === 1 ? 'advertencia' : 'advertencias'}`;
     }
     default: {
       const inalcanzable: never = a.estado;

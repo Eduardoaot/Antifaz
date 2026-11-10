@@ -35,7 +35,7 @@ def test_decodifica_a_coordenadas_reales() -> None:
     assert [(z.regla_id, z.x, z.y, z.ancho, z.alto) for z in zonas] == [("MAT-01", 400, 225, 200, 50)]
 
 
-@pytest.mark.parametrize(("frase", "regla"), [("a smartphone screen", "PAN-01"), ("a television", "PAN-01"), ("a credit card", "FIN-01"), ("a street sign", "UBI-04"), ("jewelry or a necklace", "VAL-02"), ("a gun", "ARM-01"), ("a rifle", "ARM-01"), ("a flag", "EXT-01")])
+@pytest.mark.parametrize(("frase", "regla"), [("a smartphone screen", "PAN-01"), ("a television", "PAN-01"), ("a credit card", "FIN-01"), ("a street sign", "UBI-04"), ("a window with a view of the street or buildings", "UBI-06"), ("jewelry or a necklace", "VAL-02"), ("a gun", "ARM-01"), ("a rifle", "ARM-01"), ("a flag", "EXT-01")])
 def test_cada_clase_lleva_a_su_regla(frase: str, regla: str) -> None:
     assert decodificar(*_salida((frase, 0.9, (0.5, 0.5, 0.2, 0.2))), 100, 100)[0].regla_id == regla
 
@@ -76,6 +76,9 @@ def _simular(monkeypatch: pytest.MonkeyPatch, escena: dict[str, float], zonas: l
         def escena(self, _p: Any) -> dict[str, float]:
             return {**NEUTRO, **escena}
 
+        def probabilidad_bano(self, _p: object) -> float:
+            return 0.0
+
         def zonas(self, _p: Any, _u: float) -> list[Zona]:
             return zonas
 
@@ -105,7 +108,7 @@ def test_objetos_llegan_como_zonas(tmp_path: Path, monkeypatch: pytest.MonkeyPat
     assert _de(resultado, "MAT-01")[0]["caja"] == {"x": 10, "y": 10, "ancho": 50, "alto": 20}
     assert _de(resultado, "MAT-01")[0]["requiere_revision"] is True
     assert _de(resultado, "PAN-01")[0]["requiere_revision"] is False
-    assert {"MAT-01", "PAN-01", "VAL-02", "UBI-04"} <= set(resultado["cobertura"]["reglas_revisadas"])
+    assert {"MAT-01", "PAN-01", "VAL-02", "UBI-04", "UBI-06"} <= set(resultado["cobertura"]["reglas_revisadas"])
     assert "UBI-05" not in resultado["cobertura"]["reglas_revisadas"]
 
 

@@ -78,10 +78,22 @@ Cada parámetro de este archivo tiene pruebas parametrizadas de mínimo-1, míni
 | `caras.umbral_confirmar` | decimal | n/a | n/a | 0.6 (medido en una muestra chica) | Constante interna. Una detección dudosa por debajo de este valor se descarta. Si no se puede confirmar, se conserva |
 | `contenido.umbral_escena` | decimal | n/a | n/a | 0.35; extremismo 0.6 (medido en una muestra chica) | Constante interna. Por encima se avisa sobre toda la imagen |
 | `contenido.desnudez_segura` | decimal | n/a | n/a | 0.7 (medido en una muestra chica) | Constante interna. Por debajo, la zona solo cuenta si la escena suma 0.1 o más en desnudez y sugerente |
-| `objetos.umbral` | decimal, por clase | n/a | n/a | Placa y letrero 0.1; joya y tarjeta 0.15; pantallas y bandera 0.2; armas 0.3 (medido en una muestra chica) | Constante interna |
+| `objetos.umbral` | decimal, por clase | n/a | n/a | Placa y letrero 0.1; joya y tarjeta 0.15; pantallas y bandera 0.2; armas 0.3 (medido en una muestra chica); ventana con vista 0.2 (propuesta sin medir) | Constante interna |
+| `contenido.umbral_bano` | decimal | n/a | n/a | 0.6 (propuesta sin medir) | Constante interna. Comparación aparte de las frases de riesgo para no quitarle puntaje a la desnudez. Solo avisa, con riesgo bajo |
+| `nivel.mostrado` | regla, no número | n/a | n/a | Nivel del catálogo | La pregunta de menores es neutral hasta responderla; con un "sí", ella, las caras y el baño suben a alto. Con poca confianza, medio baja a bajo. Alto nunca baja |
 | `contenido.umbral_zonas` | decimal | n/a | n/a | 0.25 (propuesta, favorece recall) | Constante interna. Por debajo de `umbral_revision` se marca con duda |
 | `ocr.umbral_texto` | decimal | 0 | 1 | 0.3 (propuesta) | Estándar |
 | `clic.x`, `clic.y` | entero, px de la imagen original | 0 | Ancho-1, alto-1 | n/a | Fuera de la imagen: se ignora y se avisa "Ese punto queda fuera de la imagen". El sidecar lo rechaza |
+
+## Sesgos
+
+Herramienta: `tools/medir_sesgo.py`. Política en `docs/SESGOS.md`.
+
+| Parámetro | Tipo | Mín | Máx | Default | Ante un valor inválido |
+|---|---|---|---|---|---|
+| `sesgo.minimo_por_grupo` | entero, fotos | 1 | Sin límite | 30 (propuesta) | La herramienta sale con código 2. Un grupo con menos fotos no se compara |
+| `sesgo.brecha_maxima` | decimal, proporción | Más de 0 | Menos de 1 | 0.05 (propuesta, falta aprobarla) | La herramienta sale con código 2. Por encima, la medición no se aprueba |
+| `sesgo.iou_acierto` | decimal | n/a | n/a | 0.5 | Constante interna. Una cara cuenta como encontrada con IoU de 0.5 o más |
 
 ## Archivos
 

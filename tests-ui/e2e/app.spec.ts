@@ -65,9 +65,11 @@ test('flujo completo: cara, ¿Por qué?, ocultar y exportar sin metadatos', asyn
   await expect(veredicto(pagina)).toHaveText('Revisa estas advertencias', { timeout: 60_000 });
 
   const cara = pagina.locator('[data-regla="CAR-01"]');
-  await expect(cara).toContainText('Riesgo medio');
+  // Una cara sola no es alarma: riesgo bajo. La pregunta de menores es neutral hasta que se responde.
+  await expect(cara.locator('.nivel')).toContainText('Riesgo bajo');
   await expect(cara).toContainText('Se detectó una cara');
   await expect(pagina.locator('[data-regla="UBI-01"]')).toContainText('Riesgo alto');
+  await expect(pagina.locator('[data-regla="MEN-01"] .nivel')).toHaveText('Pregunta');
   await expect(pagina.getByRole('group', { name: '¿Hay menores en esta foto?' })).toBeVisible();
 
   await cara.getByRole('button', { name: /^¿Por qué\?/ }).click();
@@ -943,7 +945,7 @@ test('zoom del 200%, colores forzados y simulación de daltonismo', async () => 
 
   await pagina.emulateMedia({ forcedColors: 'active', reducedMotion: 'reduce' });
   await pagina.screenshot({ path: join(CAPTURAS, 'colores-forzados.png') });
-  await expect(pagina.locator('[data-regla="CAR-01"]')).toContainText('Riesgo medio');
+  await expect(pagina.locator('[data-regla="CAR-01"]')).toContainText('Riesgo bajo');
   await pagina.emulateMedia({ forcedColors: 'none' });
 
   const cdp = await pagina.context().newCDPSession(pagina);

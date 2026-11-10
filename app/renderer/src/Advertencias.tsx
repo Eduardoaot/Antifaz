@@ -1,12 +1,14 @@
-import { AlertCircle, AlertTriangle, Baby, Car, CreditCard, Crosshair, Eye, EyeOff, Flag, Gem, IdCard, Info, MapPin, Monitor, Phone, Plane, QrCode, Shirt, Stethoscope, Users } from 'lucide-react';
+import { AlertCircle, AlertTriangle, Baby, Bath, Car, CircleHelp, CreditCard, Crosshair, Eye, EyeOff, Flag, Gem, IdCard, Info, MapPin, Monitor, Phone, Plane, QrCode, Shirt, Stethoscope, Users } from 'lucide-react';
 import { useState } from 'react';
-import { etiquetaNivel, reglaDe, type Nivel, type Regla } from '../../shared/catalogo';
+import { reglaDe, type Regla } from '../../shared/catalogo';
 import { esquemaEfecto, LIMITES, type Analisis, type Hallazgo } from '../../shared/contrato';
 import {
   decidir,
   describirHallazgo,
   efectoDe,
   elegirEfecto,
+  etiquetaNivelMostrado,
+  nivelMostrado,
   reglasNoRevisadas,
   responderMenores,
   soloAvisaSinZona,
@@ -14,6 +16,7 @@ import {
   textoRevisado,
   tituloVeredicto,
   veredicto,
+  type NivelMostrado,
   type Resaltado,
   type Revision,
 } from '../../shared/logica';
@@ -22,8 +25,10 @@ import { DialogoPorQue } from './Dialogos';
 import { eventosResaltar } from './resaltar';
 import { OpcionesEmoji } from './OpcionesEmoji';
 
-function IconoNivel({ nivel }: { nivel: Nivel }): React.JSX.Element {
+function IconoNivel({ nivel }: { nivel: NivelMostrado }): React.JSX.Element {
   switch (nivel) {
+    case 'pregunta':
+      return <CircleHelp aria-hidden="true" />;
     case 'alto':
       return <AlertTriangle aria-hidden="true" />;
     case 'medio':
@@ -70,6 +75,8 @@ function IconoCategoria({ regla }: { regla: Regla }): React.JSX.Element | null {
       return <Crosshair aria-hidden="true" />;
     case 'extremismo':
       return <Flag aria-hidden="true" />;
+    case 'espacios_intimos':
+      return <Bath aria-hidden="true" />;
     default:
       return null;
   }
@@ -126,16 +133,17 @@ export function Advertencias({ hallazgos, revision, alCambiar, alOcultarTodo, al
           const regla = reglaDe(h.regla_id);
           const numero = numeros.get(h.id);
           const decision = revision.decisiones[h.id];
+          const nivel = nivelMostrado(h, revision);
           return (
             <li
               key={h.id}
-              className={`advertencia ${regla.nivel_riesgo}${h.caja !== null && resaltado?.id === h.id ? ' resaltada' : ''}`}
+              className={`advertencia ${nivel === 'pregunta' ? 'nivel-pregunta' : nivel}${h.caja !== null && resaltado?.id === h.id ? ' resaltada' : ''}`}
               data-regla={h.regla_id}
               data-zona={h.caja !== null ? h.id : undefined}
               {...(h.caja !== null ? eventosResaltar(h.id, resaltado, alResaltar) : {})}
             >
               <p className="nivel">
-                <IconoNivel nivel={regla.nivel_riesgo} /> {etiquetaNivel(regla.nivel_riesgo)}
+                <IconoNivel nivel={nivel} /> {etiquetaNivelMostrado(nivel)}
                 <IconoCategoria regla={regla} />
                 {h.caja !== null && <span className="numero">Zona {numero}</span>}
               </p>
@@ -150,6 +158,7 @@ export function Advertencias({ hallazgos, revision, alCambiar, alOcultarTodo, al
               )}
 
               {h.regla_id === 'UBI-01' && <p className="suave">Se borra al exportar, sin que hagas nada.</p>}
+              {h.regla_id === 'INT-01' && <p className="suave">Es un aviso sobre toda la foto: revísala completa antes de publicarla.</p>}
               {soloAvisaSinZona(h) && <p className="suave">Todavía no podemos taparlo por zona. Si no quieres mostrarlo, recorta la foto o no la publiques.</p>}
               {h.regla_id === 'DES-01' && h.caja !== null && <p className="suave">La marcamos para ocultarla. Instagram podría limitar la foto aunque esté tapada.</p>}
 

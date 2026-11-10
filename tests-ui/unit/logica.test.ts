@@ -32,6 +32,9 @@ import {
   ocultarRiesgoAlto,
   ocultarTodo,
   ordenarHallazgos,
+  contarAdvertencias,
+  etiquetaNivelMostrado,
+  nivelMostrado,
   pendientes,
   quitarManual,
   rehacer,
@@ -200,8 +203,9 @@ describe('acciones masivas', () => {
     expect(Object.keys(r.decisiones).sort()).toEqual(['a', 'b']);
   });
 
-  it('ocultar riesgo alto incluye las caras si podría haber menores', () => {
-    expect(Object.keys(ocultarRiesgoAlto(REVISION_INICIAL, lista).decisiones).sort()).toEqual(['a', 'b']);
+  it('ocultar riesgo alto incluye las caras solo si dijiste que hay menores', () => {
+    // Sin respuesta, una cara es riesgo bajo: el botón oculta lo que la pantalla marca como alto.
+    expect(ocultarRiesgoAlto(REVISION_INICIAL, lista).decisiones).toEqual({});
     const conSi = responderMenores(REVISION_INICIAL, lista, true);
     expect(Object.keys(ocultarRiesgoAlto(conSi, lista).decisiones).sort()).toEqual(['a', 'b']);
   });
@@ -235,13 +239,15 @@ describe('veredicto: una falla nunca parece limpia', () => {
   it.each([
     [analisis([]), 'sin_hallazgos'],
     [analisis([gps]), 'con_advertencias'],
+    [analisis([cara('a'), menores]), 'leve'],
+    [analisis([cara('a'), menores, gps]), 'con_advertencias'],
     [analisis([], ['modelo_no_disponible']), 'parcial'],
     [analisis([gps], ['deteccion_fallo']), 'parcial'],
   ] as const)('%#', (a, esperado) => {
     expect(veredicto(a)).toBe(esperado);
   });
 
-  it.each(['parcial', 'con_advertencias', 'sin_hallazgos'] as Veredicto[])('%s tiene título', (v) => {
+  it.each(['parcial', 'con_advertencias', 'leve', 'sin_hallazgos'] as Veredicto[])('%s tiene título', (v) => {
     expect(tituloVeredicto(v).length).toBeGreaterThan(0);
   });
 
@@ -726,5 +732,50 @@ describe('visor: zona bajo el puntero', () => {
 
   it('sin zonas no elige nada', () => {
     expect(zonaEnPunto(1, 1, [])).toBeNull();
+  });
+});
+
+describe('nivel mostrado: menos alarma con lo cotidiano, nunca menos con lo grave', () => {
+  const placa = (requiere: boolean): Hallazgo => ({ id: 'p', regla_id: 'MAT-01', caja: { x: 0, y: 0, ancho: 9, alto: 9 }, confianza: requiere ? 0.2 : 0.9, requiere_revision: requiere, posicion: 'al centro' });
+  const documento = (requiere: boolean): Hallazgo => ({ ...placa(requiere), id: 'd', regla_id: 'DOC-01' });
+  const bano: Hallazgo = { id: 'b', regla_id: 'INT-01', caja: null, confianza: 0.8, requiere_revision: true, posicion: null };
+
+  it('una cara con tu amigo es riesgo bajo y la pregunta de menores es neutral', () => {
+    expect(nivelMostrado(cara('a'), REVISION_INICIAL)).toBe('bajo');
+    expect(nivelMostrado(menores, REVISION_INICIAL)).toBe('pregunta');
+    expect(etiquetaNivelMostrado('pregunta')).toBe('Pregunta');
+    expect(contarAdvertencias([cara('a'), menores])).toBe(1);
+  });
+
+  it('si dices que hay menores, la pregunta, las caras y el baño suben a riesgo alto', () => {
+    const r = responderMenores(REVISION_INICIAL, [cara('a')], true);
+    expect(nivelMostrado(menores, r)).toBe('alto');
+    expect(nivelMostrado(cara('a'), r)).toBe('alto');
+    expect(nivelMostrado(bano, r)).toBe('alto');
+    expect(nivelMostrado(placa(false), r)).toBe('medio');
+  });
+
+  it('si dices que no, nada sube', () => {
+    const r = responderMenores(REVISION_INICIAL, [], false);
+    expect(nivelMostrado(cara('a'), r)).toBe('bajo');
+    expect(nivelMostrado(bano, r)).toBe('bajo');
+    expect(nivelMostrado(menores, r)).toBe('pregunta');
+  });
+
+  it('con poca confianza lo medio baja a bajo, pero lo alto nunca baja', () => {
+    expect(nivelMostrado(placa(false), REVISION_INICIAL)).toBe('medio');
+    expect(nivelMostrado(placa(true), REVISION_INICIAL)).toBe('bajo');
+    expect(nivelMostrado(documento(true), REVISION_INICIAL)).toBe('alto');
+    expect(nivelMostrado(gps, REVISION_INICIAL)).toBe('alto');
+  });
+
+  it('propiedad: el nivel mostrado de algo de riesgo alto siempre es alto', () => {
+    const altas = catalogo.reglas.filter((r) => r.nivel_riesgo === 'alto' && r.requiere_confirmacion !== true);
+    fc.assert(
+      fc.property(fc.constantFrom(...altas), fc.boolean(), fc.constantFrom(null, true, false), (regla, requiere, hay) => {
+        const h: Hallazgo = { ...placa(requiere), regla_id: regla.id };
+        return nivelMostrado(h, { ...REVISION_INICIAL, hayMenores: hay }) === 'alto';
+      }),
+    );
   });
 });

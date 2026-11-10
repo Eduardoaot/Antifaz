@@ -145,6 +145,9 @@ def _confirmar_con(monkeypatch: pytest.MonkeyPatch, probabilidad: float) -> list
         def escena(self, _p: object) -> dict[str, float]:
             return {"ARM-01": 0.0, "EXT-01": 0.0, "DES-01": 0.0, "SUG-01": 0.0}
 
+        def probabilidad_bano(self, _p: object) -> float:
+            return 0.0
+
         def zonas(self, _p: object, _u: float) -> list[object]:
             return []
 
