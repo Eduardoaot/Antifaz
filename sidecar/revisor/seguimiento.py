@@ -38,10 +38,11 @@ ARCHIVOS_EDGETAM = {
 # qa/RANGOS.md, "Procesamiento de video": lado corto del proxy.
 PROXY_LADO_MIN = 240
 PROXY_LADO_MAX = 720
-# Cada cuántos frames del proxy se llama a EdgeTAM. 4 ≈ 6 llamadas/s a 24 fps de tracking.
+# Cada cuántos frames del proxy se llama a EdgeTAM. 8 ≈ 3 llamadas/s a 24 fps de tracking.
+# Medido en docs/benchmarks (paso 8, proxy 360): 0 % visible y ~89 s por 15 s de video.
 PASO_CLAVE_MIN = 1
 PASO_CLAVE_MAX = 24
-PASO_CLAVE_DEFAULT = 4
+PASO_CLAVE_DEFAULT = 8
 # Margen extra sobre la caja de CSRT al unirla con la silueta trasladada (fail-closed).
 MARGEN_CAJA_CSRT_PCT = 15.0
 MARGEN_CAJA_CSRT_PX = 8

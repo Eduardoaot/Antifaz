@@ -119,9 +119,9 @@ FFmpeg 9.0.2 y exiftool 13.61, con hash fijado en `sidecar/revisor/herramientas.
 
 | Parámetro | Tipo | Mín | Máx | Default | Ante un valor inválido |
 |---|---|---|---|---|---|
-| `proxy.lado_corto_px` | entero, px | 240 (propuesta) | 720 (propuesta) | 480 (medido: EdgeTAM tarda 1.85 s por frame en el i5) | Estándar |
+| `proxy.lado_corto_px` | entero, px | 240 (propuesta) | 720 (propuesta) | 360 (medido en docs/benchmarks: mejor tiempo con 0 % visible en el i5-1245U) | Estándar |
 | `tracking.fps` | decimal, fps | 1 (propuesta) | 30 (propuesta) | 24 (beta; decisión del responsable, 2026-11-06) | Estándar. Entre frames rastreados se interpola y se amplía la máscara. Si el video tiene menos fps, se rastrea cada frame |
-| `tracking.paso_clave` | entero, frames del proxy | 1 | 24 | 4 (propuesta; docs/benchmarks) | Estándar. EdgeTAM corre una sola vez sobre esos keyframes (video corto); CSRT rellena los huecos trasladando la silueta y uniéndola a la caja ampliada. Si CSRT se pierde, máscara vacía y `pistas` marca revisión |
+| `tracking.paso_clave` | entero, frames del proxy | 1 | 24 | 8 (medido en docs/benchmarks: 0 % visible; ~22 s por 3 s y ~89 s por 15 s a proxy 360) | Estándar. EdgeTAM corre una sola vez sobre esos keyframes (video corto); CSRT rellena los huecos trasladando la silueta y uniéndola a la caja ampliada. Si CSRT se pierde, máscara vacía y `pistas` marca revisión |
 | `tracking.margen_caja_csrt_pct` | decimal, % | n/a | n/a | 15 | Constante interna. Amplía la caja de CSRT antes de unirla a la silueta trasladada |
 | `tracking.margen_caja_csrt_px` | entero, px | n/a | n/a | 8 | Constante interna. Piso del margen de la caja de CSRT |
 | `bloque.frames` | entero, frames | 30 (propuesta) | 3000 (propuesta) | 300 (propuesta) | Estándar |

@@ -113,14 +113,14 @@ def abrir(original: Path, falsas: Falsas | None = None) -> tuple[video_app.Video
 @pytest.mark.parametrize(
     ("ancho", "alto", "esperado"),
     [
-        (1920, 1080, (852, 480)),
-        (1080, 1920, (480, 852)),
-        (640, 480, (640, 480)),
-        (480, 480, (480, 480)),
+        (1920, 1080, (640, 360)),
+        (1080, 1920, (360, 640)),
+        (640, 480, (480, 360)),
+        (480, 480, (360, 360)),
         (320, 240, (320, 240)),
         (100, 100, (240, 240)),
         (16, 16, (240, 240)),
-        (3841, 2161, (852, 480)),
+        (3841, 2161, (640, 360)),
     ],
 )
 def test_dimensiones_proxy(ancho: int, alto: int, esperado: tuple[int, int]) -> None:

@@ -1,8 +1,8 @@
 """Video en la app: abrir, ver un frame, seguir un objeto, quitarlo y exportar.
 
-Flujo de la beta: hasta 3 s, seguimiento a 24 fps sobre un proxy de 480 px, con el híbrido
-EdgeTAM (keyframes) + CSRT (entre medias). En video todavía no hay detección automática: la
-persona elige qué ocultar, y la app lo dice.
+Flujo de la beta: hasta 3 s, seguimiento a 24 fps sobre un proxy de 360 px, con el híbrido
+EdgeTAM (keyframes cada `tracking.paso_clave`) + CSRT (entre medias). En video todavía no hay
+detección automática: la persona elige qué ocultar, y la app lo dice.
 
 Privacidad:
 - Los frames sin ocultar solo viven en memoria y en tuberías con FFmpeg (SEG-004).
@@ -39,7 +39,7 @@ from .seguimiento import Punto, Seguidor
 
 registro = logging.getLogger(__name__)
 
-PROXY_LADO = 480
+PROXY_LADO = 360
 PROXY_LADO_MIN = 240
 PROXY_LARGO_MAX = 4096
 TIEMPO_DECODIFICAR_S = 300.0
@@ -97,7 +97,7 @@ def _par(valor: int) -> int:
 
 
 def dimensiones_proxy(ancho: int, alto: int) -> tuple[int, int]:
-    """Lado corto de 480 px. Uno más chico se amplía hasta 240, el mínimo de EdgeTAM. Siempre pares."""
+    """Lado corto de 360 px. Uno más chico se amplía hasta 240, el mínimo de EdgeTAM. Siempre pares."""
     corto, largo = min(ancho, alto), max(ancho, alto)
     objetivo = PROXY_LADO if corto >= PROXY_LADO else max(corto, PROXY_LADO_MIN)
     largo_proxy = round(largo * objetivo / corto)

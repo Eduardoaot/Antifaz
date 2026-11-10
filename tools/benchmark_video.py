@@ -53,7 +53,7 @@ MODELOS_HF = {
     "edgetam": ("yonigozlan/EdgeTAM-hf", "c266ce53b3fc00f0f495b583f6a116c4e57f53bb"),
 }
 METODOS = ["sam2.1-tiny", "edgetam", "csrt", "yunet", "hibrido"]
-PASO_HIBRIDO = 4  # mismo default que sidecar/revisor/seguimiento.py
+PASO_HIBRIDO = 8  # default alineado con sidecar; se puede sobreescribir con --paso
 
 
 # --- Video sintético con respuesta conocida ---------------------------------------------------
@@ -193,18 +193,19 @@ def seguir_csrt(frames: list[np.ndarray], caja0: tuple[int, int, int, int]) -> t
     return mascaras, time.perf_counter() - inicio
 
 
-def seguir_hibrido(frames: list[np.ndarray], punto: tuple[int, int]) -> tuple[dict[int, np.ndarray], float]:
+def seguir_hibrido(
+    frames: list[np.ndarray], punto: tuple[int, int], paso: int = PASO_HIBRIDO
+) -> tuple[dict[int, np.ndarray], float]:
     """Usa el SeguidorHibrido del sidecar (EdgeTAM en keyframes + CSRT)."""
     import sys
 
     sidecar = str(RAIZ / "sidecar")
     if sidecar not in sys.path:
         sys.path.insert(0, sidecar)
-    from revisor.seguimiento import PASO_CLAVE_DEFAULT, Punto, SeguidorEdgeTam, SeguidorHibrido
+    from revisor.seguimiento import Punto, SeguidorEdgeTam, SeguidorHibrido
 
-    assert PASO_CLAVE_DEFAULT == PASO_HIBRIDO
     edgetam = SeguidorEdgeTam(RAIZ / "sidecar" / "modelos")
-    hibrido = SeguidorHibrido(edgetam, paso=PASO_HIBRIDO)
+    hibrido = SeguidorHibrido(edgetam, paso=paso)
     inicio = time.perf_counter()
     mascaras = hibrido.seguir(frames, 0, Punto(punto[0], punto[1]))
     return mascaras, time.perf_counter() - inicio
@@ -285,9 +286,18 @@ class Resultado:
     peor_frame_visible_pct: float
     cobertura_media_pct: float
     cara_elegida_en_frame0_pct: float
+    paso_clave: int | None = None
 
 
-def correr(metodo: str, fps: int, proxy: int, segundos: float, hilos: int, fps_video: int = FPS_VIDEO) -> Resultado:
+def correr(
+    metodo: str,
+    fps: int,
+    proxy: int,
+    segundos: float,
+    hilos: int,
+    fps_video: int = FPS_VIDEO,
+    paso_clave: int = PASO_HIBRIDO,
+) -> Resultado:
     import torch
 
     torch.set_num_threads(hilos)
@@ -308,7 +318,7 @@ def correr(metodo: str, fps: int, proxy: int, segundos: float, hilos: int, fps_v
         case "yunet":
             locales, segundos_cpu = seguir_yunet(sub, caja0)
         case "hibrido":
-            locales, segundos_cpu = seguir_hibrido(sub, centro0)
+            locales, segundos_cpu = seguir_hibrido(sub, centro0, paso_clave)
         case _:
             raise SystemExit(f"método desconocido: {metodo}")
     rastreados = {indices[k]: m for k, m in locales.items()}
@@ -341,6 +351,7 @@ def correr(metodo: str, fps: int, proxy: int, segundos: float, hilos: int, fps_v
         peor_frame_visible_pct=round(100 * max(visibles), 1),
         cobertura_media_pct=round(100 * float(np.mean(coberturas)), 2),
         cara_elegida_en_frame0_pct=round(100 * float(seleccion.sum()) / float(verdades[0].sum()), 1),
+        paso_clave=paso_clave if metodo == "hibrido" else None,
     )
 
 
@@ -361,6 +372,7 @@ def main() -> int:
     p.add_argument("--fps", type=int, nargs="+", default=[5, 10])
     p.add_argument("--proxy", type=int, nargs="+", default=[480])
     p.add_argument("--metodos", nargs="+", choices=METODOS, default=METODOS)
+    p.add_argument("--paso", type=int, default=PASO_HIBRIDO, help="paso de keyframes del híbrido")
     p.add_argument("--salida", type=Path, default=None)
     p.add_argument("--una", nargs=3, metavar=("METODO", "FPS", "PROXY"), help=argparse.SUPPRESS)
     a = p.parse_args()
@@ -368,26 +380,36 @@ def main() -> int:
         p.error("hilos de 1 a 256, segundos de más de 0 a 600 y fps del video de 1 a 240")
     if any(not 1 <= f <= a.fps_video for f in a.fps):
         p.error("cada fps de tracking va de 1 al fps del video")
+    if not 1 <= a.paso <= 24:
+        p.error("paso de keyframes de 1 a 24")
     _fijar_nucleos(a.hilos)
 
     if a.una is not None:
         metodo, fps, proxy = a.una[0], int(a.una[1]), int(a.una[2])
-        print(json.dumps(asdict(correr(metodo, fps, proxy, a.segundos, a.hilos, a.fps_video))))
+        print(json.dumps(asdict(correr(metodo, fps, proxy, a.segundos, a.hilos, a.fps_video, a.paso))))
         return 0
 
     resultados: list[dict[str, Any]] = []
     for metodo in a.metodos:
         for proxy in a.proxy:
             for fps in a.fps:
-                print(f"… {metodo}, {fps} fps, proxy {proxy}", flush=True)
+                etiqueta = f"{metodo}, {fps} fps, proxy {proxy}"
+                if metodo == "hibrido":
+                    etiqueta += f", paso {a.paso}"
+                print(f"… {etiqueta}", flush=True)
                 hecho = subprocess.run(
                     [sys.executable, __file__, "--una", metodo, str(fps), str(proxy),
-                     "--hilos", str(a.hilos), "--segundos", str(a.segundos), "--fps-video", str(a.fps_video)],
+                     "--hilos", str(a.hilos), "--segundos", str(a.segundos), "--fps-video", str(a.fps_video),
+                     "--paso", str(a.paso)],
                     capture_output=True, text=True, encoding="utf-8",
                 )
                 if hecho.returncode != 0:
                     print(f"   falló: {hecho.stderr.strip().splitlines()[-1:]}", flush=True)
-                    resultados.append({"metodo": metodo, "fps_tracking": fps, "lado_proxy": proxy, "error": hecho.stderr[-2000:]})
+                    resultados.append({
+                        "metodo": metodo, "fps_tracking": fps, "lado_proxy": proxy,
+                        "paso_clave": a.paso if metodo == "hibrido" else None,
+                        "error": hecho.stderr[-2000:],
+                    })
                     continue
                 r = json.loads(hecho.stdout.strip().splitlines()[-1])
                 resultados.append(r)
@@ -402,6 +424,7 @@ def main() -> int:
         "hilos_usados": a.hilos,
         "segundos_de_video": a.segundos,
         "fps_video": a.fps_video,
+        "paso_clave": a.paso,
         "modelos": MODELOS_HF,
     }
     informe = {"equipo": equipo, "resultados": resultados}
