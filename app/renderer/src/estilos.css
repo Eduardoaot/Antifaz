@@ -420,6 +420,8 @@ summary { cursor: pointer; min-height: 1.75rem; font-weight: 500; }
 .sticker .manija.se { left: 100%; top: 100%; transform: translate(-50%, -50%); cursor: nwse-resize; }
 /* Mientras se arrastra: la cara que nunca puede quedar al descubierto. */
 .ovalo-cara { position: absolute; z-index: 1; border: 2px dashed #fff; outline: 1px dashed #000; border-radius: 50%; pointer-events: none; }
+/* En lo que no es cara, lo que no puede destaparse es la zona completa: se marca como caja. */
+.ovalo-cara.zona-fija { border-radius: 0; }
 .advertencias { display: grid; gap: 0.75rem; }
 .advertencia {
   display: grid; gap: 0.625rem; padding: 0.875rem 1rem;

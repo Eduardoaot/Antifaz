@@ -71,6 +71,8 @@ import {
   pasoZoom,
   textoZoom,
   zonaEnPunto,
+  zonasConSticker,
+  hallazgoDeManual,
 } from '../../app/shared/logica';
 
 const cara = (id: string, x = 10): Hallazgo => ({
@@ -216,12 +218,48 @@ describe('tamaño del sticker sobre una cara', () => {
   const conEmoji = (efecto: 'emoji_sonrisa' | 'difuminado' = 'emoji_sonrisa'): Revision =>
     elegirEfecto(decidir(REVISION_INICIAL, 'a', 'ocultar'), 'a', efecto);
 
-  it('solo un emoji sobre una cara con su caja del detector cambia de tamaño', () => {
+  it('cualquier zona con emoji cambia de tamaño y se mueve; sin emoji o sin zona, no', () => {
     expect(ajustaSticker(conEmoji(), conNucleo())).toBe(true);
     expect(ajustaSticker(conEmoji('difuminado'), conNucleo())).toBe(false);
-    expect(ajustaSticker(conEmoji(), cara('a'))).toBe(false);
-    expect(ajustaSticker(conEmoji(), { ...conNucleo(), nucleo: null })).toBe(false);
-    expect(ajustaSticker(conEmoji(), { ...conNucleo(), regla_id: 'MAT-01' })).toBe(false);
+    expect(ajustaSticker(conEmoji(), cara('a'))).toBe(true);
+    expect(ajustaSticker(conEmoji(), { ...conNucleo(), nucleo: null })).toBe(true);
+    expect(ajustaSticker(conEmoji(), { ...conNucleo(), regla_id: 'MAT-01' })).toBe(true);
+    expect(ajustaSticker(conEmoji(), { ...conNucleo(), caja: null })).toBe(false);
+  });
+
+  it('sin cara del detector, el sticker no baja de su tamaño y solo se mueve al agrandarlo', () => {
+    const placa: Hallazgo = { ...conNucleo(), regla_id: 'MAT-01', nucleo: null };
+    expect(escalaMinimaSticker(placa)).toBe(1);
+    // A tamaño normal no se aleja del centro; al 150 % ya puede.
+    expect(posicionDe(ajustarSticker(conEmoji(), placa, { posicion: { x: 0.3, y: 0 } }), 'a')).toEqual({ x: 0, y: 0 });
+    const grande = ajustarSticker(conEmoji(), placa, { escala: 1.5 });
+    expect(posicionDe(ajustarSticker(grande, placa, { posicion: { x: 0.3, y: 0 } }), 'a')).toEqual({ x: 0.3, y: 0 });
+    const [o] = construirOcultamientos(ajustarSticker(grande, placa, { posicion: { x: 0.3, y: 0 } }), [placa]);
+    expect(o).toMatchObject({ forma: 'caja', nucleo: null, escala: 1.5, desplazamiento_x: 0.3, desplazamiento_y: 0 });
+    expect(esquemaOcultamiento.safeParse(o).success).toBe(true);
+  });
+
+  it('tus zonas con emoji también tienen sticker, con su tamaño y posición', () => {
+    let r = agregarManual(REVISION_INICIAL, 'm', { x: 100, y: 100, ancho: 80, alto: 60 }, null, 'rectangulo');
+    expect(zonasConSticker(r, [])).toEqual([]);
+    r = efectoDeManual(r, 'm', 'emoji_mono');
+    const [zona] = zonasConSticker(r, []);
+    expect(zona).toEqual(hallazgoDeManual(r.manuales[0]!));
+    expect(efectoDe(r, zona!)).toBe('emoji_mono');
+    r = ajustarSticker(ajustarSticker(r, zona!, { escala: 1.6 }), zona!, { posicion: { x: -0.4, y: 0.2 } });
+    const [o] = construirOcultamientos(r, []);
+    expect(o).toMatchObject({ efecto: 'emoji_mono', forma: 'caja', nucleo: null, escala: 1.6, desplazamiento_x: -0.4, desplazamiento_y: 0.2 });
+    // Con otro efecto, el ajuste guardado no se envía.
+    expect(construirOcultamientos(efectoDeManual(r, 'm', 'solido'), [])[0]).toMatchObject({ escala: 1, desplazamiento_x: 0, desplazamiento_y: 0 });
+    // Al quitar la zona, su sticker se va con ella.
+    expect(stickerAjustado(quitarManual(r, 'm'), 'm')).toBe(false);
+  });
+
+  it('solo cuentan las zonas detectadas que decidiste ocultar', () => {
+    const placa: Hallazgo = { ...conNucleo('p'), regla_id: 'MAT-01', nucleo: null };
+    const r = elegirEfecto(REVISION_INICIAL, 'p', 'emoji_estrella');
+    expect(zonasConSticker(r, [placa])).toEqual([]);
+    expect(zonasConSticker(decidir(r, 'p', 'ocultar'), [placa])).toEqual([placa]);
   });
 
   it('el mínimo sale de la cara frente a la zona con margen, redondeado hacia arriba al paso', () => {

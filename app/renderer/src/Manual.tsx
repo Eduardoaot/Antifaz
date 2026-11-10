@@ -1,8 +1,22 @@
 import { useState, type SyntheticEvent } from 'react';
-import { esquemaEfecto, LIMITES } from '../../shared/contrato';
+import { esEmoji, esquemaEfecto, LIMITES } from '../../shared/contrato';
+import { AjusteSticker } from './Advertencias';
 import { OpcionesEmoji } from './OpcionesEmoji';
 import { eventosResaltar } from './resaltar';
-import { efectoManual, leerCaja, leerPunto, textoOrigen, type Herramienta, type Caja, type Resaltado, type Revision, type ZonaManual } from '../../shared/logica';
+import {
+  ajustarSticker,
+  efectoManual,
+  hallazgoDeManual,
+  leerCaja,
+  leerPunto,
+  restablecerSticker,
+  textoOrigen,
+  type Herramienta,
+  type Caja,
+  type Resaltado,
+  type Revision,
+  type ZonaManual,
+} from '../../shared/logica';
 
 interface Props {
   ancho: number;
@@ -20,6 +34,11 @@ interface Props {
   /** Zona resaltada a la vez aquí y en la imagen. */
   resaltado?: Resaltado | null;
   alResaltar?: (r: Resaltado | null) => void;
+  /** Sticker elegido en la foto o en un panel: sus ajustes quedan abiertos. */
+  seleccionSticker?: string | null;
+  alSeleccionarSticker?: (id: string | null) => void;
+  /** Tamaño y posición del sticker de tu zona. */
+  alCambiarRevision?: (cambio: (r: Revision) => Revision) => void;
 }
 
 const HERRAMIENTAS: readonly { valor: Herramienta; texto: string }[] = [
@@ -29,7 +48,7 @@ const HERRAMIENTAS: readonly { valor: Herramienta; texto: string }[] = [
   { valor: 'pincel', texto: 'Pintar con pincel' },
 ];
 
-export function Manual({ ancho, alto, herramienta, tamanoPincel, revision, ocupado, alElegirHerramienta, alCambiarTamano, alAgregarCaja, alBuscarEnPunto, alQuitar, alCambiarEfecto, resaltado = null, alResaltar }: Props): React.JSX.Element {
+export function Manual({ ancho, alto, herramienta, tamanoPincel, revision, ocupado, alElegirHerramienta, alCambiarTamano, alAgregarCaja, alBuscarEnPunto, alQuitar, alCambiarEfecto, resaltado = null, alResaltar, seleccionSticker = null, alSeleccionarSticker, alCambiarRevision }: Props): React.JSX.Element {
   const [valores, setValores] = useState({ x: '', y: '', ancho: '', alto: '' });
   const [error, setError] = useState<string | null>(null);
 
@@ -121,6 +140,17 @@ export function Manual({ ancho, alto, herramienta, tamanoPincel, revision, ocupa
                   </select>
                 </label>
                 <button type="button" className="boton" onClick={() => { alQuitar(z.id); }}>Quitar<span className="solo-lector"> tu zona {i + 1}</span></button>
+                {esEmoji(z.efecto) && alCambiarRevision !== undefined && (
+                  <AjusteSticker
+                    hallazgo={hallazgoDeManual(z)}
+                    numero={i + 1}
+                    revision={revision}
+                    abierto={seleccionSticker === z.id}
+                    alAbrir={(abrir) => { alSeleccionarSticker?.(abrir ? z.id : null); }}
+                    alAjustar={(hz, cambio) => { alCambiarRevision((r) => ajustarSticker(r, hz, cambio)); }}
+                    alRestablecer={(sid) => { alCambiarRevision((r) => restablecerSticker(r, sid)); }}
+                  />
+                )}
               </div>
             </li>
           ))}

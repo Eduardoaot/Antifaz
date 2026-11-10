@@ -45,7 +45,7 @@ interface Props {
 const pct = (v: number, total: number): string => `${(v / total) * 100}%`;
 
 /**
- * Marco para mover el sticker de una cara y cambiar su tamaño desde la foto. Mientras se arrastra solo
+ * Marco para mover el sticker de cualquier zona y cambiar su tamaño desde la foto. Mientras se arrastra solo
  * se mueve el marco con una copia del emoji; al soltar, el sidecar dibuja la vista previa real. Así cada
  * arrastre es un paso de deshacer y una sola vista previa.
  */
@@ -53,8 +53,10 @@ export function MarcoSticker({ hallazgo, emoji, revision, ancho, alto, lienzo, s
   const [provisional, setProvisional] = useState<{ escala: number; posicion: Posicion } | null>(null);
   const arrastre = useRef<Arrastre | null>(null);
   const caja = hallazgo.caja;
-  const nucleo = hallazgo.nucleo;
-  if (caja === null || nucleo === undefined || nucleo === null) return null;
+  if (caja === null) return null;
+  // Lo que nunca puede quedar al descubierto: la cara del detector, o la zona completa si no es cara.
+  const cara = hallazgo.nucleo ?? null;
+  const fija = cara ?? caja;
 
   const escala = provisional?.escala ?? escalaDe(revision, hallazgo.id);
   const posicion = provisional?.posicion ?? posicionDe(revision, hallazgo.id);
@@ -127,15 +129,15 @@ export function MarcoSticker({ hallazgo, emoji, revision, ancho, alto, lienzo, s
   return (
     <>
       {provisional !== null && (
-        // Lo que no puede quedar al descubierto: la cara que vio el detector, con su margen mínimo.
+        // Lo que no puede quedar al descubierto, con su margen mínimo: óvalo en una cara, caja en lo demás.
         <div
           aria-hidden="true"
-          className="ovalo-cara"
+          className={cara === null ? 'ovalo-cara zona-fija' : 'ovalo-cara'}
           style={{
-            left: pct(nucleo.x - margenCara, ancho),
-            top: pct(nucleo.y - margenCara, alto),
-            width: pct(nucleo.ancho + 2 * margenCara, ancho),
-            height: pct(nucleo.alto + 2 * margenCara, alto),
+            left: pct(fija.x - margenCara, ancho),
+            top: pct(fija.y - margenCara, alto),
+            width: pct(fija.ancho + 2 * margenCara, ancho),
+            height: pct(fija.alto + 2 * margenCara, alto),
           }}
         />
       )}

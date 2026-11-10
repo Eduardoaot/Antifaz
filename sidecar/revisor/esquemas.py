@@ -61,10 +61,11 @@ class Ocultamiento(Estricto):
     forma: Literal["caja", "elipse"] = "caja"
     # La cara que vio el detector, sin margen. Solo con ella el emoji puede ser más chico que su zona.
     nucleo: CajaImagen | None = None
-    # Tamaño del emoji en veces el que se elige solo. Nunca queda más chico de lo que tapa el núcleo.
+    # Tamaño del emoji en veces el que se elige solo. Nunca queda más chico de lo que debe tapar: el
+    # núcleo en una cara, o la zona completa en las demás.
     escala: Annotated[float, Field(ge=ESCALA_STICKER_MIN, le=ESCALA_STICKER_MAX)] = 1.0
-    # Desplazamiento del emoji en fracciones de los semiejes de su zona. Solo cuenta con núcleo, y el
-    # emoji crece lo necesario para seguir tapándolo.
+    # Desplazamiento del emoji en fracciones de los semiejes de su zona, en cualquier zona. El emoji
+    # crece lo necesario para seguir tapando lo que debe, y el relleno de debajo no cambia.
     desplazamiento_x: Annotated[float, Field(ge=-POSICION_STICKER_MAX, le=POSICION_STICKER_MAX)] = 0.0
     desplazamiento_y: Annotated[float, Field(ge=-POSICION_STICKER_MAX, le=POSICION_STICKER_MAX)] = 0.0
 

@@ -628,13 +628,75 @@ def test_mover_el_sticker_lo_lleva_hacia_ese_lado() -> None:
     assert not np.array_equal(centrado, arriba)
 
 
-@pytest.mark.parametrize("efecto", [*EFECTOS, "emoji_sonrisa"])
-def test_sin_cara_del_detector_el_desplazamiento_no_cuenta(efecto: str) -> None:
-    """Sin núcleo no hay contra qué comprobar que siga tapando: el emoji se queda centrado."""
+@pytest.mark.parametrize("efecto", EFECTOS)
+def test_sin_emoji_el_desplazamiento_no_cuenta(efecto: str) -> None:
+    """Mover y agrandar solo existen para el emoji: un bloque, difuminado o pixelado no cambian."""
     a = _imagen()
     normal, _ = efectos.aplicar(a, [_cara(efecto, nucleo=None)])
-    movido, _ = efectos.aplicar(a, [_cara(efecto, nucleo=None, desplazamiento_x=0.5, desplazamiento_y=-0.5)])
+    movido, _ = efectos.aplicar(a, [_cara(efecto, nucleo=None, escala=1.5, desplazamiento_x=0.5, desplazamiento_y=-0.5)])
     assert np.array_equal(normal, movido)
+
+
+# --- Sticker en zonas que no son caras (pecho, texto, placas, tus zonas) -----------------------------
+
+
+def _zona(efecto: str = "emoji_sonrisa", **extra: Any) -> Any:
+    return oculto(110, 70, 60, 40, efecto, **extra)
+
+
+@pytest.mark.parametrize("efecto", EMOJIS)
+@pytest.mark.parametrize(("dx", "dy", "escala"), [(0.6, 0.0, 1.6), (-2.0, 2.0, 2.0), (0.0, -1.0, 1.0), (0.0, 0.0, 0.25)])
+def test_sticker_movido_en_otra_zona_la_sigue_tapando_completa(efecto: str, dx: float, dy: float, escala: float) -> None:
+    """Movido, agrandado o pedido más chico, nada de lo que había en la zona llega a la salida."""
+    a = _imagen()
+    o = _zona(efecto, escala=escala, desplazamiento_x=dx, desplazamiento_y=dy)
+    salida_a, _ = efectos.aplicar(a, [o])
+    salida_b, _ = efectos.aplicar(255 - a, [o])
+    x0, y0, x1, y1 = efectos.region_dilatada(o, 200, 300)
+    assert np.array_equal(salida_a[y0:y1, x0:x1], salida_b[y0:y1, x0:x1])
+
+
+def test_sticker_en_otra_zona_se_mueve_hacia_ese_lado() -> None:
+    a = _imagen()
+    centrado, regiones_c = efectos.aplicar(a, [_zona(escala=1.6)])
+    derecha, regiones_d = efectos.aplicar(a, [_zona(escala=1.6, desplazamiento_x=0.6)])
+    assert not np.array_equal(centrado, derecha)
+    assert regiones_d[0][2] > regiones_c[0][2], "el emoji no llegó más a la derecha"
+
+
+def test_sticker_pedido_mas_chico_en_otra_zona_no_se_encoge() -> None:
+    """Sin cara del detector no hay un mínimo menor que la zona: el emoji no baja de su tamaño."""
+    a = _imagen()
+    normal, regiones_n = efectos.aplicar(a, [_zona()])
+    chico, regiones_c = efectos.aplicar(a, [_zona(escala=0.25)])
+    assert regiones_c[0] == regiones_n[0]
+    assert np.array_equal(normal, chico)
+
+
+def test_sticker_movido_con_silueta_tapa_la_silueta() -> None:
+    a = _imagen()
+    silueta = np.zeros((40, 60), dtype=bool)
+    silueta[5:35, 10:50] = True
+    o = _zona(mascara_id="m", escala=1.8, desplazamiento_x=1.0, desplazamiento_y=0.5)
+    salida_a, _ = efectos.aplicar(a, [o], {"m": silueta})
+    salida_b, _ = efectos.aplicar(255 - a, [o], {"m": silueta})
+    y0, x0 = 70 + 5, 110 + 10
+    assert np.array_equal(salida_a[y0 : y0 + 30, x0 : x0 + 40], salida_b[y0 : y0 + 30, x0 : x0 + 40])
+
+
+@given(
+    dx=st.floats(-2.0, 2.0),
+    dy=st.floats(-2.0, 2.0),
+    escala=st.floats(0.25, 2.0),
+    efecto=st.sampled_from(EMOJIS),
+)
+def test_propiedad_sticker_en_otra_zona_nunca_destapa(dx: float, dy: float, escala: float, efecto: str) -> None:
+    a = _imagen()
+    o = _zona(efecto, escala=escala, desplazamiento_x=dx, desplazamiento_y=dy)
+    salida_a, _ = efectos.aplicar(a, [o])
+    salida_b, _ = efectos.aplicar(255 - a, [o])
+    x0, y0, x1, y1 = efectos.region_dilatada(o, 200, 300)
+    assert np.array_equal(salida_a[y0:y1, x0:x1], salida_b[y0:y1, x0:x1])
 
 
 @given(

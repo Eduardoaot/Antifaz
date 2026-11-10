@@ -720,6 +720,9 @@ export function App(): React.JSX.Element {
                 alCambiarEfecto={(id, efecto) => { cambiarRevision(actual.info.id, (r) => efectoDeManual(r, id, efecto)); }}
                 resaltado={resaltado}
                 alResaltar={setResaltado}
+                seleccionSticker={sticker}
+                alSeleccionarSticker={setSticker}
+                alCambiarRevision={(cambio) => { cambiarRevision(actual.info.id, cambio); }}
               />
               </fieldset>
               <section aria-labelledby="titulo-resumen" className="resumen">

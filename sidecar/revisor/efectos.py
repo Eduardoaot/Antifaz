@@ -114,19 +114,26 @@ def _ovalo_nucleo(
     alto: int,
     ancho: int,
 ) -> NDArray[np.bool_] | None:
-    """La cara del detector con el margen mínimo, en coordenadas de la región, si el emoji se ajusta.
+    """Lo que el emoji ajustado debe seguir tapando, en coordenadas de la región. None si no se ajustó.
 
-    Solo aplica a un emoji sobre una cara (óvalo, sin silueta y lejos de la orilla) que se encogió o se
-    movió. En cualquier otro caso es None y el emoji tapa su zona completa, centrado, como siempre.
+    Un emoji que se encogió o se movió puede quedar en cualquier zona. En una cara (óvalo con núcleo,
+    sin silueta y lejos de la orilla) basta con la cara del detector y su margen mínimo. En cualquier
+    otra zona, lo que se tapa es la zona completa (o su silueta): ahí el relleno nunca se achica, así
+    que mover el emoji solo cambia dónde se ve, sin destapar nada.
     """
     n = o.nucleo
     movido = o.desplazamiento_x != 0 or o.desplazamiento_y != 0
-    if n is None or (o.escala >= 1 and not movido) or not es_emoji(o.efecto) or o.forma != "elipse":
+    if not es_emoji(o.efecto) or (o.escala >= 1 and not movido):
         return None
-    if _silueta(o, region, mascaras) is not None:
-        return None
-    if o.x == 0 or o.y == 0 or o.x + o.ancho >= ancho or o.y + o.alto >= alto:
-        return None
+    silueta = _silueta(o, region, mascaras)
+    orilla = o.x == 0 or o.y == 0 or o.x + o.ancho >= ancho or o.y + o.alto >= alto
+    if n is None or o.forma != "elipse" or silueta is not None or orilla:
+        # Lo mismo que la zona tapa sin ajustar: su silueta, su óvalo o la caja completa.
+        forma = _forma(o, region, mascaras, alto, ancho)
+        if forma is not None:
+            return forma
+        x0, y0, x1, y1 = region
+        return np.ones((y1 - y0, x1 - x0), dtype=bool)
     m = o.dilatacion_px
     x0, y0, x1, y1 = region
     cx, cy = (2 * n.x + n.ancho - 1) / 2, (2 * n.y + n.alto - 1) / 2
@@ -326,7 +333,8 @@ def aplicar(
     pares = list(zip(ocultamientos, regiones, strict=True))
     formas = [_forma(o, r, siluetas, alto, ancho) for o, r in pares]
     nucleos = [_ovalo_nucleo(o, r, siluetas, alto, ancho) for o, r in pares]
-    # Un sticker más chico que su zona solo oculta la cara del detector: lo demás queda como en la foto.
+    # Un sticker más chico que su zona de cara solo oculta la cara del detector: lo demás queda como en
+    # la foto. En las demás zonas, lo que se tapa sigue siendo la zona completa.
     recortes = [n if n is not None else f for f, n in zip(formas, nucleos, strict=True)]
     # Los bloques sólidos y los emojis primero: un difuminado vecino no debe tomar color de lo que tapan.
     fuente = pixeles.copy()
@@ -351,7 +359,7 @@ def aplicar(
             # El tamaño se mide siempre contra la zona completa: la escala es relativa a ese tamaño.
             objetivo = forma if forma is not None else np.ones((y1 - y0, x1 - x0), dtype=bool)
             centro = ((ux0 + ux1) / 2, (uy0 + uy1) / 2)
-            # Movido, en fracciones de los semiejes. Solo cuenta si la cara del detector manda.
+            # Movido, en fracciones de los semiejes. Solo cuenta con un mínimo que tapar (`nucleo` aquí).
             pegar_en = (
                 centro[0] + o.desplazamiento_x * (ux1 - ux0) / 2,
                 centro[1] + o.desplazamiento_y * (uy1 - uy0) / 2,
