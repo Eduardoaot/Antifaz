@@ -92,6 +92,25 @@ FRASES_NO_CARA = (
 )
 MARGEN_RECORTE_CARA = 0.35
 
+# ¿La foto parece tomada en un baño? Va aparte de FRASES_RIESGO a propósito: si compitiera con ellas,
+# un desnudo tomado en un baño repartiría su puntaje y DES-01 podría quedar bajo su umbral.
+FRASES_BANO = (
+    "a photo taken in a bathroom",
+    "a mirror selfie in a bathroom",
+    "a photo of a shower or bathtub",
+    "a photo of a toilet",
+)
+FRASES_NO_BANO = (
+    "a photo taken in a bedroom",
+    "a photo taken in a living room",
+    "a photo taken in a kitchen",
+    "a photo taken in an office",
+    "a photo taken in a restaurant or store",
+    "a photo taken outdoors",
+    "a photo taken at a pool or beach",
+    "a close-up photo of an object",
+)
+
 ETIQUETAS_NUDENET = (
     "FEMALE_GENITALIA_COVERED",
     "FACE_FEMALE",
@@ -200,9 +219,12 @@ class RevisorContenido:
         codificado_cara = tokenizador.encode_batch([*FRASES_CARA, *FRASES_NO_CARA])
         self._ids_cara = np.array([e.ids for e in codificado_cara], dtype=np.int64)
         self._mascara_cara = np.array([e.attention_mask for e in codificado_cara], dtype=np.int64)
+        codificado_bano = tokenizador.encode_batch([*FRASES_BANO, *FRASES_NO_BANO])
+        self._ids_bano = np.array([e.ids for e in codificado_bano], dtype=np.int64)
+        self._mascara_bano = np.array([e.attention_mask for e in codificado_bano], dtype=np.int64)
 
-    def escena(self, pixeles: Pixeles) -> dict[str, float]:
-        """Probabilidad de cada grupo de riesgo. Suman menos de 1 porque compiten con las frases neutras."""
+    def _entrada_completa(self, pixeles: Pixeles) -> Any:
+        """Recorte central de 224 px de la imagen completa, normalizado para CLIP."""
         rgb = pixeles[:, :, :3]
         alto, ancho = rgb.shape[:2]
         escala = LADO_CLIP / min(alto, ancho)
@@ -210,7 +232,11 @@ class RevisorContenido:
         reducida = cv2.resize(rgb, nuevo, interpolation=cv2.INTER_AREA if escala < 1 else cv2.INTER_CUBIC)
         y, x = (nuevo[1] - LADO_CLIP) // 2, (nuevo[0] - LADO_CLIP) // 2
         recorte = reducida[y : y + LADO_CLIP, x : x + LADO_CLIP].astype(np.float32) / 255
-        entrada = ((recorte - MEDIA_CLIP) / DESVIACION_CLIP).transpose(2, 0, 1)[None].astype(np.float32)
+        return ((recorte - MEDIA_CLIP) / DESVIACION_CLIP).transpose(2, 0, 1)[None].astype(np.float32)
+
+    def escena(self, pixeles: Pixeles) -> dict[str, float]:
+        """Probabilidad de cada grupo de riesgo. Suman menos de 1 porque compiten con las frases neutras."""
+        entrada = self._entrada_completa(pixeles)
         salidas: Any = self._clip.run(
             ["logits_per_image"],
             {"pixel_values": entrada, "input_ids": self._ids, "attention_mask": self._mascara},
@@ -240,6 +266,20 @@ class RevisorContenido:
         logits = salidas[0][0]
         exponente = np.exp(logits - logits.max())
         return float((exponente / exponente.sum())[: len(FRASES_CARA)].sum())
+
+    def probabilidad_bano(self, pixeles: Pixeles) -> float:
+        """Qué tan probable es que la foto completa esté tomada en un baño."""
+        salidas: Any = self._clip.run(
+            ["logits_per_image"],
+            {
+                "pixel_values": self._entrada_completa(pixeles),
+                "input_ids": self._ids_bano,
+                "attention_mask": self._mascara_bano,
+            },
+        )
+        logits = salidas[0][0]
+        exponente = np.exp(logits - logits.max())
+        return float((exponente / exponente.sum())[: len(FRASES_BANO)].sum())
 
     def zonas(self, pixeles: Pixeles, umbral: float) -> list[Zona]:
         bgr = pixeles[:, :, 2::-1]

@@ -77,10 +77,12 @@ def test_modelo_real_en_imagenes_comunes() -> None:
         assert all(0 <= v <= 1 for v in puntajes.values())
     assert max(revisor.escena(astronauta).values()) < analisis.UMBRAL_ESCENA
     assert revisor.zonas(astronauta, 0.25) == []
+    # Una foto en el espacio no parece un baño.
+    assert 0 <= revisor.probabilidad_bano(astronauta) < analisis.UMBRAL_BANO
     assert revisor.zonas(np.zeros((1, 1, 3), dtype=np.uint8), 0.25) == []
 
 
-def _simular(monkeypatch: pytest.MonkeyPatch, escena: dict[str, float], zonas: list[Zona]) -> None:
+def _simular(monkeypatch: pytest.MonkeyPatch, escena: dict[str, float], zonas: list[Zona], bano: float = 0.0) -> None:
     class SinObjetos:
         def buscar(self, _p: Any) -> list[Any]:
             return []
@@ -90,6 +92,9 @@ def _simular(monkeypatch: pytest.MonkeyPatch, escena: dict[str, float], zonas: l
     class Falso:
         def escena(self, _p: Any) -> dict[str, float]:
             return escena
+
+        def probabilidad_bano(self, _p: Any) -> float:
+            return bano
 
         def zonas(self, _p: Any, _u: float) -> list[Zona]:
             return zonas
@@ -161,3 +166,44 @@ def test_nunca_afirma_que_muestra_la_foto() -> None:
     for regla in cat["reglas"]:
         if regla["id"] in {"ARM-01", "EXT-01", "DES-01", "SUG-01"}:
             assert regla["texto_aviso"].startswith("Podría")
+
+
+@pytest.mark.parametrize(("bano", "aparece"), [(0.59, False), (0.6, True), (0.95, True)])
+def test_bano_es_aviso_de_riesgo_bajo_sobre_la_foto_completa(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, bano: float, aparece: bool
+) -> None:
+    _simular(monkeypatch, NEUTRO, [], bano)
+    resultado = _analizar(tmp_path)
+    hallazgos = [h for h in resultado["hallazgos"] if h["regla_id"] == "INT-01"]
+    assert bool(hallazgos) is aparece
+    assert "INT-01" in resultado["cobertura"]["reglas_revisadas"]
+    if aparece:
+        assert hallazgos[0]["caja"] is None
+        assert hallazgos[0]["requiere_revision"] is True
+
+
+def test_el_bano_no_le_quita_puntaje_a_la_desnudez(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """El baño va en su propia comparación: un desnudo en un baño se sigue avisando."""
+    _simular(monkeypatch, {**NEUTRO, "DES-01": 0.5}, [], 0.99)
+    reglas = {h["regla_id"] for h in _analizar(tmp_path)["hallazgos"]}
+    assert {"DES-01", "INT-01"} <= reglas
+    assert "INT-01" not in contenido.FRASES_RIESGO
+
+
+def test_si_falla_el_bano_la_revision_queda_parcial(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _simular(monkeypatch, NEUTRO, [])
+    original = contenido.revisor_de
+
+    def con_bano_roto(carpeta: Any) -> Any:
+        revisor = original(carpeta)
+
+        def romper(_p: Any) -> float:
+            raise RuntimeError("falla simulada")
+
+        revisor.probabilidad_bano = romper
+        return revisor
+
+    monkeypatch.setattr(contenido, "revisor_de", con_bano_roto)
+    resultado = _analizar(tmp_path)
+    assert resultado["cobertura"]["completa"] is False
+    assert "INT-01" not in resultado["cobertura"]["reglas_revisadas"]

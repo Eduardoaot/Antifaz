@@ -15,6 +15,9 @@ registro = logging.getLogger(__name__)
 REGLAS_DE_CARAS = ("CAR-01", "MEN-01")
 REGLA_DE_METADATOS = "UBI-01"
 REGLAS_DE_CONTENIDO = ("ARM-01", "EXT-01", "DES-01", "SUG-01")
+REGLA_DE_BANO = "INT-01"
+# Propuesta sin medir (2026-11-06). Es riesgo bajo y solo avisa: nunca oculta nada por sí sola.
+UMBRAL_BANO = 0.6
 # Medido en una muestra chica: imágenes comunes hasta 0.19, ejemplos de riesgo desde 0.71.
 UMBRAL_ESCENA = 0.35
 # Las protestas con banderas comunes dieron hasta 0.50, y los ejemplos reales desde 0.72.
@@ -140,6 +143,7 @@ def _revisar_contenido(
         revisor = contenido.revisor_de(carpeta_modelos)
         escena = revisor.escena(imagen.pixeles)
         zonas = revisor.zonas(imagen.pixeles, UMBRAL_ZONAS)
+        bano = revisor.probabilidad_bano(imagen.pixeles)
     except ModeloNoDisponible as e:
         registro.error("Modelos de contenido no disponibles: %s", e)
         motivos.append("contenido_no_disponible")
@@ -149,6 +153,18 @@ def _revisar_contenido(
         motivos.append("contenido_fallo")
         return
     revisadas.extend(REGLAS_DE_CONTENIDO)
+    revisadas.append(REGLA_DE_BANO)
+    if bano >= UMBRAL_BANO:
+        hallazgos.append(
+            {
+                "id": "escena-INT-01",
+                "regla_id": REGLA_DE_BANO,
+                "caja": None,
+                "confianza": round(bano, 3),
+                "requiere_revision": True,
+                "posicion": None,
+            }
+        )
     zonas = [z for z in zonas if _zona_creible(z, escena)]
     for i, zona in enumerate(zonas):
         hallazgos.append(

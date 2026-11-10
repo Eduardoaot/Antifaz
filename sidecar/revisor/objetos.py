@@ -42,11 +42,13 @@ CLASES = (
     Clase("a credit card", "FIN-01", 0.15),
     Clase("jewelry or a necklace", "VAL-02", 0.15),
     Clase("a street sign", "UBI-04", 0.1),
+    # Propuesta sin medir (2026-11-06): lo que importa es la vista, no la ventana. Riesgo bajo.
+    Clase("a window with a view of the street or buildings", "UBI-06", 0.2),
     Clase("a gun", "ARM-01", 0.3),
     Clase("a rifle", "ARM-01", 0.3),
     Clase("a flag", "EXT-01", 0.2),
 )
-REGLAS_DE_OBJETOS = ("MAT-01", "PAN-01", "VAL-02", "UBI-04")
+REGLAS_DE_OBJETOS = ("MAT-01", "PAN-01", "VAL-02", "UBI-04", "UBI-06")
 
 
 @dataclass(frozen=True)
