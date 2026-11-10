@@ -5,8 +5,10 @@ perdió el objeto) y decide qué ocultar en cada frame del video. Las reglas son
 
 - Entre dos frames rastreados se mueven ambas máscaras hacia el frame intermedio, se unen y se
   amplían. Es la interpolación que se midió en tools/benchmark_video.py.
-- Si el objeto se pierde a mitad de la pista, se oculta la caja que cubre la última y la siguiente
-  posición conocidas, y esos frames se marcan para revisión. Nunca se deja de ocultar.
+- Si el objeto se pierde a mitad de la pista: cerca de la última o siguiente aparición (mismo
+  `pista.margen_frames`) se oculta con margen extra y se marca revisión; en el medio de un hueco
+  largo no se inventa cuadro (el objeto suele haber salido del encuadre) pero sí se marca revisión.
+  Un hueco corto (ambas orillas a la vez) sí interpola el corredor, o ancla si el salto es grande.
 - Se oculta también `margen_frames` antes del primer frame y después del último en que aparece.
 - Al pasar del proxy a la resolución real, un píxel parcialmente cubierto cuenta como cubierto.
 
@@ -33,6 +35,11 @@ FPS_TRACKING_MIN = 1.0
 FPS_TRACKING_MAX = 30.0
 MARGEN_PX_MIN = 8
 MARGEN_PCT = 10.0
+# Multiplicador del margen de dilatación cuando el seguimiento perdió el objeto (fail-closed acotado).
+MARGEN_PERDIDO_MULT = 3
+# Si la distancia entre centros supera esto × la diagonal mayor, el objeto probablemente salió del
+# encuadre: no se pinta el corredor, solo la ancla temporal más cercana.
+SALTO_PERDIDO_MULT = 4.0
 
 
 @dataclass(frozen=True)
@@ -88,14 +95,6 @@ def _desplazar(m: Mascara, dx: float, dy: float) -> Mascara:
 def _centro(m: Mascara) -> tuple[float, float]:
     ys, xs = np.nonzero(m)
     return float(xs.mean()), float(ys.mean())
-
-
-def _caja_de_ambas(a: Mascara, b: Mascara) -> Mascara:
-    ca, cb = _caja(a), _caja(b)
-    assert ca is not None and cb is not None
-    salida = np.zeros_like(a)
-    salida[min(ca[1], cb[1]) : max(ca[3], cb[3]), min(ca[0], cb[0]) : max(ca[2], cb[2])] = True
-    return salida
 
 
 def _validar(rastreadas: dict[int, Mascara], total: int) -> tuple[int, int]:
@@ -155,15 +154,64 @@ class _Contexto:
         if t > ultimo:
             dentro = t - ultimo <= self.margen
             return ZonaFrame(t, _ampliada(self.rastreadas[ultimo]) if dentro else self.vacia, False)
-        return _zona_dentro(t, self.rastreadas, self.rastreados, self.con_objeto)
+        return _zona_dentro(t, self.rastreadas, self.rastreados, self.con_objeto, self.margen, self.vacia)
 
 
 def _ampliada(m: Mascara) -> Mascara:
     return _dilatar(m, margen_px(m))
 
 
+def _corredor(ma: Mascara, mb: Mascara, t: int, a: int, b: int) -> Mascara:
+    """Une las siluetas de a y b desplazadas hacia el frame t (cubre el trayecto)."""
+    if a == b:
+        return ma.copy()
+    (xa, ya), (xb, yb) = _centro(ma), _centro(mb)
+    u = (t - a) / (b - a)
+    hacia_b = _desplazar(ma, (xb - xa) * u, (yb - ya) * u)
+    hacia_a = _desplazar(mb, (xa - xb) * (1 - u), (ya - yb) * (1 - u))
+    return hacia_b | hacia_a
+
+
+def _diagonal(m: Mascara) -> float:
+    caja = _caja(m)
+    if caja is None:
+        return 0.0
+    x0, y0, x1, y1 = caja
+    return math.hypot(x1 - x0, y1 - y0)
+
+
+def _salto_grande(ma: Mascara, mb: Mascara) -> bool:
+    (xa, ya), (xb, yb) = _centro(ma), _centro(mb)
+    distancia = math.hypot(xb - xa, yb - ya)
+    ref = max(_diagonal(ma), _diagonal(mb), float(MARGEN_PX_MIN))
+    return distancia > SALTO_PERDIDO_MULT * ref
+
+
+def _zona_perdido(
+    t: int, a: int, b: int, ma: Mascara, mb: Mascara, margen_frames: int, vacia: Mascara
+) -> ZonaFrame:
+    """Fail-closed cerca de las orillas; sin cuadro fantasma en el medio de un hueco largo."""
+    cerca_a = (t - a) <= margen_frames
+    cerca_b = (b - t) <= margen_frames
+    if not cerca_a and not cerca_b:
+        # Hueco largo: el objeto probablemente salió del encuadre. No inventar zona.
+        return ZonaFrame(t, vacia.copy(), True)
+    if cerca_a and cerca_b and _salto_grande(ma, mb):
+        ancla = ma if (t - a) <= (b - t) else mb
+        return ZonaFrame(t, _dilatar(ancla, margen_px(ancla) * MARGEN_PERDIDO_MULT), True)
+    # Orilla(s): mover la silueta a lo largo del trayecto (no dejarla clavada donde se vio).
+    union = _corredor(ma, mb, t, a, b)
+    base = max(margen_px(ma), margen_px(mb)) * MARGEN_PERDIDO_MULT
+    return ZonaFrame(t, _dilatar(union, base), True)
+
+
 def _zona_dentro(
-    t: int, rastreadas: dict[int, Mascara], rastreados: list[int], con_objeto: list[int]
+    t: int,
+    rastreadas: dict[int, Mascara],
+    rastreados: list[int],
+    con_objeto: list[int],
+    margen_frames: int,
+    vacia: Mascara,
 ) -> ZonaFrame:
     """t está entre el primer y el último frame con objeto."""
     # Vecinos con objeto: el último antes (o en) t y el primero después (o en) t.
@@ -174,16 +222,11 @@ def _zona_dentro(
     perdido = any(a < i < b and not rastreadas[i].any() for i in rastreados) or (
         t in rastreadas and not rastreadas[t].any()
     )
-    if perdido:
-        caja = _caja_de_ambas(ma, mb)
-        return ZonaFrame(t, _dilatar(caja, max(margen_px(ma), margen_px(mb))), True)
     if a == b:
-        return ZonaFrame(t, _ampliada(ma), False)
-    (xa, ya), (xb, yb) = _centro(ma), _centro(mb)
-    u = (t - a) / (b - a)
-    hacia_b = _desplazar(ma, (xb - xa) * u, (yb - ya) * u)
-    hacia_a = _desplazar(mb, (xa - xb) * (1 - u), (ya - yb) * (1 - u))
-    union = hacia_b | hacia_a
+        return ZonaFrame(t, _ampliada(ma), perdido)
+    if perdido:
+        return _zona_perdido(t, a, b, ma, mb, margen_frames, vacia)
+    union = _corredor(ma, mb, t, a, b)
     return ZonaFrame(t, _dilatar(union, max(margen_px(ma), margen_px(mb))), False)
 
 

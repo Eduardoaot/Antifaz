@@ -53,7 +53,7 @@ MODELOS_HF = {
     "edgetam": ("yonigozlan/EdgeTAM-hf", "c266ce53b3fc00f0f495b583f6a116c4e57f53bb"),
 }
 METODOS = ["sam2.1-tiny", "edgetam", "csrt", "yunet", "hibrido"]
-PASO_HIBRIDO = 8  # default alineado con sidecar; se puede sobreescribir con --paso
+PASO_HIBRIDO = 6  # default alineado con sidecar; se puede sobreescribir con --paso
 
 
 # --- Video sintético con respuesta conocida ---------------------------------------------------

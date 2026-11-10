@@ -33,8 +33,8 @@ from .rutas import ruta_larga
 TIEMPO_MAX_S_MIN = 1.0
 TIEMPO_MAX_S_MAX = 6 * 60 * 60.0
 SALIDA_MAX_BYTES = 64 * 1024 * 1024
-# Frames por tubería: 3 s a 240 fps como máximo (qa/RANGOS.md, "Video de entrada"), con holgura.
-FRAMES_MAX = 1000
+# Frames por tubería: 15 s a 240 fps como máximo (qa/RANGOS.md, "Video de entrada"), con holgura.
+FRAMES_MAX = 4000
 LADO_FRAME_MAX = 8192
 _BLOQUE_HASH = 1024 * 1024
 

@@ -1,6 +1,6 @@
 """Video en la app: abrir, ver un frame, seguir un objeto, quitarlo y exportar.
 
-Flujo de la beta: hasta 3 s, seguimiento a 24 fps sobre un proxy de 360 px, con el híbrido
+Flujo de la beta: hasta 15 s, seguimiento a 24 fps sobre un proxy de 360 px, con el híbrido
 EdgeTAM (keyframes cada `tracking.paso_clave`) + CSRT (entre medias). En video todavía no hay
 detección automática: la persona elige qué ocultar, y la app lo dice.
 

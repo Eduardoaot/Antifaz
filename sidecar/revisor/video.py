@@ -22,11 +22,12 @@ from .errores import Codigo, ErrorRevisor
 from .herramientas import Herramienta, Herramientas, entrada
 
 # qa/RANGOS.md, "Video de entrada". Si cambias uno, cambia también ese documento.
-# Beta: máximo 3 s y seguimiento a 24 fps, por decisión del responsable (2026-11-06).
-DURACION_MAX_S = 3.0
-# Un clip "de 3 s" del teléfono suele durar 3.003 s o más: se acepta un frame de más, hasta 0.05 s.
+# Beta: máximo 15 s (medido con híbrido paso 6 / proxy 360: ~144 s de espera, 0 % visible).
+DURACION_MAX_S = 15.0
+# Un clip "de N s" del teléfono suele durar N.003 s o más: se acepta un frame de más, hasta 0.05 s.
 TOLERANCIA_MAX_S = 0.05
-DURACION_AVISO_S = 3
+# Igual al máximo: la UI aún no pide confirmar por duración. El flag queda listo.
+DURACION_AVISO_S = 15
 TRACKING_FPS = 24.0
 LADO_MIN_PX = 16
 LADO_MAX_PX = 8192

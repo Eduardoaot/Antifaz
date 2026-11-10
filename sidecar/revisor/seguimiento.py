@@ -39,10 +39,11 @@ ARCHIVOS_EDGETAM = {
 PROXY_LADO_MIN = 240
 PROXY_LADO_MAX = 720
 # Cada cuántos frames del proxy se llama a EdgeTAM. 8 ≈ 3 llamadas/s a 24 fps de tracking.
-# Medido en docs/benchmarks (paso 8, proxy 360): 0 % visible y ~89 s por 15 s de video.
+# Medido en docs/benchmarks (paso 6, proxy 360): 0 % visible y ~144 s por 15 s de video.
+# Paso 8 era ~89 s pero en cámara en mano dejaba fugas CSRT entre claves.
 PASO_CLAVE_MIN = 1
 PASO_CLAVE_MAX = 24
-PASO_CLAVE_DEFAULT = 8
+PASO_CLAVE_DEFAULT = 6
 # Margen extra sobre la caja de CSRT al unirla con la silueta trasladada (fail-closed).
 MARGEN_CAJA_CSRT_PCT = 15.0
 MARGEN_CAJA_CSRT_PX = 8
@@ -261,11 +262,43 @@ def _indices_clave(total: int, frame_inicio: int, paso: int) -> list[int]:
     return sorted(indices)
 
 
+def _csrt_tramo(
+    lista: Sequence[Frame],
+    inicio: int,
+    fin: int,
+    mascara_clave: Mascara,
+    caja_clave: tuple[int, int, int, int],
+    vacia: Mascara,
+) -> dict[int, Mascara]:
+    """CSRT desde `inicio` hacia `fin` (fin exclusive en dirección). `fin` puede ser < inicio."""
+    paso = 1 if fin > inicio else -1
+    rastreador = _nuevo_csrt()
+    x0, y0, x1, y1 = caja_clave
+    rastreador.init(_bgr(lista[inicio]), (x0, y0, x1 - x0, y1 - y0))
+    salida: dict[int, Mascara] = {}
+    perdio = False
+    t = inicio + paso
+    while t != fin:
+        if perdio:
+            salida[t] = vacia.copy()
+        else:
+            ok, (x, y, w, h) = rastreador.update(_bgr(lista[t]))
+            if not ok or w < 1 or h < 1:
+                salida[t] = vacia.copy()
+                perdio = True
+            else:
+                caja_t = (int(x), int(y), int(x + w), int(y + h))
+                salida[t] = _zona_entre_claves(mascara_clave, caja_clave, caja_t)
+        t += paso
+    return salida
+
+
 class SeguidorHibrido:
     """EdgeTAM una vez sobre los keyframes (video corto); CSRT rellena los huecos.
 
-    Así EdgeTAM conserva contexto temporal entre claves. Si CSRT se pierde, máscara vacía
-    y `pistas` marca revisión.
+    Entre claves, CSRT corre hacia adelante y hacia atrás y se unen las máscaras: así se
+    reduce la deriva típica (el cuadro se queda atrás del objeto). Si ambos fallan, máscara
+    vacía y `pistas` marca revisión.
     """
 
     def __init__(self, edgetam: SeguidorEdgeTam, paso: int = PASO_CLAVE_DEFAULT) -> None:
@@ -298,30 +331,31 @@ class SeguidorHibrido:
         mascaras: dict[int, Mascara] = {claves[i]: por_clave[i] for i in range(len(claves))}
 
         def rellenar(a: int, b: int) -> None:
-            """Rellena (a, b) exclusive con CSRT desde la silueta en a hacia b."""
+            """Rellena (a, b) exclusive con CSRT ida y vuelta; unión fail-closed."""
             if b - a <= 1:
                 return
-            mascara_a = mascaras[a]
-            caja_a = _caja_de_mascara(mascara_a)
-            if caja_a is None:
-                for t in range(a + 1, b):
-                    mascaras[t] = vacia.copy()
-                return
-            rastreador = _nuevo_csrt()
-            x0, y0, x1, y1 = caja_a
-            rastreador.init(_bgr(lista[a]), (x0, y0, x1 - x0, y1 - y0))
-            perdio = False
+            mascara_a, mascara_b = mascaras[a], mascaras[b]
+            caja_a, caja_b = _caja_de_mascara(mascara_a), _caja_de_mascara(mascara_b)
+            ida = (
+                _csrt_tramo(lista, a, b, mascara_a, caja_a, vacia)
+                if caja_a is not None
+                else {}
+            )
+            vuelta = (
+                _csrt_tramo(lista, b, a, mascara_b, caja_b, vacia)
+                if caja_b is not None
+                else {}
+            )
             for t in range(a + 1, b):
-                if perdio:
+                m_ida, m_vuelta = ida.get(t), vuelta.get(t)
+                if m_ida is not None and m_ida.any() and m_vuelta is not None and m_vuelta.any():
+                    mascaras[t] = m_ida | m_vuelta
+                elif m_ida is not None and m_ida.any():
+                    mascaras[t] = m_ida
+                elif m_vuelta is not None and m_vuelta.any():
+                    mascaras[t] = m_vuelta
+                else:
                     mascaras[t] = vacia.copy()
-                    continue
-                ok, (x, y, w, h) = rastreador.update(_bgr(lista[t]))
-                if not ok or w < 1 or h < 1:
-                    mascaras[t] = vacia.copy()
-                    perdio = True
-                    continue
-                caja_t = (int(x), int(y), int(x + w), int(y + h))
-                mascaras[t] = _zona_entre_claves(mascara_a, caja_a, caja_t)
             if avance is not None:
                 avance(len(mascaras), total)
 

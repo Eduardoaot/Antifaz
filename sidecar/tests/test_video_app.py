@@ -17,7 +17,8 @@ from revisor.seguimiento import Avance, Indicacion
 
 from .test_metadatos_video import caja, mp4
 
-ANCHO, ALTO, N, FPS = 640, 480, 10, 24
+# 480×360: el proxy queda 1:1 con el original (lado corto = PROXY_LADO).
+ANCHO, ALTO, N, FPS = 480, 360, 10, 24
 
 
 def ffprobe(ancho: int = ANCHO, alto: int = ALTO, frames: int = N, fps: str = "24/1", audio: bool = True) -> bytes:
@@ -34,9 +35,9 @@ def ffprobe(ancho: int = ANCHO, alto: int = ALTO, frames: int = N, fps: str = "2
 EXIF_LIMPIO = json.dumps([{
     "SourceFile": "x.parcial", "ExifTool:ExifToolVersion": 13.61, "System:FileName": "x.parcial",
     "System:FileModifyDate": "2026:11:06 10:00:00-06:00", "File:FileType": "MP4",
-    "QuickTime:CreateDate": "0000:00:00 00:00:00", "QuickTime:ImageWidth": 640,
+    "QuickTime:CreateDate": "0000:00:00 00:00:00", "QuickTime:ImageWidth": 480,
     "Track1:HandlerDescription": "VideoHandler", "Track1:MediaCreateDate": "0000:00:00 00:00:00",
-    "Composite:ImageSize": "640 480",
+    "Composite:ImageSize": "480 360",
 }]).encode()
 
 
@@ -63,7 +64,7 @@ class Falsas:
     def leer_frames(self, argumentos: list[str], ancho: int, alto: int, max_frames: int, tiempo_max_s: float) -> Iterator[np.ndarray]:
         cantidad = self.salida_frames if "crop" in " ".join(argumentos) else self.frames
         for i in range(cantidad):
-            yield np.full((alto, ancho, 3), 40 + i, dtype=np.uint8)
+            yield np.full((alto, ancho, 3), 40 + (i % 200), dtype=np.uint8)
 
     def escribir_frames(self, argumentos: list[str], frames: Iterable[np.ndarray], ancho: int, alto: int, tiempo_max_s: float) -> int:
         self.argumentos_codificar = argumentos
@@ -171,7 +172,8 @@ def test_abrir_rechaza_si_los_frames_reales_pasan_el_limite(original: Path) -> N
             return ffprobe(frames=24)
 
     with pytest.raises(ErrorRevisor) as e:
-        abrir(original, Miente(frames=24 * 4))
+        # ffprobe dice 1 s; la tubería entrega 16 s a 24 fps → por encima del máximo de 15 s.
+        abrir(original, Miente(frames=24 * 16))
     assert e.value.codigo is Codigo.VIDEO_DEMASIADO_LARGO
 
 
@@ -236,7 +238,7 @@ def test_vista_oculta_la_zona(original: Path) -> None:
     imagen = cv2.imdecode(np.frombuffer(datos, np.uint8), cv2.IMREAD_COLOR)
     assert imagen.shape == (ALTO, ANCHO, 3)
     assert imagen[110:170, 110:170].max() < 20  # tapado con negro
-    assert imagen[400:470, 500:600].mean() > 30  # lo demás se ve
+    assert imagen[300:350, 400:470].mean() > 30  # lo demás se ve
 
 
 def test_vista_sin_pistas_y_con_pista_desconocida(original: Path) -> None:
@@ -279,7 +281,7 @@ def test_exportar_oculta_cada_frame_y_verifica(original: Path, tmp_path: Path) -
     assert len(falsas.escritos) == N
     for p, frame in enumerate(falsas.escritos):
         assert frame[110:170, 110 + p * 10 : 170 + p * 10].max() == 0, p
-        assert frame[400:470, 500:600].min() == 40 + p
+        assert frame[300:350, 400:470].min() == 40 + (p % 200)
 
 
 def test_exportar_argumentos_sin_metadatos(original: Path, tmp_path: Path) -> None:

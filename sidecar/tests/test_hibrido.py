@@ -104,9 +104,22 @@ def test_keyframe_vacio_rellena_hueco_vacio() -> None:
     mascaras = SeguidorHibrido(PrimeroVacio(), paso=4).seguir(frames, 0, Punto(40, 120))  # type: ignore[arg-type]
     assert sorted(mascaras) == list(range(8))
     assert not mascaras[0].any()
-    # El hueco hasta el siguiente keyframe queda vacío (fail-closed).
-    assert not mascaras[1].any()
+    # Sin silueta en el keyframe inicial, CSRT ida no aporta; la vuelta desde el siguiente sí.
+    assert mascaras[3].any()
 
 
 def test_constantes_de_paso_en_rangos() -> None:
     assert seguimiento.PASO_CLAVE_MIN <= seguimiento.PASO_CLAVE_DEFAULT <= seguimiento.PASO_CLAVE_MAX
+
+
+@pytest.mark.skipif(not _csrt_disponible(), reason="opencv sin contrib/CSRT")
+def test_relleno_bidireccional_une_ida_y_vuelta() -> None:
+    """Con movimiento lateral, el relleno no deja el hueco vacío entre claves."""
+    frames = video_cuadrado(16)
+    mascaras = SeguidorHibrido(EdgeTamFalso(), paso=5).seguir(  # type: ignore[arg-type]
+        frames, 0, Punto(40, 120)
+    )
+    # Frames intermedios (no keyframe) deben tener cobertura.
+    claves = set(_indices_clave(16, 0, 5))
+    intermedios = [i for i in range(16) if i not in claves]
+    assert intermedios and all(mascaras[i].any() for i in intermedios)
