@@ -50,7 +50,7 @@ def test_seg_salida_sin_metadatos(tmp_path: Path, nombre: str) -> None:
 
 
 @pytest.mark.parametrize("nombre", ["salida.jpg", "salida.png"])
-@pytest.mark.parametrize("efecto", ["emoji_sonrisa", "emoji_lentes", "emoji_gato", "emoji_estrella"])
+@pytest.mark.parametrize("efecto", ["emoji_sonrisa", "emoji_lentes", "emoji_gato", "emoji_estrella", "emoji_mono"])
 def test_exporta_con_emoji_y_la_verificacion_lo_acepta(tmp_path: Path, nombre: str, efecto: str) -> None:
     """Los bordes del emoji tienen más detalle que un bloque: JPEG debe seguir dentro de su tolerancia."""
     imagen = _abrir_con_todo(tmp_path)

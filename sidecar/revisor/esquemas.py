@@ -30,7 +30,7 @@ class Estricto(BaseModel):
 
 # Cada emoji es un efecto propio: así la recuperación, las zonas manuales y el video lo aceptan igual.
 # Coinciden con EMOJIS de app/shared/contrato.ts y con los archivos de revisor/emojis.py.
-TipoEmoji = Literal["emoji_sonrisa", "emoji_lentes", "emoji_gato", "emoji_estrella"]
+TipoEmoji = Literal["emoji_sonrisa", "emoji_lentes", "emoji_gato", "emoji_estrella", "emoji_mono"]
 TipoEfecto = Literal["solido", "difuminado", "pixelado"] | TipoEmoji
 
 

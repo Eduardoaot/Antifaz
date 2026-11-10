@@ -255,7 +255,7 @@ def _aplicar_efecto(
             _difuminar(salida, fuente, x0, y0, x1, y1, intensidad)
         case "pixelado":
             _pixelar(salida, fuente, x0, y0, x1, y1, intensidad)
-        case "emoji_sonrisa" | "emoji_lentes" | "emoji_gato" | "emoji_estrella":
+        case "emoji_sonrisa" | "emoji_lentes" | "emoji_gato" | "emoji_estrella" | "emoji_mono":
             # Primero un relleno fijo: es lo que lo hace irreversible. El emoji se pega encima después.
             salida[y0:y1, x0:x1, :3] = emojis.color_principal(efecto)
         case _ as inalcanzable:

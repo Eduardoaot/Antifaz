@@ -19,7 +19,7 @@ from .conftest import DATOS, MODELOS, oculto
 
 EFECTOS = ["solido", "difuminado", "pixelado"]
 CON_COLOR = ["difuminado", "pixelado"]
-EMOJIS = ["emoji_sonrisa", "emoji_lentes", "emoji_gato", "emoji_estrella"]
+EMOJIS = ["emoji_sonrisa", "emoji_lentes", "emoji_gato", "emoji_estrella", "emoji_mono"]
 
 
 def _imagen(alto: int = 200, ancho: int = 300, canales: int = 3, valor: int | None = None) -> np.ndarray:

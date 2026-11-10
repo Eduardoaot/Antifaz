@@ -48,7 +48,7 @@ export const LIMITES = {
  * Cada emoji es un efecto propio: así la recuperación, las zonas manuales y el video lo aceptan igual.
  * Coinciden con TipoEmoji de sidecar/revisor/esquemas.py. Se dibujan sobre bloque sólido.
  */
-export const EMOJIS = ['emoji_sonrisa', 'emoji_lentes', 'emoji_gato', 'emoji_estrella'] as const;
+export const EMOJIS = ['emoji_sonrisa', 'emoji_lentes', 'emoji_gato', 'emoji_estrella', 'emoji_mono'] as const;
 export type Emoji = (typeof EMOJIS)[number];
 
 export const esquemaEfecto = z.enum(['solido', 'difuminado', 'pixelado', ...EMOJIS] as const);
@@ -65,6 +65,7 @@ export const FRACCION_OPACA_EMOJI: Readonly<Record<Emoji, number>> = {
   emoji_lentes: 0.87,
   emoji_gato: 0.59,
   emoji_estrella: 0.48,
+  emoji_mono: 0.64,
 };
 
 /** Hasta cuántas veces el lado de su zona crece el emoji. Coincide con EMOJI_ESCALA_MAX de efectos.py. */
@@ -75,6 +76,7 @@ export const ETIQUETA_EMOJI: Readonly<Record<Emoji, string>> = {
   emoji_lentes: '😎 Carita con lentes',
   emoji_gato: '🐱 Gato',
   emoji_estrella: '⭐ Estrella',
+  emoji_mono: '🙈 Mono con los ojos tapados',
 };
 
 export const esquemaTema = z.enum(['sistema', 'claro', 'oscuro']);

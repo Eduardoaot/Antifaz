@@ -55,7 +55,7 @@ def test_efecto_desconocido_nunca_cae_en_sin_efecto(malo: Any) -> None:
 
 @pytest.mark.parametrize(
     "efecto",
-    ["solido", "difuminado", "pixelado", "emoji_sonrisa", "emoji_lentes", "emoji_gato", "emoji_estrella"],
+    ["solido", "difuminado", "pixelado", "emoji_sonrisa", "emoji_lentes", "emoji_gato", "emoji_estrella", "emoji_mono"],
 )
 def test_efectos_validos(efecto: str) -> None:
     assert validar_oculta(efecto=efecto).efecto == efecto

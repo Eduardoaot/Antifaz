@@ -45,7 +45,7 @@ Cada parámetro de este archivo tiene pruebas parametrizadas de mínimo-1, míni
 
 | Parámetro | Tipo | Mín | Máx | Default | Ante un valor inválido |
 |---|---|---|---|---|---|
-| `efecto.tipo` | enum: `solido`, `difuminado`, `pixelado`, `emoji_sonrisa`, `emoji_lentes`, `emoji_gato`, `emoji_estrella` | n/a | n/a | `solido` para texto, códigos, documentos y matrículas; `difuminado` para caras | Estándar. Un tipo desconocido nunca cae en "sin efecto" |
+| `efecto.tipo` | enum: `solido`, `difuminado`, `pixelado`, `emoji_sonrisa`, `emoji_lentes`, `emoji_gato`, `emoji_estrella`, `emoji_mono` | n/a | n/a | `solido` para texto, códigos, documentos y matrículas; `difuminado` para caras | Estándar. Un tipo desconocido nunca cae en "sin efecto" |
 | `efecto.intensidad` | entero, % | 1 | 100 | 80 | Estándar. En difuminado y pixelado, menos intensidad es más fácil de reconocer |
 | `efecto.aviso_intensidad_baja` | entero, % | 1 | 100 | 30 (propuesta) | Estándar. Por debajo de este valor se avisa: "Con poca intensidad es más fácil reconocer lo que hay debajo" |
 | `efecto.sigma_px` | decimal, px | 25 | 1000 | max(25, 25% del lado corto de la región) | Estándar |

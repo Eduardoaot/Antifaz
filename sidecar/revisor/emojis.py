@@ -26,6 +26,7 @@ ARCHIVOS: dict[TipoEmoji, tuple[str, str]] = {
     "emoji_lentes": ("emoji_u1f60e.png", "542ca1bdbcb831a026a9139ef75dacb609867170d06a487e3ae9c7a4ec22b4c6"),
     "emoji_gato": ("emoji_u1f431.png", "51a931f7f61de2442f7c4bb79fa56636b6ead7d9a4bba8cae55bf0523ebc0e08"),
     "emoji_estrella": ("emoji_u2b50.png", "4bd86e289d7b490bbdbe94ab250e81ec5a49b6f3b15acb6d92b3a47a3439cb56"),
+    "emoji_mono": ("emoji_u1f648.png", "e0522acdc8605daee370fd812c613b8863276e72e0a9c6563bab408ae3313066"),
 }
 
 
