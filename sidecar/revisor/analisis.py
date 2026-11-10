@@ -60,6 +60,15 @@ def _ampliar(
     }
 
 
+def _nucleo(cara: Cara, img_ancho: int, img_alto: int) -> dict[str, int] | None:
+    """La caja del detector, recortada a la foto. Permite hacer un sticker más chico sin destapar la cara."""
+    x0, y0 = max(0, cara.x), max(0, cara.y)
+    x1, y1 = min(img_ancho, cara.x + cara.ancho), min(img_alto, cara.y + cara.alto)
+    if x1 <= x0 or y1 <= y0:
+        return None
+    return {"x": x0, "y": y0, "ancho": x1 - x0, "alto": y1 - y0}
+
+
 def _umbral_escena(regla: str) -> float:
     return UMBRAL_ESCENA_EXTREMISMO if regla == "EXT-01" else UMBRAL_ESCENA
 
@@ -309,6 +318,7 @@ def analizar(
                         "posicion": describir_posicion(
                             cara.x, cara.y, cara.ancho, cara.alto, imagen.ancho, imagen.alto
                         ),
+                        "nucleo": _nucleo(cara, imagen.ancho, imagen.alto),
                     }
                 )
             revisadas.extend(REGLAS_DE_CARAS)

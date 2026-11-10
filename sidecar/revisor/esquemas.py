@@ -17,6 +17,9 @@ PREVISTA_LADO_MAX = 4096
 PINCEL_MIN = 1
 PINCEL_MAX = 512
 PUNTOS_TRAZO_MAX = 5000
+# Tamaño del sticker sobre una cara, en veces el que se elige solo. Coincide con LIMITES.escalaSticker.
+ESCALA_STICKER_MIN = 0.25
+ESCALA_STICKER_MAX = 2.0
 
 
 class Estricto(BaseModel):
@@ -33,6 +36,13 @@ def es_emoji(efecto: str) -> bool:
     return efecto in get_args(TipoEmoji)
 
 
+class CajaImagen(Estricto):
+    x: Annotated[int, Field(ge=0, le=LADO_MAX_PX - 1)]
+    y: Annotated[int, Field(ge=0, le=LADO_MAX_PX - 1)]
+    ancho: Annotated[int, Field(ge=1, le=LADO_MAX_PX)]
+    alto: Annotated[int, Field(ge=1, le=LADO_MAX_PX)]
+
+
 class Ocultamiento(Estricto):
     x: Annotated[int, Field(ge=0, le=LADO_MAX_PX - 1)]
     y: Annotated[int, Field(ge=0, le=LADO_MAX_PX - 1)]
@@ -47,6 +57,22 @@ class Ocultamiento(Estricto):
     # Solo la usa el emoji: "elipse" (caras) tapa el óvalo de la zona con margen para ajustarse a la cara;
     # "caja" tapa el rectángulo completo. Con silueta, manda la silueta.
     forma: Literal["caja", "elipse"] = "caja"
+    # La cara que vio el detector, sin margen. Solo con ella el emoji puede ser más chico que su zona.
+    nucleo: CajaImagen | None = None
+    # Tamaño del emoji en veces el que se elige solo. Nunca queda más chico de lo que tapa el núcleo.
+    escala: Annotated[float, Field(ge=ESCALA_STICKER_MIN, le=ESCALA_STICKER_MAX)] = 1.0
+
+    @model_validator(mode="after")
+    def nucleo_dentro(self) -> Ocultamiento:
+        n = self.nucleo
+        if n is not None and not (
+            n.x >= self.x
+            and n.y >= self.y
+            and n.x + n.ancho <= self.x + self.ancho
+            and n.y + n.alto <= self.y + self.alto
+        ):
+            raise ValueError("el núcleo debe quedar dentro de la zona")
+        return self
 
 
 class Ping(Estricto):

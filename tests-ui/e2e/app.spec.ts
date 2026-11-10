@@ -113,6 +113,55 @@ test('flujo completo: cara, ¿Por qué?, ocultar y exportar sin metadatos', asyn
   }
 });
 
+for (const tema of ['claro', 'oscuro'] as const) {
+  test(`sticker en una cara: cambia de tamaño sin destaparla, tema ${tema}`, async () => {
+    sesion = await lanzar();
+    const { pagina, app } = sesion;
+    await pagina.getByLabel('Tema').selectOption(tema);
+    await abrir(sesion, [m('cara con ñ.jpg')]);
+    await expect(veredicto(pagina)).toBeVisible({ timeout: 60_000 });
+    const cara = pagina.locator('[data-regla="CAR-01"]');
+    await pagina.getByRole('button', { name: 'Sí, ocultar las caras' }).click();
+    await cara.getByLabel(/^Efecto/).selectOption('emoji_sonrisa');
+
+    const tamano = cara.getByRole('slider', { name: /^Tamaño del sticker/ });
+    await expect(tamano).toHaveValue('1');
+    await expect(cara.locator('.tamano-sticker output')).toHaveText('100 %');
+
+    // Con teclado: Inicio lleva al mínimo y se guarda al soltar la tecla.
+    await tamano.focus();
+    await pagina.keyboard.press('Home');
+    await expect(cara).toContainText('Es lo más chico: tapa justo la cara.');
+    await expect(cara.getByRole('button', { name: /^Volver al tamaño original/ })).toBeVisible();
+    await pagina.waitForTimeout(800);
+    await sinViolaciones(pagina);
+    await pagina.screenshot({ path: join(CAPTURAS, `sticker-chico-${tema}.png`) });
+
+    await pagina.keyboard.press('End');
+    await expect(cara.locator('.tamano-sticker output')).toHaveText('200 %');
+    await pagina.waitForTimeout(800);
+    await pagina.screenshot({ path: join(CAPTURAS, `sticker-grande-${tema}.png`) });
+
+    // Deshacer regresa al mínimo: cada ajuste es un solo paso.
+    await pagina.locator('body').click({ position: { x: 5, y: 5 } });
+    await pagina.keyboard.press('Control+z');
+    await expect(tamano).not.toHaveValue('2');
+
+    await tamano.focus();
+    await pagina.keyboard.press('Home');
+    const salida = join(mkdtempSync(join(tmpdir(), 'revisor-salida-')), 'sticker.jpg');
+    await simularGuardar(app, salida);
+    await pagina.getByRole('button', { name: 'Exportar copia' }).click();
+    await expect(pagina.getByTestId('anuncio')).toContainText('con 1 zona oculta');
+    const caras = execFileSync(
+      PYTHON,
+      ['-c', 'import sys;from pathlib import Path;from revisor import cargador;from revisor.caras import DetectorCaras;i=cargador.abrir(sys.argv[1]);print(len(DetectorCaras(Path("modelos")).detectar(i.pixeles,0.25)))', salida],
+      { cwd: join(RAIZ, 'sidecar') },
+    ).toString().trim();
+    expect(caras, 'con el sticker al mínimo, la cara exportada aún se detecta').toBe('0');
+  });
+}
+
 test('foto sin nada: lo dice sin prometer de más', async () => {
   sesion = await lanzar();
   const { pagina } = sesion;

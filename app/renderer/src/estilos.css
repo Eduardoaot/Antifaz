@@ -382,6 +382,12 @@ summary { cursor: pointer; min-height: 1.75rem; font-weight: 500; }
 /* El menú de efecto va en su propia fila, alineado con los botones. */
 .controles label { display: flex; align-items: center; gap: 0.5rem; flex-basis: 100%; }
 .controles label select { flex: 1; min-width: 0; }
+/* Tamaño del sticker: etiqueta arriba, control con su porcentaje y la ayuda abajo. */
+.tamano-sticker { flex-basis: 100%; display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 0.25rem 0.75rem; }
+.tamano-sticker label, .tamano-sticker p, .tamano-sticker .enlace { grid-column: 1 / -1; }
+.tamano-sticker input { width: 100%; min-width: 0; }
+.tamano-sticker output { font-variant-numeric: tabular-nums; min-width: 3.5rem; text-align: end; }
+.tamano-sticker p { margin: 0; font-size: 0.9375rem; }
 .advertencias { display: grid; gap: 0.75rem; }
 .advertencia {
   display: grid; gap: 0.625rem; padding: 0.875rem 1rem;

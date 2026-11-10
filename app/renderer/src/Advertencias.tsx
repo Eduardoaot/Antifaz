@@ -1,12 +1,16 @@
 import { AlertCircle, AlertTriangle, Baby, Bath, Car, CircleHelp, CreditCard, Crosshair, Eye, EyeOff, Flag, Gem, IdCard, Info, MapPin, Monitor, Phone, Plane, QrCode, Shirt, Stethoscope, Users } from 'lucide-react';
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { reglaDe, type Regla } from '../../shared/catalogo';
 import { esquemaEfecto, LIMITES, type Analisis, type Hallazgo } from '../../shared/contrato';
 import {
+  ajustaSticker,
+  cambiarEscala,
   decidir,
   describirHallazgo,
   efectoDe,
   elegirEfecto,
+  escalaDe,
+  escalaMinimaSticker,
   etiquetaNivelMostrado,
   nivelMostrado,
   reglasNoRevisadas,
@@ -80,6 +84,63 @@ function IconoCategoria({ regla }: { regla: Regla }): React.JSX.Element | null {
     default:
       return null;
   }
+}
+
+function textoTamano(valor: number, minimo: number): string {
+  if (valor <= minimo) return 'Es lo más chico: tapa justo la cara.';
+  if (valor < LIMITES.escalaSticker.porDefecto) return 'Más chico tapa la cara, pero podría dejar ver cabello u orejas.';
+  if (valor > LIMITES.escalaSticker.porDefecto) return 'Más grande tapa más de lo necesario.';
+  return 'Es el tamaño que elegimos: tapa la cara con un margen.';
+}
+
+interface PropsTamano {
+  hallazgo: Hallazgo;
+  numero: number | undefined;
+  revision: Revision;
+  alCambiar: (cambio: (r: Revision) => Revision) => void;
+}
+
+/** Tamaño del sticker de una cara. Se guarda al soltar: un paso de deshacer y una vista previa por ajuste. */
+function TamanoSticker({ hallazgo, numero, revision, alCambiar }: PropsTamano): React.JSX.Element {
+  const id = useId();
+  const [moviendo, setMoviendo] = useState<number | null>(null);
+  const guardada = escalaDe(revision, hallazgo.id);
+  const minimo = escalaMinimaSticker(hallazgo);
+  const valor = Math.max(minimo, moviendo ?? guardada);
+  const porcentaje = `${String(Math.round(valor * 100))} %`;
+  const confirmar = (): void => {
+    if (moviendo === null) return;
+    setMoviendo(null);
+    alCambiar((r) => cambiarEscala(r, hallazgo.id, moviendo));
+  };
+  return (
+    <div className="tamano-sticker">
+      <label htmlFor={`${id}-control`}>
+        Tamaño del sticker<span className="solo-lector"> de la zona {numero}</span>
+      </label>
+      <input
+        id={`${id}-control`}
+        type="range"
+        min={minimo}
+        max={LIMITES.escalaSticker.max}
+        step={LIMITES.escalaSticker.paso}
+        value={valor}
+        aria-valuetext={porcentaje}
+        aria-describedby={`${id}-ayuda`}
+        onChange={(e) => { setMoviendo(Number(e.target.value)); }}
+        onPointerUp={confirmar}
+        onKeyUp={confirmar}
+        onBlur={confirmar}
+      />
+      <output htmlFor={`${id}-control`}>{porcentaje}</output>
+      {guardada !== LIMITES.escalaSticker.porDefecto && moviendo === null && (
+        <button type="button" className="enlace" onClick={() => { alCambiar((r) => cambiarEscala(r, hallazgo.id, LIMITES.escalaSticker.porDefecto)); }}>
+          Volver al tamaño original<span className="solo-lector"> de la zona {numero}</span>
+        </button>
+      )}
+      <p id={`${id}-ayuda`} className="suave">{textoTamano(valor, minimo)}</p>
+    </div>
+  );
 }
 
 export function Cobertura({ analisis }: { analisis: Analisis }): React.JSX.Element {
@@ -185,6 +246,9 @@ export function Advertencias({ hallazgos, revision, alCambiar, alOcultarTodo, al
                       <OpcionesEmoji />
                     </select>
                   </label>
+                  {decision === 'ocultar' && ajustaSticker(revision, h) && (
+                    <TamanoSticker hallazgo={h} numero={numero} revision={revision} alCambiar={alCambiar} />
+                  )}
                 </div>
               )}
               <button type="button" className="enlace" onClick={() => { setPorQue(regla); }}>

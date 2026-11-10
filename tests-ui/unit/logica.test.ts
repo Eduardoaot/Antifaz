@@ -7,6 +7,11 @@ import {
   REVISION_INICIAL,
   aEdicion,
   aPuntoDeImagen,
+  ajustaSticker,
+  cambiarEscala,
+  escalaDe,
+  escalaMinimaSticker,
+  limitarEscala,
   agregarManual,
   agregarPuntoTrazo,
   textoOrigen,
@@ -47,6 +52,7 @@ import {
   textoMotivo,
   tituloVeredicto,
   veredicto,
+  type Revision,
   type Veredicto,
   NIVELES_ZOOM,
   anchoAjustado,
@@ -192,6 +198,84 @@ describe('emoji', () => {
     const r = elegirEfecto(decidir(REVISION_INICIAL, 'a', 'ocultar'), 'a', 'emoji_lentes');
     const guardada = esquemaEdicion.parse(JSON.parse(JSON.stringify(aEdicion('3f2b6c1e-8a4d-4b7e-9c2a-1d5e6f7a8b9c', r))));
     expect(desdeEdicion(guardada).efectos.a).toBe('emoji_lentes');
+  });
+});
+
+describe('tamaño del sticker sobre una cara', () => {
+  // Caja con el margen de caras (x1.3) alrededor de lo que vio el detector.
+  const conNucleo = (id = 'a'): Hallazgo => ({
+    ...cara(id), caja: { x: 100, y: 100, ancho: 130, alto: 130 }, nucleo: { x: 115, y: 115, ancho: 100, alto: 100 },
+  });
+  const conEmoji = (efecto: 'emoji_sonrisa' | 'difuminado' = 'emoji_sonrisa'): Revision =>
+    elegirEfecto(decidir(REVISION_INICIAL, 'a', 'ocultar'), 'a', efecto);
+
+  it('solo un emoji sobre una cara con su caja del detector cambia de tamaño', () => {
+    expect(ajustaSticker(conEmoji(), conNucleo())).toBe(true);
+    expect(ajustaSticker(conEmoji('difuminado'), conNucleo())).toBe(false);
+    expect(ajustaSticker(conEmoji(), cara('a'))).toBe(false);
+    expect(ajustaSticker(conEmoji(), { ...conNucleo(), nucleo: null })).toBe(false);
+    expect(ajustaSticker(conEmoji(), { ...conNucleo(), regla_id: 'MAT-01' })).toBe(false);
+  });
+
+  it('el mínimo sale de la cara frente a la zona con margen, redondeado hacia arriba al paso', () => {
+    // (100 + 2·8) / (130 + 2·13) = 0.744 → 0.75
+    expect(escalaMinimaSticker(conNucleo())).toBe(0.75);
+    expect(escalaMinimaSticker(cara('a'))).toBe(1);
+    expect(escalaMinimaSticker({ ...conNucleo(), caja: { x: 0, y: 0, ancho: 4000, alto: 4000 }, nucleo: { x: 10, y: 10, ancho: 1, alto: 1 } })).toBe(LIMITES.escalaSticker.min);
+    // La cara ocupa toda su zona: solo se puede quitar la diferencia entre los márgenes.
+    expect(escalaMinimaSticker({ ...conNucleo(), nucleo: { x: 100, y: 100, ancho: 130, alto: 130 } })).toBe(0.95);
+  });
+
+  it.each([
+    [0.1, 0.25], [0.25, 0.25], [0.5, 0.5], [1.03, 1.05], [2, 2], [2.5, 2], [-1, 0.25],
+    [Number.NaN, 1], [Number.POSITIVE_INFINITY, 1], [Number.NEGATIVE_INFINITY, 1],
+  ])('limitarEscala(%s) = %s', (entrada, esperado) => {
+    expect(limitarEscala(entrada)).toBe(esperado);
+  });
+
+  it('propiedad: la escala limitada siempre queda en rango', () => {
+    fc.assert(fc.property(fc.double(), (v) => {
+      const e = limitarEscala(v);
+      return e >= LIMITES.escalaSticker.min && e <= LIMITES.escalaSticker.max;
+    }));
+  });
+
+  it('cambiar el tamaño se guarda, volver a 1 lo quita, y repetirlo no gasta un paso', () => {
+    const r = cambiarEscala(conEmoji(), 'a', 0.8);
+    expect(escalaDe(r, 'a')).toBe(0.8);
+    expect(hayCambios({ ...REVISION_INICIAL, escalas: r.escalas })).toBe(true);
+    expect(cambiarEscala(r, 'a', 0.8)).toBe(r);
+    expect(cambiarEscala(r, 'a', 1).escalas).toEqual({});
+  });
+
+  it('va al sidecar con la caja del detector solo si es un emoji', () => {
+    const r = cambiarEscala(conEmoji(), 'a', 0.8);
+    const [o] = construirOcultamientos(r, [conNucleo()]);
+    expect(o).toMatchObject({ forma: 'elipse', escala: 0.8, nucleo: { x: 115, y: 115, ancho: 100, alto: 100 } });
+    expect(esquemaOcultamiento.safeParse(o).success).toBe(true);
+    const [d] = construirOcultamientos(elegirEfecto(r, 'a', 'difuminado'), [conNucleo()]);
+    expect(d).toMatchObject({ escala: 1, nucleo: null });
+  });
+
+  it('el esquema rechaza una escala fuera de rango y una cara fuera de su zona', () => {
+    const [o] = construirOcultamientos(conEmoji(), [conNucleo()]);
+    expect(o).toBeDefined();
+    for (const escala of [0.2, 2.01, Number.NaN, '1', null, undefined]) {
+      expect(esquemaOcultamiento.safeParse({ ...o, escala }).success).toBe(false);
+    }
+    for (const nucleo of [{ x: 99, y: 115, ancho: 100, alto: 100 }, { x: 115, y: 115, ancho: 116, alto: 100 }, { x: 115, y: 115, ancho: 0, alto: 100 }, undefined]) {
+      expect(esquemaOcultamiento.safeParse({ ...o, nucleo }).success).toBe(false);
+    }
+    expect(esquemaOcultamiento.safeParse({ ...o, nucleo: { x: 100, y: 100, ancho: 130, alto: 130 } }).success).toBe(true);
+  });
+
+  it('la recuperación conserva el tamaño, y las guardadas antes no lo traen', () => {
+    const r = cambiarEscala(conEmoji(), 'a', 1.5);
+    const e = esquemaEdicion.parse(JSON.parse(JSON.stringify(aEdicion('3f2b6c1e-8a4d-4b7e-9c2a-1d5e6f7a8b9c', r))));
+    expect(desdeEdicion(e).escalas).toEqual({ a: 1.5 });
+    const { escalas: _, ...vieja } = e;
+    expect(esquemaEdicion.parse(vieja).escalas).toEqual({});
+    expect(esquemaEdicion.safeParse({ ...e, escalas: { a: 3 } }).success).toBe(false);
   });
 });
 

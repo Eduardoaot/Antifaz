@@ -12,7 +12,7 @@ from PIL import Image
 from revisor import analisis, caras, cargador, contenido, objetos
 from revisor.caras import DetectorCaras, ModeloNoDisponible
 
-from .conftest import DATOS, MODELOS, exif_con_gps, guardar, imagen_prueba
+from .conftest import DATOS, MODELOS, exif_con_gps, guardar, imagen_prueba, oculto
 
 ASTRONAUTA = DATOS / "astronauta.jpg"
 
@@ -85,6 +85,14 @@ def test_caja_cabe_en_la_imagen_con_cualquier_multiplicador() -> None:
                 assert h["caja"]["x"] >= 0 and h["caja"]["y"] >= 0
                 assert h["caja"]["x"] + h["caja"]["ancho"] <= imagen.ancho
                 assert h["caja"]["y"] + h["caja"]["alto"] <= imagen.alto
+            if h["regla_id"] == "CAR-01":
+                # La caja del detector, dentro de la zona con margen: así se valida al ocultar.
+                n, c = h["nucleo"], h["caja"]
+                assert n is not None and n["ancho"] >= 1 and n["alto"] >= 1
+                assert n["x"] >= c["x"] and n["y"] >= c["y"]
+                assert n["x"] + n["ancho"] <= c["x"] + c["ancho"]
+                assert n["y"] + n["alto"] <= c["y"] + c["alto"]
+                oculto(c["x"], c["y"], c["ancho"], c["alto"], "emoji_sonrisa", forma="elipse", nucleo=n)
 
 
 def test_gps_genera_advertencia(tmp_path: Path) -> None:

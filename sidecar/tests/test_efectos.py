@@ -463,3 +463,139 @@ def test_color_principal_es_amarillo_en_las_caritas() -> None:
 
     r, g, b = emojis.color_principal("emoji_sonrisa")
     assert r > 200 and g > 150 and b < 120
+
+
+# --- Tamaño del sticker sobre una cara --------------------------------------------------------------
+
+# Zona de una cara con el margen (x1.3) y, dentro, lo que vio el detector.
+CARA = {"x": 100, "y": 50, "ancho": 78, "alto": 104}
+NUCLEO = {"x": 109, "y": 62, "ancho": 60, "alto": 80}
+
+
+def _cara(efecto: str = "emoji_sonrisa", escala: float = 1.0, **extra: Any) -> Any:
+    datos: dict[str, Any] = {"forma": "elipse", "nucleo": NUCLEO, "escala": escala} | extra
+    return oculto(CARA["x"], CARA["y"], CARA["ancho"], CARA["alto"], efecto, **datos)
+
+
+def _tocados(salida: np.ndarray, original: np.ndarray) -> int:
+    return int((salida != original).any(axis=2).sum())
+
+
+def _ovalo_nucleo(o: Any, lado: int = 300) -> tuple[np.ndarray, tuple[int, int, int, int]]:
+    region = efectos.region_dilatada(o, 200, lado)
+    ovalo = efectos._ovalo_nucleo(o, region, {}, 200, lado)  # pyright: ignore[reportPrivateUsage]
+    assert ovalo is not None
+    return ovalo, region
+
+
+def test_sticker_mas_chico_y_mas_grande_cambia_lo_que_toca() -> None:
+    a = _imagen()
+    chico, _ = efectos.aplicar(a, [_cara(escala=0.7)])
+    normal, _ = efectos.aplicar(a, [_cara()])
+    grande, regiones = efectos.aplicar(a, [_cara(escala=1.6)])
+    assert _tocados(chico, a) < _tocados(normal, a) < _tocados(grande, a)
+    caja = efectos.region_dilatada(_cara(), 200, 300)
+    rx0, ry0, rx1, ry1 = regiones[0]
+    assert rx0 < caja[0] and ry0 < caja[1] and rx1 > caja[2] and ry1 > caja[3]
+
+
+@pytest.mark.parametrize("efecto", EMOJIS)
+@pytest.mark.parametrize("escala", [0.25, 0.5, 0.8, 0.95])
+def test_sticker_chico_nunca_destapa_la_cara_del_detector(efecto: str, escala: float) -> None:
+    """Más chico que su zona, pero la cara del detector sigue sin depender de lo que había debajo."""
+    a = _imagen()
+    b = a.copy()
+    b[40:170, 90:190] = 255 - b[40:170, 90:190]
+    o = _cara(efecto, escala)
+    salida_a, _ = efectos.aplicar(a, [o])
+    salida_b, _ = efectos.aplicar(b, [o])
+    ovalo, (x0, y0, x1, y1) = _ovalo_nucleo(o)
+    assert np.array_equal(salida_a[y0:y1, x0:x1][ovalo], salida_b[y0:y1, x0:x1][ovalo])
+    # El óvalo abarca lo que vio el detector: el centro de cada lado de su caja queda dentro.
+    n = NUCLEO
+    medio_x, medio_y = n["x"] + n["ancho"] // 2 - x0, n["y"] + n["alto"] // 2 - y0
+    lados = [(n["y"] - y0, medio_x), (n["y"] + n["alto"] - 1 - y0, medio_x), (medio_y, n["x"] - x0), (medio_y, n["x"] + n["ancho"] - 1 - x0)]
+    assert all(ovalo[fila, columna] for fila, columna in lados)
+
+
+def test_sticker_no_baja_del_minimo_que_tapa_la_cara() -> None:
+    """Pedir menos que el mínimo da el mínimo: escalas muy chicas acaban igual."""
+    a = _imagen()
+    muy_chico, _ = efectos.aplicar(a, [_cara(escala=0.25)])
+    tambien, _ = efectos.aplicar(a, [_cara(escala=0.3)])
+    assert np.array_equal(muy_chico, tambien)
+    assert _tocados(muy_chico, a) > NUCLEO["ancho"] * NUCLEO["alto"] * 0.7
+
+
+@pytest.mark.parametrize(
+    "extra",
+    [
+        {"nucleo": None},
+        {"x": 0, "y": 0, "nucleo": {"x": 9, "y": 12, "ancho": 60, "alto": 80}},
+        {"forma": "caja"},
+    ],
+    ids=["sin_nucleo", "en_la_orilla", "forma_caja"],
+)
+def test_sin_cara_del_detector_el_sticker_no_se_encoge(extra: dict[str, Any]) -> None:
+    a = _imagen()
+    datos = {"forma": "elipse", "nucleo": NUCLEO} | extra
+    x, y = int(datos.pop("x", CARA["x"])), int(datos.pop("y", CARA["y"]))
+    base = datos
+    normal, _ = efectos.aplicar(a, [oculto(x, y, CARA["ancho"], CARA["alto"], "emoji_sonrisa", **base)])
+    chico, _ = efectos.aplicar(a, [oculto(x, y, CARA["ancho"], CARA["alto"], "emoji_sonrisa", escala=0.5, **base)])
+    assert np.array_equal(normal, chico)
+
+
+def test_la_escala_solo_cambia_al_emoji() -> None:
+    a = _imagen()
+    for efecto in EFECTOS:
+        normal, _ = efectos.aplicar(a, [_cara(efecto)])
+        for escala in (0.5, 2.0):
+            assert np.array_equal(normal, efectos.aplicar(a, [_cara(efecto, escala)])[0]), (efecto, escala)
+
+
+@given(
+    dx=st.integers(0, 18),
+    dy=st.integers(0, 24),
+    ancho=st.integers(1, 60),
+    alto=st.integers(1, 80),
+    escala=st.floats(0.25, 0.99),
+    efecto=st.sampled_from(EMOJIS),
+)
+def test_propiedad_sticker_chico_tapa_la_cara_del_detector(
+    dx: int, dy: int, ancho: int, alto: int, escala: float, efecto: str
+) -> None:
+    """Con cualquier cara dentro de su zona y cualquier tamaño menor, su óvalo no depende de la foto."""
+    nucleo = {"x": CARA["x"] + dx, "y": CARA["y"] + dy, "ancho": min(ancho, 78 - dx), "alto": min(alto, 104 - dy)}
+    a = _imagen()
+    o = _cara(efecto, escala, nucleo=nucleo)
+    salida_a, _ = efectos.aplicar(a, [o])
+    salida_b, _ = efectos.aplicar(255 - a, [o])
+    ovalo, (x0, y0, x1, y1) = _ovalo_nucleo(o)
+    assert np.array_equal(salida_a[y0:y1, x0:x1][ovalo], salida_b[y0:y1, x0:x1][ovalo])
+
+
+@pytest.mark.parametrize("escala", [0.2, 2.01, float("nan"), float("inf")])
+def test_escala_fuera_de_rango_se_rechaza(escala: float) -> None:
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError):
+        _cara(escala=escala)
+
+
+@pytest.mark.parametrize(
+    "nucleo",
+    [
+        {"x": 99, "y": 62, "ancho": 60, "alto": 80},
+        {"x": 109, "y": 62, "ancho": 70, "alto": 80},
+        {"x": 109, "y": 62, "ancho": 60, "alto": 93},
+        {"x": 109, "y": 62, "ancho": 0, "alto": 80},
+        {"x": -1, "y": 62, "ancho": 60, "alto": 80},
+    ],
+)
+def test_cara_del_detector_fuera_de_su_zona_se_rechaza(nucleo: dict[str, int]) -> None:
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError):
+        _cara(nucleo=nucleo)
+

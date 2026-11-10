@@ -9,6 +9,11 @@ export const LIMITES = {
   intensidad: { min: 1, max: 100, porDefecto: 80, avisoBaja: 30 },
   dilatacionPx: { min: 8, max: 512, porDefecto: 8 },
   dilatacionPct: { min: 0, max: 50, porDefecto: 10 },
+  /**
+   * Tamaño de un sticker sobre una cara, en veces el tamaño que la app elige sola. Por debajo de 1 se
+   * ajusta a la cara que vio el detector; el sidecar nunca lo deja más chico que eso.
+   */
+  escalaSticker: { min: 0.25, max: 2, porDefecto: 1, paso: 0.05 },
   loteArchivos: 500,
   ocultamientos: 5000,
   jpegCalidad: { min: 60, max: 100, porDefecto: 92 },
@@ -73,6 +78,18 @@ export function textoCierre(recuperacionSegura: boolean): string {
 
 const enteroEnRango = (min: number, max: number) => z.number().int().min(min).max(max);
 
+const esquemaCajaImagen = z.strictObject({
+  x: enteroEnRango(0, LIMITES.ladoMax - 1),
+  y: enteroEnRango(0, LIMITES.ladoMax - 1),
+  ancho: enteroEnRango(1, LIMITES.ladoMax),
+  alto: enteroEnRango(1, LIMITES.ladoMax),
+});
+
+interface CajaEntera { x: number; y: number; ancho: number; alto: number }
+
+export const nucleoDentro = (n: CajaEntera, caja: CajaEntera): boolean =>
+  n.x >= caja.x && n.y >= caja.y && n.x + n.ancho <= caja.x + caja.ancho && n.y + n.alto <= caja.y + caja.alto;
+
 export const esquemaOcultamiento = z.strictObject({
   x: enteroEnRango(0, LIMITES.ladoMax - 1),
   y: enteroEnRango(0, LIMITES.ladoMax - 1),
@@ -85,6 +102,13 @@ export const esquemaOcultamiento = z.strictObject({
   mascara_id: z.string().min(1).max(64).nullable(),
   /** Solo la usa el emoji: en caras tapa el óvalo para ajustarse a la cara; si no, el rectángulo completo. */
   forma: z.enum(['caja', 'elipse']),
+  /** La cara que vio el detector, sin el margen. Permite hacer el emoji más chico sin destaparla. */
+  nucleo: esquemaCajaImagen.nullable(),
+  /** Tamaño del emoji en veces el que la app elige sola. Los demás efectos lo ignoran. */
+  escala: z.number().min(LIMITES.escalaSticker.min).max(LIMITES.escalaSticker.max),
+}).refine((o) => o.nucleo === null || nucleoDentro(o.nucleo, o), {
+  message: 'La cara debe quedar dentro de su zona',
+  path: ['nucleo'],
 });
 export type Ocultamiento = z.infer<typeof esquemaOcultamiento>;
 
@@ -101,6 +125,8 @@ export const esquemaHallazgo = z.strictObject({
   confianza: z.number().min(0).max(1),
   requiere_revision: z.boolean(),
   posicion: z.string().nullable(),
+  /** Solo en caras: la caja del detector, sin el margen que se agrega para ocultar. */
+  nucleo: esquemaCajaImagen.nullable().optional(),
 });
 export type Hallazgo = z.infer<typeof esquemaHallazgo>;
 
@@ -283,6 +309,8 @@ export const esquemaEdicion = z.strictObject({
   intensidad: enteroEnRango(LIMITES.intensidad.min, LIMITES.intensidad.max),
   hayMenores: z.boolean().nullable(),
   manuales: z.array(esquemaManual).max(LIMITES.ocultamientos).default([]),
+  // Opcional: las recuperaciones guardadas antes de poder cambiar el tamaño del sticker no lo traen.
+  escalas: z.record(z.string(), z.number().min(LIMITES.escalaSticker.min).max(LIMITES.escalaSticker.max)).default({}),
 });
 export type Edicion = z.infer<typeof esquemaEdicion>;
 

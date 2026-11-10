@@ -1,6 +1,7 @@
 /** Lógica pura de la revisión de una foto. Sin React ni Electron, para probarla a fondo. */
 import { catalogo, etiquetaNivel, reglaDe, type Nivel, type Regla } from './catalogo';
 import {
+  esEmoji,
   LIMITES,
   type Analisis,
   type Decision,
@@ -38,6 +39,8 @@ export interface Revision {
   intensidad: number;
   hayMenores: boolean | null;
   manuales: readonly ZonaManual[];
+  /** Tamaño del sticker de cada cara, en veces el que la app elige sola. Sin entrada, 1. */
+  escalas: Readonly<Record<string, number>>;
 }
 
 export const REVISION_INICIAL: Revision = {
@@ -46,6 +49,7 @@ export const REVISION_INICIAL: Revision = {
   intensidad: LIMITES.intensidad.porDefecto,
   hayMenores: null,
   manuales: [],
+  escalas: {},
 };
 
 export interface Historial {
@@ -111,6 +115,52 @@ export function efectoDe(r: Revision, h: Hallazgo): Efecto {
   return r.efectos[h.id] ?? (h.regla_id === 'CAR-01' ? 'difuminado' : 'solido');
 }
 
+// --- Tamaño del sticker sobre una cara ----------------------------------------------------------
+
+// Al centésimo: 0.95 debe ser 0.95, no 0.9500000000000001, para compararlo y guardarlo tal cual.
+const redondearPaso = (v: number): number =>
+  Math.round(Math.round(v / LIMITES.escalaSticker.paso) * LIMITES.escalaSticker.paso * 100) / 100;
+
+/** Solo un emoji sobre una cara con su caja del detector puede cambiar de tamaño. */
+export function ajustaSticker(r: Revision, h: Hallazgo): boolean {
+  return h.regla_id === 'CAR-01' && h.caja !== null && h.nucleo !== undefined && h.nucleo !== null && esEmoji(efectoDe(r, h));
+}
+
+/**
+ * Hasta dónde puede encogerse el sticker: lo que mide la cara del detector frente a la zona con margen.
+ * Es una aproximación para el control; el sidecar calcula el mínimo exacto y nunca baja de él.
+ */
+export function escalaMinimaSticker(h: Hallazgo): number {
+  const { min } = LIMITES.escalaSticker;
+  if (h.caja === null || h.nucleo === undefined || h.nucleo === null) return 1;
+  const margen = Math.max(LIMITES.dilatacionPx.porDefecto, Math.ceil((Math.min(h.caja.ancho, h.caja.alto) * LIMITES.dilatacionPct.porDefecto) / 100));
+  const nucleo = LIMITES.dilatacionPx.porDefecto;
+  const proporcion = Math.max(
+    (h.nucleo.ancho + 2 * nucleo) / (h.caja.ancho + 2 * margen),
+    (h.nucleo.alto + 2 * nucleo) / (h.caja.alto + 2 * margen),
+  );
+  if (!Number.isFinite(proporcion)) return 1;
+  // Hacia arriba, al paso del control: así el control no ofrece tamaños que el sidecar no daría.
+  const paso = LIMITES.escalaSticker.paso;
+  return Math.min(1, Math.max(min, redondearPaso(Math.ceil(proporcion / paso - 1e-9) * paso)));
+}
+
+/** Fuera de rango o no numérico, se limita; 1 se guarda como "sin cambio". */
+export function limitarEscala(valor: number): number {
+  const { min, max, porDefecto } = LIMITES.escalaSticker;
+  if (!Number.isFinite(valor)) return porDefecto;
+  return Math.min(max, Math.max(min, redondearPaso(valor)));
+}
+
+export const escalaDe = (r: Revision, id: string): number => r.escalas[id] ?? LIMITES.escalaSticker.porDefecto;
+
+export function cambiarEscala(r: Revision, id: string, valor: number): Revision {
+  const escala = limitarEscala(valor);
+  if (escala === escalaDe(r, id)) return r;
+  const resto = Object.fromEntries(Object.entries(r.escalas).filter(([clave]) => clave !== id));
+  return { ...r, escalas: escala === LIMITES.escalaSticker.porDefecto ? resto : { ...resto, [id]: escala } };
+}
+
 export function construirOcultamientos(r: Revision, hallazgos: readonly Hallazgo[]): Ocultamiento[] {
   const salida: Ocultamiento[] = [];
   for (const h of hallazgos) {
@@ -124,6 +174,8 @@ export function construirOcultamientos(r: Revision, hallazgos: readonly Hallazgo
       mascara_id: null,
       // Con el margen de las caras, el óvalo contiene toda la cara detectada: el emoji puede ajustarse a ella.
       forma: h.regla_id === 'CAR-01' ? 'elipse' : 'caja',
+      nucleo: ajustaSticker(r, h) ? (h.nucleo ?? null) : null,
+      escala: ajustaSticker(r, h) ? escalaDe(r, h.id) : LIMITES.escalaSticker.porDefecto,
     });
   }
   for (const z of r.manuales) {
@@ -141,6 +193,8 @@ export function construirOcultamientos(r: Revision, hallazgos: readonly Hallazgo
       mascara_id: z.mascara_id,
       // Lo que dibujaste a mano se tapa completo; con silueta, el emoji se ajusta a ella en el sidecar.
       forma: 'caja',
+      nucleo: null,
+      escala: LIMITES.escalaSticker.porDefecto,
     });
   }
   return salida;
@@ -492,6 +546,7 @@ export function aEdicion(archivoId: string, r: Revision): Edicion {
     intensidad: r.intensidad,
     hayMenores: r.hayMenores,
     manuales: r.manuales.map((z) => ({ ...z })),
+    escalas: { ...r.escalas },
   };
 }
 
@@ -502,6 +557,7 @@ export function desdeEdicion(e: Edicion): Revision {
     intensidad: e.intensidad,
     hayMenores: e.hayMenores,
     manuales: e.manuales.map((z) => ({ ...z, origen: z.origen ?? origenPorMascara(z.mascara_id) })),
+    escalas: e.escalas,
   };
 }
 
@@ -511,6 +567,7 @@ export function hayCambios(r: Revision): boolean {
     Object.keys(r.efectos).length > 0 ||
     r.hayMenores !== null ||
     r.manuales.length > 0 ||
+    Object.keys(r.escalas).length > 0 ||
     r.intensidad !== LIMITES.intensidad.porDefecto
   );
 }
