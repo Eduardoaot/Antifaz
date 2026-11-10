@@ -2,7 +2,6 @@ import { Maximize, SquareSplitHorizontal, ZoomIn, ZoomOut } from 'lucide-react';
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import { esEmoji, LIMITES, type Hallazgo, type Ocultamiento, type Punto } from '../../shared/contrato';
 import {
-  ajustaSticker,
   agregarPuntoTrazo,
   anchoAjustado,
   aPuntoDeImagen,
@@ -18,6 +17,7 @@ import {
   posicionDe,
   textoZoom,
   zonaEnPunto,
+  zonasConSticker,
   type Caja,
   type CambioSticker,
   type Herramienta,
@@ -239,9 +239,10 @@ export function Visor({ archivo, hallazgos, ocultamientos, revision, herramienta
     ...(revision?.manuales ?? []).map((z) => ({ id: z.id, caja: { x: z.x, y: z.y, ancho: z.ancho, alto: z.alto } })),
   ];
 
-  // Stickers de caras que se pueden mover: solo con "Solo ver", para no competir con las herramientas.
+  // Stickers que se pueden mover, en cualquier zona con emoji (también las tuyas): solo con "Solo ver",
+  // para no competir con las herramientas.
   const editables = !comparando && herramienta === 'ninguna' && revision !== null && alAjustarSticker !== undefined;
-  const stickers = editables ? conCaja.filter((h) => revision.decisiones[h.id] === 'ocultar' && ajustaSticker(revision, h)) : [];
+  const stickers = editables ? zonasConSticker(revision, conCaja) : [];
   const elegido = stickers.find((h) => h.id === seleccionSticker);
 
   // Con el teclado en el panel, la imagen ampliada se mueve para mostrar la zona.

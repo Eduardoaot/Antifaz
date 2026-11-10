@@ -137,6 +137,8 @@ Al ejecutar un caso, el Estado pasa a `automatizado` o `manual`, con enlace a su
 | ESC-004 | 4 | Ventana con cortina o sin vista | Analizar | No debería avisar; tasa de falsas alarmas medida | pendiente: falta muestra |
 | ZON-001 | 4 | Pecho en traje de baño o lencería | Analizar | Los dos lados quedan en una sola zona, con margen; con una persona al lado, cada quien conserva la suya | automatizado con salidas simuladas: sidecar/tests/test_contenido.py. Revisado a ojo en 14 fotos locales que no se versionan |
 | ZON-002 | 4 | Parte baja del traje de baño o lencería | Analizar | Se propone la zona aunque la persona esté lejos o de espaldas | pendiente: NudeNet no la encontró en varias personas de fotos grupales; no se arregla bajando el umbral |
+| STK-001 | 4 | Mover y agrandar el emoji en una zona que no es cara (pecho, texto, placa, tu zona) | Agrandar, mover con la cruceta y arrastrar en la foto; exportar | Se mueve; a tamaño normal no se aleja; nada de la zona se ve en lo exportado | automatizado: sidecar/tests/test_efectos.py (propiedad), tests-ui/unit/logica.test.ts y tests-ui/e2e/app.spec.ts ("sticker en tu zona") |
+| STK-002 | 4 | Emoji de carita sobre una cara, exportado | Revisar lo exportado con el detector | La cara real queda tapada; el detector puede encontrar la carita del emoji (0.26 a 0.36), no la persona | revisado a mano con sidecar/tests/datos/astronauta.jpg; las E2E usan la estrella para no confundirlas |
 | ZON-003 | 4 | Hombre sin camisa | Analizar | No se marca como desnudez | pendiente: NudeNet confundió el pecho de dos hombres con un pecho femenino descubierto |
 
 ## Sesgos (SES, Fase 4)

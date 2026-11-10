@@ -15,6 +15,7 @@ import {
   posicionDe,
   restablecerSticker,
   stickerAjustado,
+  tieneNucleo,
   type CambioSticker,
   type Posicion,
   etiquetaNivelMostrado,
@@ -92,7 +93,12 @@ function IconoCategoria({ regla }: { regla: Regla }): React.JSX.Element | null {
   }
 }
 
-function textoTamano(valor: number, minimo: number): string {
+function textoTamano(valor: number, minimo: number, cara: boolean): string {
+  if (!cara) {
+    return valor > LIMITES.escalaSticker.porDefecto
+      ? 'Más grande tapa más de lo necesario.'
+      : 'Es el tamaño que elegimos: tapa toda la zona.';
+  }
   if (valor <= minimo) return 'Es lo más chico: tapa justo la cara.';
   if (valor < LIMITES.escalaSticker.porDefecto) return 'Más chico tapa la cara, pero podría dejar ver cabello u orejas.';
   if (valor > LIMITES.escalaSticker.porDefecto) return 'Más grande tapa más de lo necesario.';
@@ -102,7 +108,8 @@ function textoTamano(valor: number, minimo: number): string {
 function textoPosicion(h: Hallazgo, escala: number, p: Posicion): string | null {
   if (escala <= escalaMinimaSticker(h)) return 'Para moverlo, primero hazlo más grande.';
   if (p.x === 0 && p.y === 0) return null;
-  return enElTope(h, escala, p) ? 'Hasta aquí: más lejos dejaría ver la cara.' : 'Lo moviste del centro.';
+  if (!enElTope(h, escala, p)) return 'Lo moviste del centro.';
+  return tieneNucleo(h) ? 'Hasta aquí: más lejos dejaría ver la cara.' : 'Hasta aquí: más lejos dejaría ver la zona.';
 }
 
 interface PropsAjuste {
@@ -119,7 +126,7 @@ interface PropsAjuste {
  * Un solo botón en la fila: abre el tamaño, la cruceta para moverlo y "Restablecer". Es la ruta con
  * teclado de lo mismo que se hace arrastrando en la foto, y se abre también al elegir el sticker ahí.
  */
-function AjusteSticker({ hallazgo, numero, revision, abierto, alAbrir, alAjustar, alRestablecer }: PropsAjuste): React.JSX.Element {
+export function AjusteSticker({ hallazgo, numero, revision, abierto, alAbrir, alAjustar, alRestablecer }: PropsAjuste): React.JSX.Element {
   const id = useId();
   const [moviendo, setMoviendo] = useState<number | null>(null);
   const guardada = escalaDe(revision, hallazgo.id);
@@ -178,7 +185,7 @@ function AjusteSticker({ hallazgo, numero, revision, abierto, alAbrir, alAjustar
             </button>
           </div>
           <p id={`${id}-ayuda`} className="suave" aria-live="polite">
-            {textoTamano(valor, minimo)}
+            {textoTamano(valor, minimo, tieneNucleo(hallazgo))}
             {enPosicion !== null && <> {enPosicion}</>}
           </p>
           {ajustado && moviendo === null && (

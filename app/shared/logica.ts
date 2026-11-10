@@ -123,18 +123,50 @@ export function responderMenores(r: Revision, hallazgos: readonly Hallazgo[], ha
 }
 
 export function efectoDe(r: Revision, h: Hallazgo): Efecto {
+  // Una zona tuya guarda su efecto en ella misma.
+  const manual = r.manuales.find((z) => z.id === h.id);
+  if (manual !== undefined) return manual.efecto;
   return r.efectos[h.id] ?? (h.regla_id === 'CAR-01' ? 'difuminado' : 'solido');
 }
 
-// --- Tamaño y posición del sticker sobre una cara ------------------------------------------------
+/** Regla con la que una zona tuya se trata como cualquier hallazgo con caja (por ejemplo, el sticker). */
+export const REGLA_MANUAL = 'MANUAL';
+
+/** Tu zona como hallazgo con caja y sin cara del detector: así comparte el sticker con todo lo demás. */
+export function hallazgoDeManual(z: ZonaManual): Hallazgo {
+  return {
+    id: z.id,
+    regla_id: REGLA_MANUAL,
+    caja: { x: z.x, y: z.y, ancho: z.ancho, alto: z.alto },
+    confianza: 1,
+    requiere_revision: false,
+    posicion: null,
+    nucleo: null,
+  };
+}
+
+// --- Tamaño y posición del sticker en cualquier zona --------------------------------------------
 
 // Al centésimo: 0.95 debe ser 0.95, no 0.9500000000000001, para compararlo y guardarlo tal cual.
 const redondearPaso = (v: number): number =>
   Math.round(Math.round(v / LIMITES.escalaSticker.paso) * LIMITES.escalaSticker.paso * 100) / 100;
 
-/** Solo un emoji sobre una cara con su caja del detector puede cambiar de tamaño y moverse. */
+/**
+ * Cualquier zona con emoji puede cambiar de tamaño y moverse: caras, pecho, texto, placas o tus zonas.
+ * En una cara, lo que no puede destaparse es la cara del detector; en lo demás, la zona completa, y el
+ * sidecar mantiene el relleno debajo aunque el emoji se mueva.
+ */
 export function ajustaSticker(r: Revision, h: Hallazgo): boolean {
-  return h.regla_id === 'CAR-01' && h.caja !== null && h.nucleo !== undefined && h.nucleo !== null && esEmoji(efectoDe(r, h));
+  return h.caja !== null && esEmoji(efectoDe(r, h));
+}
+
+/** Verdadero si lo que no puede destaparse es una cara del detector (y no la zona completa). */
+export const tieneNucleo = (h: Hallazgo): boolean => h.nucleo !== undefined && h.nucleo !== null;
+
+/** Las zonas cuyo sticker se puede mover ahora: las ocultas con emoji, detectadas o tuyas. */
+export function zonasConSticker(r: Revision, hallazgos: readonly Hallazgo[]): Hallazgo[] {
+  const detectadas = hallazgos.filter((h) => r.decisiones[h.id] === 'ocultar' && ajustaSticker(r, h));
+  return [...detectadas, ...r.manuales.map(hallazgoDeManual).filter((h) => ajustaSticker(r, h))];
 }
 
 /** El margen que el sidecar agrega a una zona de cara (`region_dilatada` en efectos.py). */
@@ -277,6 +309,7 @@ export function construirOcultamientos(r: Revision, hallazgos: readonly Hallazgo
     });
   }
   for (const z of r.manuales) {
+    const ajusta = esEmoji(z.efecto);
     salida.push({
       x: z.x,
       y: z.y,
@@ -292,9 +325,9 @@ export function construirOcultamientos(r: Revision, hallazgos: readonly Hallazgo
       // Lo que dibujaste a mano se tapa completo; con silueta, el emoji se ajusta a ella en el sidecar.
       forma: 'caja',
       nucleo: null,
-      escala: LIMITES.escalaSticker.porDefecto,
-      desplazamiento_x: 0,
-      desplazamiento_y: 0,
+      escala: ajusta ? escalaDe(r, z.id) : LIMITES.escalaSticker.porDefecto,
+      desplazamiento_x: ajusta ? posicionDe(r, z.id).x : 0,
+      desplazamiento_y: ajusta ? posicionDe(r, z.id).y : 0,
     });
   }
   return salida;
@@ -546,7 +579,8 @@ export function agregarPuntoTrazo(trazo: readonly Punto[], punto: Punto, tamano:
 export const trazoLleno = (trazo: readonly Punto[]): boolean => trazo.length >= LIMITES.puntosTrazo;
 
 export function quitarManual(r: Revision, id: string): Revision {
-  return { ...r, manuales: r.manuales.filter((z) => z.id !== id) };
+  // Su sticker se va con ella: un id nuevo con el mismo nombre no debe heredar tamaño ni posición.
+  return { ...r, manuales: r.manuales.filter((z) => z.id !== id), escalas: sinClave(r.escalas, id), posiciones: sinClave(r.posiciones, id) };
 }
 
 export function efectoDeManual(r: Revision, id: string, efecto: Efecto): Revision {
