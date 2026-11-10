@@ -1,0 +1,71 @@
+{
+  "equipo": {
+    "cpu": "Intel64 Family 6 Model 154 Stepping 4, GenuineIntel",
+    "nucleos_fisicos": 10,
+    "nucleos_logicos": 12,
+    "ram_gb": 15.4,
+    "hilos_usados": 10,
+    "segundos_de_video": 15.0,
+    "fps_video": 24,
+    "modelos": {
+      "sam2.1-tiny": [
+        "facebook/sam2.1-hiera-tiny",
+        "de431c4043854a71d8101e17995dfe596bf101a5"
+      ],
+      "edgetam": [
+        "yonigozlan/EdgeTAM-hf",
+        "c266ce53b3fc00f0f495b583f6a116c4e57f53bb"
+      ]
+    }
+  },
+  "resultados": [
+    {
+      "metodo": "hibrido",
+      "fps_tracking": 24,
+      "lado_proxy": 240,
+      "hilos": 10,
+      "frames_video": 360,
+      "frames_rastreados": 360,
+      "s_por_frame_rastreado": 0.1788,
+      "minutos_por_minuto_de_video": 4.29,
+      "segundos_por_video": 64.4,
+      "memoria_pico_mb": 1169.0,
+      "frames_con_algo_visible_pct": 31.7,
+      "peor_frame_visible_pct": 89.1,
+      "cobertura_media_pct": 84.36,
+      "cara_elegida_en_frame0_pct": 100.0
+    },
+    {
+      "metodo": "hibrido",
+      "fps_tracking": 24,
+      "lado_proxy": 360,
+      "hilos": 10,
+      "frames_video": 360,
+      "frames_rastreados": 360,
+      "s_por_frame_rastreado": 0.2624,
+      "minutos_por_minuto_de_video": 6.3,
+      "segundos_por_video": 94.5,
+      "memoria_pico_mb": 1440.0,
+      "frames_con_algo_visible_pct": 34.2,
+      "peor_frame_visible_pct": 87.8,
+      "cobertura_media_pct": 90.35,
+      "cara_elegida_en_frame0_pct": 99.4
+    },
+    {
+      "metodo": "hibrido",
+      "fps_tracking": 24,
+      "lado_proxy": 480,
+      "hilos": 10,
+      "frames_video": 360,
+      "frames_rastreados": 360,
+      "s_por_frame_rastreado": 0.3317,
+      "minutos_por_minuto_de_video": 7.96,
+      "segundos_por_video": 119.4,
+      "memoria_pico_mb": 1747.0,
+      "frames_con_algo_visible_pct": 40.8,
+      "peor_frame_visible_pct": 92.0,
+      "cobertura_media_pct": 83.43,
+      "cara_elegida_en_frame0_pct": 99.0
+    }
+  ]
+}

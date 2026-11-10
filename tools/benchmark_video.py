@@ -52,7 +52,8 @@ MODELOS_HF = {
     "sam2.1-tiny": ("facebook/sam2.1-hiera-tiny", "de431c4043854a71d8101e17995dfe596bf101a5"),
     "edgetam": ("yonigozlan/EdgeTAM-hf", "c266ce53b3fc00f0f495b583f6a116c4e57f53bb"),
 }
-METODOS = ["sam2.1-tiny", "edgetam", "csrt", "yunet"]
+METODOS = ["sam2.1-tiny", "edgetam", "csrt", "yunet", "hibrido"]
+PASO_HIBRIDO = 4  # mismo default que sidecar/revisor/seguimiento.py
 
 
 # --- Video sintético con respuesta conocida ---------------------------------------------------
@@ -192,6 +193,23 @@ def seguir_csrt(frames: list[np.ndarray], caja0: tuple[int, int, int, int]) -> t
     return mascaras, time.perf_counter() - inicio
 
 
+def seguir_hibrido(frames: list[np.ndarray], punto: tuple[int, int]) -> tuple[dict[int, np.ndarray], float]:
+    """Usa el SeguidorHibrido del sidecar (EdgeTAM en keyframes + CSRT)."""
+    import sys
+
+    sidecar = str(RAIZ / "sidecar")
+    if sidecar not in sys.path:
+        sys.path.insert(0, sidecar)
+    from revisor.seguimiento import PASO_CLAVE_DEFAULT, Punto, SeguidorEdgeTam, SeguidorHibrido
+
+    assert PASO_CLAVE_DEFAULT == PASO_HIBRIDO
+    edgetam = SeguidorEdgeTam(RAIZ / "sidecar" / "modelos")
+    hibrido = SeguidorHibrido(edgetam, paso=PASO_HIBRIDO)
+    inicio = time.perf_counter()
+    mascaras = hibrido.seguir(frames, 0, Punto(punto[0], punto[1]))
+    return mascaras, time.perf_counter() - inicio
+
+
 def seguir_yunet(frames: list[np.ndarray], caja0: tuple[int, int, int, int]) -> tuple[dict[int, np.ndarray], float]:
     """Detecta caras en cada frame y se queda con la más cercana a la anterior. No es tracking."""
     alto, ancho = frames[0].shape[:2]
@@ -289,6 +307,8 @@ def correr(metodo: str, fps: int, proxy: int, segundos: float, hilos: int, fps_v
             locales, segundos_cpu = seguir_csrt(sub, caja0)
         case "yunet":
             locales, segundos_cpu = seguir_yunet(sub, caja0)
+        case "hibrido":
+            locales, segundos_cpu = seguir_hibrido(sub, centro0)
         case _:
             raise SystemExit(f"método desconocido: {metodo}")
     rastreados = {indices[k]: m for k, m in locales.items()}

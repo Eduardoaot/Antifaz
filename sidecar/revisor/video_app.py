@@ -1,8 +1,8 @@
 """Video en la app: abrir, ver un frame, seguir un objeto, quitarlo y exportar.
 
-Flujo de la beta (decisiones del responsable, 2026-11-06): hasta 3 s, seguimiento a 24 fps con
-EdgeTAM sobre un proxy de 480 px. En video todavía no hay detección automática: la persona elige
-qué ocultar, y la app lo dice.
+Flujo de la beta: hasta 3 s, seguimiento a 24 fps sobre un proxy de 480 px, con el híbrido
+EdgeTAM (keyframes) + CSRT (entre medias). En video todavía no hay detección automática: la
+persona elige qué ocultar, y la app lo dice.
 
 Privacidad:
 - Los frames sin ocultar solo viven en memoria y en tuberías con FFmpeg (SEG-004).
