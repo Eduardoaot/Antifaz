@@ -135,6 +135,9 @@ Al ejecutar un caso, el Estado pasa a `automatizado` o `manual`, con enlace a su
 | ESC-002 | 4 | Desnudo tomado en un baño | Analizar | DES-01 se sigue avisando: el baño no le quita puntaje | automatizado con modelo simulado: sidecar/tests/test_contenido.py |
 | ESC-003 | 4 | Ventana con vista a la calle | Analizar | Zona UBI-06 de riesgo bajo | pendiente: el umbral 0.2 es una propuesta sin medir |
 | ESC-004 | 4 | Ventana con cortina o sin vista | Analizar | No debería avisar; tasa de falsas alarmas medida | pendiente: falta muestra |
+| ZON-001 | 4 | Pecho en traje de baño o lencería | Analizar | Los dos lados quedan en una sola zona, con margen; con una persona al lado, cada quien conserva la suya | automatizado con salidas simuladas: sidecar/tests/test_contenido.py. Revisado a ojo en 14 fotos locales que no se versionan |
+| ZON-002 | 4 | Parte baja del traje de baño o lencería | Analizar | Se propone la zona aunque la persona esté lejos o de espaldas | pendiente: NudeNet no la encontró en varias personas de fotos grupales; no se arregla bajando el umbral |
+| ZON-003 | 4 | Hombre sin camisa | Analizar | No se marca como desnudez | pendiente: NudeNet confundió el pecho de dos hombres con un pecho femenino descubierto |
 
 ## Sesgos (SES, Fase 4)
 

@@ -144,6 +144,15 @@ REGLA_POR_ETIQUETA = {
 }
 LADO_NUDENET = 320
 UMBRAL_NMS = 0.45
+# NudeNet marca cada lado del pecho por separado. Se ocultan juntos: dos cuadros sueltos dejan ver la forma.
+ETIQUETAS_PECHO = frozenset({"FEMALE_BREAST_COVERED", "FEMALE_BREAST_EXPOSED"})
+# Son pareja si se solapan en vertical al menos la mitad del más bajo, los separa como mucho 0.6 del ancho
+# del más ancho y ninguno mide más del doble que el otro (qa/RANGOS.md, `contenido.pareja_pecho`).
+PAREJA_SOLAPE_VERTICAL = 0.5
+PAREJA_SEPARACION_MAX = 0.6
+PAREJA_PROPORCION_MAX = 2.0
+# Las cajas de NudeNet quedan justas sobre la prenda: se agranda cada lado un 15% del tamaño de la zona.
+MARGEN_ZONA = 0.15
 
 
 @dataclass(frozen=True)
@@ -172,6 +181,52 @@ def nueva_sesion(contenido: bytes) -> ort.InferenceSession:
     return ort.InferenceSession(contenido, opciones, providers=["CPUExecutionProvider"])
 
 
+def _son_pareja(a: Zona, b: Zona) -> bool:
+    solape = min(a.y + a.alto, b.y + b.alto) - max(a.y, b.y)
+    if solape < PAREJA_SOLAPE_VERTICAL * min(a.alto, b.alto):
+        return False
+    separacion = max(a.x, b.x) - min(a.x + a.ancho, b.x + b.ancho)
+    if separacion > PAREJA_SEPARACION_MAX * max(a.ancho, b.ancho):
+        return False
+    return (
+        max(a.alto, b.alto) <= PAREJA_PROPORCION_MAX * min(a.alto, b.alto)
+        and max(a.ancho, b.ancho) <= PAREJA_PROPORCION_MAX * min(a.ancho, b.ancho)
+    )
+
+
+def _unir(a: Zona, b: Zona) -> Zona:
+    """Una zona que cubre a las dos. Si una es desnudez, la unión también: gana lo más grave."""
+    x0, y0 = min(a.x, b.x), min(a.y, b.y)
+    x1, y1 = max(a.x + a.ancho, b.x + b.ancho), max(a.y + a.alto, b.y + b.alto)
+    regla = "DES-01" if "DES-01" in (a.regla_id, b.regla_id) else a.regla_id
+    return Zona(regla, x0, y0, x1 - x0, y1 - y0, max(a.confianza, b.confianza))
+
+
+def unir_pechos(pechos: list[Zona]) -> list[Zona]:
+    """Une cada lado con su pareja más cercana. Un lado sin pareja se queda como está."""
+    centro = [(z.x + z.ancho / 2, z.y + z.alto / 2) for z in pechos]
+    candidatas = sorted(
+        (float(np.hypot(centro[i][0] - centro[j][0], centro[i][1] - centro[j][1])), i, j)
+        for i in range(len(pechos))
+        for j in range(i + 1, len(pechos))
+        if _son_pareja(pechos[i], pechos[j])
+    )
+    usadas: set[int] = set()
+    salida: list[Zona] = []
+    for _, i, j in candidatas:
+        if i not in usadas and j not in usadas:
+            usadas |= {i, j}
+            salida.append(_unir(pechos[i], pechos[j]))
+    return salida + [z for k, z in enumerate(pechos) if k not in usadas]
+
+
+def con_margen(zona: Zona, ancho: int, alto: int) -> Zona:
+    mx, my = round(zona.ancho * MARGEN_ZONA), round(zona.alto * MARGEN_ZONA)
+    x0, y0 = max(0, zona.x - mx), max(0, zona.y - my)
+    x1, y1 = min(ancho, zona.x + zona.ancho + mx), min(alto, zona.y + zona.alto + my)
+    return Zona(zona.regla_id, x0, y0, x1 - x0, y1 - y0, zona.confianza)
+
+
 def decodificar_zonas(salida: Any, ancho: int, alto: int, umbral: float) -> list[Zona]:
     """Convierte la salida de NudeNet en zonas. La imagen entró rellenada hasta quedar cuadrada."""
     filas = np.transpose(salida[0])
@@ -179,6 +234,7 @@ def decodificar_zonas(salida: Any, ancho: int, alto: int, umbral: float) -> list
     cajas: list[list[int]] = []
     puntajes: list[float] = []
     reglas: list[str] = []
+    pecho: list[bool] = []
     for fila in filas:
         clases = fila[4:]
         indice = int(np.argmax(clases))
@@ -193,13 +249,16 @@ def decodificar_zonas(salida: Any, ancho: int, alto: int, umbral: float) -> list
             cajas.append([x0, y0, x1 - x0, y1 - y0])
             puntajes.append(puntaje)
             reglas.append(regla)
+            pecho.append(ETIQUETAS_NUDENET[indice] in ETIQUETAS_PECHO)
     if not cajas:
         return []
-    indices = cv2.dnn.NMSBoxes(cajas, puntajes, umbral, UMBRAL_NMS)
-    return [
-        Zona(reglas[i], cajas[i][0], cajas[i][1], cajas[i][2], cajas[i][3], puntajes[i])
-        for i in (int(v) for v in np.array(indices).reshape(-1))
+    indices = [int(v) for v in np.array(cv2.dnn.NMSBoxes(cajas, puntajes, umbral, UMBRAL_NMS)).reshape(-1)]
+    zonas = [
+        Zona(reglas[i], cajas[i][0], cajas[i][1], cajas[i][2], cajas[i][3], puntajes[i]) for i in indices
     ]
+    pechos = [z for i, z in zip(indices, zonas, strict=True) if pecho[i]]
+    otras = [z for i, z in zip(indices, zonas, strict=True) if not pecho[i]]
+    return [con_margen(z, ancho, alto) for z in unir_pechos(pechos) + otras]
 
 
 class RevisorContenido:
