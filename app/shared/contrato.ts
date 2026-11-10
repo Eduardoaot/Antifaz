@@ -14,6 +14,19 @@ export const LIMITES = {
   jpegCalidad: { min: 60, max: 100, porDefecto: 92 },
   ladoVista: 1600,
   pincel: { min: 1, max: 512, porDefecto: 32 },
+  /** Zoom del visor: 1 es "ajustar a la ventana". Solo cambia la vista, nunca la exportación. */
+  zoom: { min: 1, max: 8, porDefecto: 1 },
+  /** Comparar antes y después: porcentaje del ancho que muestra la original. Solo cambia la vista. */
+  comparacion: { min: 0, max: 100, porDefecto: 50 },
+  /**
+   * Rótulos "Original" y "Tu copia": según el % del ancho que queda de su lado, se desvanecen entre
+   * `oculto` (invisible) y `visible` (opaco), en vez de desaparecer de golpe.
+   */
+  rotuloComparacion: { oculto: 10, visible: 26 },
+  /** Si una zona empieza a menos de esto del borde superior (en % del alto), su número va abajo. */
+  margenEtiqueta: 8,
+  /** Al ajustar a la ventana, una foto chica no se estira más de esto: se vería suave y con artefactos. */
+  ajusteMaxEscala: 2,
   puntosTrazo: 5000,
   // Video (Fase 3). Coinciden con sidecar/revisor/esquemas.py.
   videoPistas: 50,
@@ -21,8 +34,24 @@ export const LIMITES = {
   videoProxyLadoMax: 4096,
 } as const;
 
-export const esquemaEfecto = z.enum(['solido', 'difuminado', 'pixelado']);
+/**
+ * Cada emoji es un efecto propio: así la recuperación, las zonas manuales y el video lo aceptan igual.
+ * Coinciden con TipoEmoji de sidecar/revisor/esquemas.py. Se dibujan sobre bloque sólido.
+ */
+export const EMOJIS = ['emoji_sonrisa', 'emoji_lentes', 'emoji_gato', 'emoji_estrella'] as const;
+export type Emoji = (typeof EMOJIS)[number];
+
+export const esquemaEfecto = z.enum(['solido', 'difuminado', 'pixelado', ...EMOJIS] as const);
 export type Efecto = z.infer<typeof esquemaEfecto>;
+
+export const esEmoji = (e: Efecto): e is Emoji => (EMOJIS as readonly string[]).includes(e);
+
+export const ETIQUETA_EMOJI: Readonly<Record<Emoji, string>> = {
+  emoji_sonrisa: '😀 Carita sonriente',
+  emoji_lentes: '😎 Carita con lentes',
+  emoji_gato: '🐱 Gato',
+  emoji_estrella: '⭐ Estrella',
+};
 
 export const esquemaTema = z.enum(['sistema', 'claro', 'oscuro']);
 export type Tema = z.infer<typeof esquemaTema>;
@@ -54,6 +83,8 @@ export const esquemaOcultamiento = z.strictObject({
   dilatacion_px: enteroEnRango(LIMITES.dilatacionPx.min, LIMITES.dilatacionPx.max),
   dilatacion_pct: z.number().min(LIMITES.dilatacionPct.min).max(LIMITES.dilatacionPct.max),
   mascara_id: z.string().min(1).max(64).nullable(),
+  /** Solo la usa el emoji: en caras tapa el óvalo para ajustarse a la cara; si no, el rectángulo completo. */
+  forma: z.enum(['caja', 'elipse']),
 });
 export type Ocultamiento = z.infer<typeof esquemaOcultamiento>;
 

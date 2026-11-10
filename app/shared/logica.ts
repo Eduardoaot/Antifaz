@@ -122,6 +122,8 @@ export function construirOcultamientos(r: Revision, hallazgos: readonly Hallazgo
       dilatacion_px: LIMITES.dilatacionPx.porDefecto,
       dilatacion_pct: LIMITES.dilatacionPct.porDefecto,
       mascara_id: null,
+      // Con el margen de las caras, el óvalo contiene toda la cara detectada: el emoji puede ajustarse a ella.
+      forma: h.regla_id === 'CAR-01' ? 'elipse' : 'caja',
     });
   }
   for (const z of r.manuales) {
@@ -137,6 +139,8 @@ export function construirOcultamientos(r: Revision, hallazgos: readonly Hallazgo
       // La silueta del modelo puede quedarse corta, así que lleva el margen completo.
       dilatacion_pct: z.origen === 'silueta' ? LIMITES.dilatacionPct.porDefecto : 0,
       mascara_id: z.mascara_id,
+      // Lo que dibujaste a mano se tapa completo; con silueta, el emoji se ajusta a ella en el sidecar.
+      forma: 'caja',
     });
   }
   return salida;
@@ -509,4 +513,100 @@ export function hayCambios(r: Revision): boolean {
     r.manuales.length > 0 ||
     r.intensidad !== LIMITES.intensidad.porDefecto
   );
+}
+
+// --- Visor: zoom y zona resaltada ---------------------------------------------------------------
+
+/** Niveles del zoom del visor. El 1 es "ajustar a la ventana". */
+export const NIVELES_ZOOM = [1, 1.5, 2, 3, 4, 6, 8] as const;
+
+/** Lo que está resaltado a la vez en la imagen y en el panel, y de dónde vino. */
+export interface Resaltado {
+  id: string;
+  /** Solo "foco" (teclado) mueve la imagen para mostrar la zona: con el mouse sería brusco. */
+  origen: 'mouse' | 'foco' | 'imagen';
+}
+
+export function limitarZoom(z: number): number {
+  if (!Number.isFinite(z)) return LIMITES.zoom.porDefecto;
+  return Math.min(LIMITES.zoom.max, Math.max(LIMITES.zoom.min, z));
+}
+
+/** El siguiente nivel hacia arriba o hacia abajo. En los extremos se queda donde está. */
+export function pasoZoom(actual: number, direccion: 1 | -1): number {
+  const z = limitarZoom(actual);
+  if (direccion === 1) return NIVELES_ZOOM.find((n) => n > z + 1e-9) ?? LIMITES.zoom.max;
+  return [...NIVELES_ZOOM].reverse().find((n) => n < z - 1e-9) ?? LIMITES.zoom.min;
+}
+
+export const textoZoom = (z: number): string => `${Math.round(limitarZoom(z) * 100)} %`;
+
+/** Corte de la comparación antes/después, en % del ancho. Un valor no finito vuelve a la mitad. */
+export function limitarCorte(v: number): number {
+  if (!Number.isFinite(v)) return LIMITES.comparacion.porDefecto;
+  return Math.min(LIMITES.comparacion.max, Math.max(LIMITES.comparacion.min, Math.round(v)));
+}
+
+/**
+ * Opacidad de un rótulo de la comparación, de 0 a 1, según el % del ancho que queda de su lado.
+ * Un valor no finito lo oculta: mejor sin rótulo que uno encima de la otra versión.
+ */
+export function opacidadRotulo(espacio: number): number {
+  if (!Number.isFinite(espacio)) return 0;
+  const { oculto, visible } = LIMITES.rotuloComparacion;
+  const t = (espacio - oculto) / (visible - oculto);
+  return Math.round(Math.min(1, Math.max(0, t)) * 100) / 100;
+}
+
+/** Dónde va el número de una zona para no tapar lo que marca. */
+export type LadoEtiqueta = 'arriba' | 'abajo' | 'dentro';
+
+/**
+ * Por defecto, encima de la zona. Si la zona toca el borde superior, debajo. Si ocupa casi todo el
+ * alto, dentro, porque fuera de la imagen no se vería. Las medidas van en píxeles de la foto.
+ */
+export function ladoEtiqueta(caja: Caja, altoImagen: number): LadoEtiqueta {
+  if (!(altoImagen > 0)) return 'dentro';
+  const margen = (LIMITES.margenEtiqueta / 100) * altoImagen;
+  if (caja.y >= margen) return 'arriba';
+  if (caja.y + caja.alto <= altoImagen - margen) return 'abajo';
+  return 'dentro';
+}
+
+/**
+ * Ancho en pantalla de la imagen al 100 %: lo más grande que cabe. Sin alto disponible, manda el ancho.
+ * Una foto chica no se estira más de `maxEscala` veces su tamaño real; para verla más grande está el zoom.
+ */
+export function anchoAjustado(
+  disponibleAncho: number,
+  disponibleAlto: number | null,
+  ancho: number,
+  alto: number,
+  maxEscala: number = LIMITES.ajusteMaxEscala,
+): number | null {
+  if (!(disponibleAncho > 0) || ancho <= 0 || alto <= 0) return null;
+  const porAlto = disponibleAlto !== null && disponibleAlto > 0 ? (disponibleAlto * ancho) / alto : Number.POSITIVE_INFINITY;
+  const porTamano = Number.isFinite(maxEscala) && maxEscala > 0 ? ancho * maxEscala : Number.POSITIVE_INFINITY;
+  return Math.max(1, Math.floor(Math.min(disponibleAncho, porAlto, porTamano)));
+}
+
+/**
+ * Desplazamiento para que el punto que estaba bajo el cursor siga ahí después del zoom.
+ * `fraccion` es dónde cae el punto en la imagen (0 a 1) y `enVentana`, dónde cae en la parte visible.
+ */
+export function desplazamientoAnclado(fraccion: number, enVentana: number, tamanoNuevo: number, visible: number): number {
+  const maximo = Math.max(0, tamanoNuevo - visible);
+  const ideal = fraccion * tamanoNuevo - enVentana;
+  return Number.isFinite(ideal) ? Math.min(maximo, Math.max(0, ideal)) : 0;
+}
+
+/** La zona bajo un punto de la imagen. Si hay varias, la más chica: es la que se quiso señalar. */
+export function zonaEnPunto(x: number, y: number, zonas: readonly { id: string; caja: Caja }[]): string | null {
+  let elegida: { id: string; area: number } | null = null;
+  for (const { id, caja } of zonas) {
+    const dentro = x >= caja.x && y >= caja.y && x < caja.x + caja.ancho && y < caja.y + caja.alto;
+    const area = caja.ancho * caja.alto;
+    if (dentro && (elegida === null || area < elegida.area)) elegida = { id, area };
+  }
+  return elegida?.id ?? null;
 }

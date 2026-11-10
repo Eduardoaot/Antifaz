@@ -49,6 +49,17 @@ def test_seg_salida_sin_metadatos(tmp_path: Path, nombre: str) -> None:
         assert not releida.info.get("xmp")
 
 
+@pytest.mark.parametrize("nombre", ["salida.jpg", "salida.png"])
+@pytest.mark.parametrize("efecto", ["emoji_sonrisa", "emoji_lentes", "emoji_gato", "emoji_estrella"])
+def test_exporta_con_emoji_y_la_verificacion_lo_acepta(tmp_path: Path, nombre: str, efecto: str) -> None:
+    """Los bordes del emoji tienen más detalle que un bloque: JPEG debe seguir dentro de su tolerancia."""
+    imagen = _abrir_con_todo(tmp_path)
+    destino = tmp_path / nombre
+    resultado = exportar.exportar(imagen, [oculto(10, 10, 120, 120, efecto), oculto(150, 40, 30, 30, efecto)], str(destino))
+    assert resultado["zonas_ocultas"] == 2
+    assert CENTINELA not in destino.read_bytes()
+
+
 def test_seg_miniatura_exif_con_el_original_no_sobrevive(tmp_path: Path) -> None:
     """La miniatura embebida puede guardar la foto sin ocultar."""
     miniatura = tmp_path / "mini.jpg"

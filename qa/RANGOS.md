@@ -45,13 +45,15 @@ Cada parámetro de este archivo tiene pruebas parametrizadas de mínimo-1, míni
 
 | Parámetro | Tipo | Mín | Máx | Default | Ante un valor inválido |
 |---|---|---|---|---|---|
-| `efecto.tipo` | enum: `solido`, `difuminado`, `pixelado`, `emoji` | n/a | n/a | `solido` para texto, códigos, documentos y matrículas; `difuminado` para caras | Estándar. Un tipo desconocido nunca cae en "sin efecto" |
+| `efecto.tipo` | enum: `solido`, `difuminado`, `pixelado`, `emoji_sonrisa`, `emoji_lentes`, `emoji_gato`, `emoji_estrella` | n/a | n/a | `solido` para texto, códigos, documentos y matrículas; `difuminado` para caras | Estándar. Un tipo desconocido nunca cae en "sin efecto" |
 | `efecto.intensidad` | entero, % | 1 | 100 | 80 | Estándar. En difuminado y pixelado, menos intensidad es más fácil de reconocer |
 | `efecto.aviso_intensidad_baja` | entero, % | 1 | 100 | 30 (propuesta) | Estándar. Por debajo de este valor se avisa: "Con poca intensidad es más fácil reconocer lo que hay debajo" |
 | `efecto.sigma_px` | decimal, px | 25 | 1000 | max(25, 25% del lado corto de la región) | Estándar |
 | `efecto.pixel_px` | entero, px | 8 (propuesta) | 256 (propuesta) | max(16, 10% del lado corto de la región) (propuesta) | Estándar. Cada bloque toma el color promedio de lo que cubre |
 | `efecto.color_solido` | enum de colores fijos | n/a | n/a | Negro | Estándar. Nunca se usa el promedio de la región: es lo que lo hace irreversible |
-| `efecto.emoji` | enum de emojis incluidos | n/a | n/a | Primero de la lista | Estándar. Se dibuja sobre relleno sólido |
+| `efecto.emoji` | Cada emoji es un valor de `efecto.tipo` (ver `sidecar/recursos/emojis/ORIGEN.md`) | n/a | n/a | Ninguno: la persona lo elige | Estándar. Tapa lo que se oculta (ver `efecto.forma`): primero se rellena con el color principal del emoji y luego el emoji, centrado, crece hasta que su parte opaca lo cubre. Fuera de eso, lo transparente deja ver la foto. Un PNG con hash distinto detiene la operación |
+| `efecto.forma` | enum: `caja`, `elipse` | n/a | n/a | `elipse` en caras (CAR-01); `caja` en todo lo demás, incluidas las zonas manuales | Estándar. Solo la usa el emoji. Con silueta, el emoji tapa la silueta. `elipse` tapa el óvalo inscrito en la zona con margen, que con el margen de caras (×1.3, 10 % y 8 px) contiene toda la caja del detector; si la caja toca la orilla de la foto, se tapa la caja completa |
+| `efecto.emoji_escala_max` | decimal, veces el lado mayor de la caja | 1 | 2 | 2 | Constante (`EMOJI_ESCALA_MAX` en `efectos.py`), no configurable. Si el emoji no alcanza a tapar la caja con ese tamaño, lo que falta queda con su color principal |
 
 ## Máscaras
 
@@ -158,7 +160,11 @@ Los límites de Instagram cambian, y sus propias fuentes se contradicen (4:5 o 3
 
 | Parámetro | Tipo | Mín | Máx | Default | Ante un valor inválido |
 |---|---|---|---|---|---|
-| `vista.zoom_pct` | entero, % | 10 | 1600 | Ajustar a la ventana | Estándar |
+| `vista.zoom` | decimal, veces el tamaño ajustado a la ventana; niveles 1, 1.5, 2, 3, 4, 6 y 8 | 1 (100 %) | 8 (800 %) | 1: ajustar a la ventana | Se ajusta al límite más cercano; NaN o infinito vuelven a 1. Solo cambia la vista, nunca la exportación. Menos de 100 % no aporta, porque la imagen ya cabe completa; más de 800 % solo agranda la vista previa, que mide como máximo 1600 px (`ladoVista`) |
+| `vista.comparacion` | entero, % del ancho que muestra la original | 0 | 100 | 50 | Se ajusta al límite más cercano y se redondea; NaN o infinito vuelven a 50. En la UI es un slider y arrastrar la línea sobre la imagen. Solo cambia la vista: mientras se compara, las herramientas no actúan y las marcas se ocultan |
+| `vista.margen_etiqueta` | % del alto de la foto | n/a | n/a | 8 | Constante (`LIMITES.margenEtiqueta`). El número de una zona va encima de ella; si la zona empieza a menos de este margen del borde superior, va debajo, y si tampoco cabe, dentro. Así no tapa lo que marca. Alto no positivo o NaN: dentro |
+| `vista.rotulo_comparacion` | % del ancho que queda del lado de cada rótulo | n/a | n/a | 10 (oculto) y 26 (opaco) | Constante (`LIMITES.rotuloComparacion`). "Original" y "Tu copia" se desvanecen de forma lineal entre los dos valores en vez de desaparecer de golpe. Un valor no finito o negativo: oculto |
+| `vista.ajuste_max_escala` | decimal, veces el tamaño real de la foto | n/a | n/a | 2 (200 %) | Constante (`LIMITES.ajusteMaxEscala`). Al ajustar a la ventana, una foto chica no se estira más de esto, porque se vería suave y con artefactos; para verla más grande está el zoom. Un valor no finito o no positivo no limita |
 | `historial.pasos` | entero | 1 | 500 (propuesta) | 100 (propuesta) | Estándar. Deshacer sin historial queda desactivado y no hace nada |
 | `tema` | enum: `sistema`, `claro`, `oscuro` | n/a | n/a | `sistema` | Se usa `sistema` y se registra el error |
 | `proyecto.nombre` | texto | 1 carácter | 120 caracteres | Nombre sin extensión del primer archivo | Estándar |

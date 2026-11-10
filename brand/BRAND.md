@@ -80,13 +80,19 @@ Valores en `brand/tokens.json`. Compruébalos con `tools/revisar_contraste.py`.
 - **Marca:** índigo profundo, `#3A3590` en claro y `#B5B0FF` en oscuro.
 - **Riesgo, reservado solo para advertencias:** alto rojo, medio ámbar, bajo gris. Elegí gris y no azul para no confundirlo con el índigo.
 - **Nunca solo color:** el riesgo siempre lleva ícono y texto. La simulación lo justifica: en modo claro con deuteranopia, rojo y ámbar quedan a solo 4.1 ΔE.
+- **Neutros (ajuste del 8 de noviembre de 2026, decisión del responsable):** el índigo y el riesgo no cambian.
+  - Superficies casi neutras en oscuro (`#121219`, `#1B1B26`): el violeta saturado en áreas grandes cansaba la vista. El índigo se queda en lo que se acciona: botón principal, foco y selección.
+  - `superficie-2` para campos y filas dentro de un panel.
+  - Dos bordes: `borde-control` (3:1) solo en botones y campos; `borde-sutil`, decorativo y sin mínimo, en cajas y separadores.
+  - `lienzo`: gris neutro detrás de la foto, casi igual al fondo para que el área no se note (`#EDEDF0` en claro, `#1A1A1F` en oscuro). Decisión del responsable (2026-11-09): se probó un gris medio-oscuro en los dos temas, como en los editores de fotos, pero en tema claro el bloque oscuro rompía con la interfaz. Sin tinte, porque un fondo con tinte desplaza cómo se perciben la piel y los tonos. Es decorativo: no tiene mínimo de contraste.
+  - Una confirmación positiva, como "copia guardada", va en índigo con ícono, nunca en verde: el verde se lee como "seguro", y la marca no promete eso.
 
 ## Tipografía
 
-Máximo dos familias, ambas OFL 1.1 e incluidas en la app, sin CDN.
+Una sola familia en la interfaz, OFL 1.1 e incluida en la app, sin CDN. Decisión del responsable (2026-11-08): antes la interfaz usaba Atkinson Hyperlegible Next e Inter solo para cifras.
 
-- **Atkinson Hyperlegible Next:** toda la interfaz.
-- **Inter:** cifras y tiempos, con numerales tabulares. "Inter" es nombre reservado según su README: se distribuye sin modificar ni crear subconjuntos.
+- **Inter:** toda la interfaz. Cifras y tiempos con numerales tabulares. "Inter" es nombre reservado según su README: se distribuye sin modificar ni crear subconjuntos.
+- **Atkinson Hyperlegible Next:** ya no se usa en la interfaz. Se conserva en `brand/fonts/` porque `tools/generar_logo.py` dibuja con ella el texto del logotipo, y las pruebas de OCR y las muestras E2E la usan para dibujar texto.
 
 Archivos y licencias en `brand/fonts/`. Comprobado con fontTools: ambas incluyen `ñ á é í ó ú ü ¿ ¡` y sus mayúsculas.
 

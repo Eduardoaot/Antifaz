@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
 import pytest
 from hypothesis import given
@@ -17,6 +19,7 @@ from .conftest import DATOS, MODELOS, oculto
 
 EFECTOS = ["solido", "difuminado", "pixelado"]
 CON_COLOR = ["difuminado", "pixelado"]
+EMOJIS = ["emoji_sonrisa", "emoji_lentes", "emoji_gato", "emoji_estrella"]
 
 
 def _imagen(alto: int = 200, ancho: int = 300, canales: int = 3, valor: int | None = None) -> np.ndarray:
@@ -91,7 +94,7 @@ def test_es_determinista_para_que_la_vista_previa_coincida() -> None:
     assert np.array_equal(efectos.aplicar(a, lista)[0], efectos.aplicar(a, lista)[0])
 
 
-@pytest.mark.parametrize("efecto", EFECTOS)
+@pytest.mark.parametrize("efecto", EFECTOS + EMOJIS)
 def test_fuera_de_la_zona_no_cambia_y_entrada_intacta(efecto: str) -> None:
     a = _imagen()
     copia = a.copy()
@@ -227,7 +230,7 @@ def test_rgb_bajo_alfa_parcial_se_conserva() -> None:
 
 @given(
     imagen=arrays(np.uint8, st.tuples(st.integers(1, 80), st.integers(1, 80), st.just(3))),
-    efecto=st.sampled_from(EFECTOS),
+    efecto=st.sampled_from(EFECTOS + EMOJIS),
     datos=st.tuples(st.floats(0, 0.9), st.floats(0, 0.9), st.floats(0.05, 1), st.floats(0.05, 1)),
     intensidad=st.integers(1, 100),
 )
@@ -247,3 +250,216 @@ def test_propiedad_cualquier_mascara_valida(
     assert np.array_equal(salida[fuera], imagen[fuera])
     if efecto == "solido":
         assert salida[y0:y1, x0:x1].max() == 0
+
+
+# --- Emoji: se dibuja sobre bloque sólido, así que es tan irreversible como él ----------------------
+
+
+@pytest.mark.parametrize("efecto", EMOJIS)
+def test_emoji_es_irreversible_el_contenido_no_influye(efecto: str) -> None:
+    """Las orillas del emoji son transparentes: debajo debe haber negro, nunca la foto."""
+    a = _imagen()
+    b = a.copy()
+    b[52:128, 72:188] = 255 - b[52:128, 72:188]
+    o = oculto(80, 60, 100, 60, efecto)
+    salida_a, regiones = efectos.aplicar(a, [o])
+    salida_b, _ = efectos.aplicar(b, [o])
+    assert np.array_equal(salida_a, salida_b), "lo original se filtró a la salida"
+    x0, y0, x1, y1 = regiones[0]
+    assert salida_a[y0:y1, x0:x1].max() > 0, "no se dibujó el emoji"
+
+
+def _silueta_dilatada(o: Any, silueta: np.ndarray, alto: int, ancho: int) -> np.ndarray:
+    """La silueta con su margen, en coordenadas de la foto: lo que el emoji debe tapar."""
+    region = efectos.region_dilatada(o, alto, ancho)
+    recorte = efectos._silueta(o, region, {"m": silueta})  # pyright: ignore[reportPrivateUsage]
+    assert recorte is not None
+    completa = np.zeros((alto, ancho), dtype=bool)
+    x0, y0, x1, y1 = region
+    completa[y0:y1, x0:x1] = recorte
+    return completa
+
+
+@pytest.mark.parametrize("efecto", EMOJIS)
+def test_emoji_con_silueta_tapa_la_silueta_sin_importar_lo_de_abajo(efecto: str) -> None:
+    """Con silueta, el emoji se ajusta a ella: lo que está dentro nunca depende de la foto."""
+    a = _imagen()
+    b = a.copy()
+    b[52:128, 72:188] = 255 - b[52:128, 72:188]
+    silueta = np.zeros((60, 100), dtype=bool)
+    silueta[20:40, 30:70] = True
+    o = oculto(80, 60, 100, 60, efecto, mascara_id="m")
+    salida_a, _ = efectos.aplicar(a, [o], {"m": silueta})
+    salida_b, _ = efectos.aplicar(b, [o], {"m": silueta})
+    tapada = _silueta_dilatada(o, silueta, 200, 300)
+    assert np.array_equal(salida_a[tapada], salida_b[tapada]), "lo de la silueta se filtró"
+
+
+def test_emoji_con_silueta_es_mas_chico_que_con_la_caja() -> None:
+    a = _imagen()
+    silueta = np.zeros((60, 100), dtype=bool)
+    silueta[20:40, 30:70] = True
+    con, _ = efectos.aplicar(a, [oculto(80, 60, 100, 60, "emoji_sonrisa", mascara_id="m")], {"m": silueta})
+    sin, _ = efectos.aplicar(a, [oculto(80, 60, 100, 60, "emoji_sonrisa")])
+    cambiados_con = int((con != a).any(axis=2).sum())
+    cambiados_sin = int((sin != a).any(axis=2).sum())
+    assert cambiados_con < cambiados_sin
+
+
+def test_difuminado_no_toma_color_de_un_emoji_vecino() -> None:
+    a = _imagen(100, 400, valor=0)
+    b = a.copy()
+    b[32:68, 82:118] = 255
+    lista = [oculto(40, 40, 20, 20, "difuminado"), oculto(90, 40, 20, 20, "emoji_gato")]
+    assert np.array_equal(efectos.aplicar(a, lista)[0], efectos.aplicar(b, lista)[0])
+
+
+@pytest.mark.parametrize("efecto", EMOJIS)
+def test_emoji_vuelve_opaca_la_caja(efecto: str) -> None:
+    """La caja queda opaca; fuera de ella, lo transparente del emoji deja la foto como estaba."""
+    a = _imagen(60, 60, canales=4)
+    a[:, :, 3] = 0
+    o = oculto(20, 20, 20, 20, efecto)
+    salida, _ = efectos.aplicar(a, [o])
+    x0, y0, x1, y1 = efectos.region_dilatada(o, 60, 60)
+    assert (salida[y0:y1, x0:x1, 3] == 255).all()
+
+
+@pytest.mark.parametrize(("ancho", "alto"), [(1, 1), (90, 1), (1, 90), (300, 200)])
+def test_emoji_en_cajas_extremas(ancho: int, alto: int) -> None:
+    a = _imagen(alto, ancho)
+    salida, _ = efectos.aplicar(a, [oculto(0, 0, ancho, alto, "emoji_sonrisa")])
+    assert salida.shape == a.shape
+
+
+def test_los_emojis_del_esquema_tienen_archivo() -> None:
+    from typing import get_args
+
+    from revisor import emojis
+    from revisor.esquemas import TipoEmoji
+
+    assert set(emojis.ARCHIVOS) == set(get_args(TipoEmoji)) == set(EMOJIS)
+
+
+@pytest.mark.parametrize("cambio", ["hash", "archivo"])
+def test_emoji_alterado_o_ausente_detiene_sin_ocultar_con_otra_cosa(
+    cambio: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from revisor import emojis
+
+    nombre, sha256 = emojis.ARCHIVOS["emoji_sonrisa"]
+    malo = (nombre, "0" * 64) if cambio == "hash" else ("no_existe.png", sha256)
+    emojis.cargar.cache_clear()
+    monkeypatch.setitem(emojis.ARCHIVOS, "emoji_sonrisa", malo)
+    try:
+        with pytest.raises(ErrorRevisor) as e:
+            efectos.aplicar(_imagen(), [oculto(80, 60, 100, 60, "emoji_sonrisa")])
+        assert e.value.codigo is Codigo.MODELO_NO_DISPONIBLE
+    finally:
+        emojis.cargar.cache_clear()
+
+
+@pytest.mark.parametrize("efecto", EMOJIS)
+def test_emoji_sin_rectangulo_negro(efecto: str) -> None:
+    """Las esquinas de la caja, donde antes quedaba negro, muestran el emoji o su color principal.
+
+    Se miran las esquinas y no toda la caja porque el gato tiene ojos y boca negros de verdad.
+    """
+    a = _imagen()
+    o = oculto(80, 50, 90, 110, efecto)
+    salida, _ = efectos.aplicar(a, [o])
+    x0, y0, x1, y1 = efectos.region_dilatada(o, 200, 300)
+    for ex, ey in [(x0, y0), (x1 - 4, y0), (x0, y1 - 4), (x1 - 4, y1 - 4)]:
+        esquina = salida[ey : ey + 4, ex : ex + 4, :3]
+        assert esquina.max() > 0, f"esquina negra en ({ex}, {ey})"
+
+
+@pytest.mark.parametrize("efecto", ["emoji_sonrisa", "emoji_lentes"])
+def test_emoji_redondo_crece_y_tapa_la_caja_con_su_parte_opaca(efecto: str) -> None:
+    from revisor import emojis
+
+    # La orilla de una caja de 100 x 140 medida desde su centro: un círculo debe abarcar su diagonal.
+    xs = np.concatenate([np.arange(100), np.arange(100), np.zeros(140), np.full(140, 99)]) - 49.5
+    ys = np.concatenate([np.zeros(100), np.full(100, 139), np.arange(140), np.arange(140)]) - 69.5
+    lado = efectos.lado_emoji(emojis.opaco(efecto), xs, ys)  # type: ignore[arg-type]
+    assert 172 <= lado <= 280
+    a = _imagen()
+    o = oculto(100, 30, 100, 140, efecto)
+    _, regiones = efectos.aplicar(a, [o])
+    caja = efectos.region_dilatada(o, 200, 300)
+    rx0, ry0, rx1, ry1 = regiones[0]
+    assert rx0 <= caja[0] and ry0 <= caja[1] and rx1 >= caja[2] and ry1 >= caja[3]
+
+
+# --- Emoji sobre caras: tapa el óvalo para ajustarse a la cara ------------------------------------
+
+
+@pytest.mark.parametrize("efecto", EMOJIS)
+def test_emoji_en_cara_tapa_el_ovalo_sin_importar_lo_de_abajo(efecto: str) -> None:
+    a = _imagen()
+    b = a.copy()
+    b[40:160, 60:200] = 255 - b[40:160, 60:200]
+    o = oculto(100, 60, 60, 80, efecto, forma="elipse")
+    salida_a, _ = efectos.aplicar(a, [o])
+    salida_b, _ = efectos.aplicar(b, [o])
+    region = efectos.region_dilatada(o, 200, 300)
+    ovalo = efectos._elipse(o, region)  # pyright: ignore[reportPrivateUsage]
+    x0, y0, x1, y1 = region
+    assert np.array_equal(salida_a[y0:y1, x0:x1][ovalo], salida_b[y0:y1, x0:x1][ovalo])
+
+
+def test_emoji_en_cara_es_mas_chico_que_en_un_rectangulo() -> None:
+    a = _imagen()
+    ovalo, _ = efectos.aplicar(a, [oculto(100, 60, 60, 80, "emoji_sonrisa", forma="elipse")])
+    caja, _ = efectos.aplicar(a, [oculto(100, 60, 60, 80, "emoji_sonrisa")])
+    assert int((ovalo != a).any(axis=2).sum()) < int((caja != a).any(axis=2).sum())
+
+
+def test_la_forma_solo_cambia_al_emoji() -> None:
+    a = _imagen()
+    for efecto in EFECTOS:
+        caja, _ = efectos.aplicar(a, [oculto(100, 60, 60, 80, efecto)])
+        ovalo, _ = efectos.aplicar(a, [oculto(100, 60, 60, 80, efecto, forma="elipse")])
+        assert np.array_equal(caja, ovalo), efecto
+
+
+@given(
+    ancho=st.integers(4, 400),
+    proporcion=st.floats(0.5, 2.0),
+    x=st.integers(0, 600),
+    y=st.integers(0, 600),
+)
+def test_el_ovalo_contiene_la_caja_del_detector(ancho: int, proporcion: float, x: int, y: int) -> None:
+    """Con el margen de las caras (x1.3, 10 % y 8 px), el óvalo tapa toda la caja que dio el detector.
+
+    Se prueba también cerca del borde de la foto, donde la zona con margen se recorta, y pegada a él,
+    donde la app recorta la caja de la cara y el emoji vuelve a tapar el rectángulo completo.
+    """
+    from revisor import analisis
+
+    alto = max(4, round(ancho * proporcion))
+    lado_img = 1100
+    caja = analisis._ampliar(x, y, ancho, alto, 1.3, lado_img, lado_img)  # pyright: ignore[reportPrivateUsage]
+    o = oculto(caja["x"], caja["y"], caja["ancho"], caja["alto"], "emoji_sonrisa", forma="elipse")
+    region = efectos.region_dilatada(o, lado_img, lado_img)
+    forma = efectos._forma(o, region, {}, lado_img, lado_img)  # pyright: ignore[reportPrivateUsage]
+    x0, y0, x1, y1 = region
+    ovalo = forma if forma is not None else np.ones((y1 - y0, x1 - x0), dtype=bool)
+    detector = ovalo[max(0, y - y0) : min(lado_img, y + alto) - y0, max(0, x - x0) : min(lado_img, x + ancho) - x0]
+    assert detector.all(), "una parte de la cara detectada quedó fuera del óvalo"
+
+
+def test_emoji_gigante_no_reserva_un_cuadro_enorme() -> None:
+    """Una caja que es toda la foto: el emoji crece más allá, pero solo se calcula lo visible."""
+    a = _imagen(1500, 2500)
+    salida, regiones = efectos.aplicar(a, [oculto(0, 0, 2500, 1500, "emoji_sonrisa")])
+    assert regiones[0] == (0, 0, 2500, 1500)
+    assert salida.shape == a.shape
+    assert float((salida.max(axis=2) == 0).mean()) < 0.01
+
+
+def test_color_principal_es_amarillo_en_las_caritas() -> None:
+    from revisor import emojis
+
+    r, g, b = emojis.color_principal("emoji_sonrisa")
+    assert r > 200 and g > 150 and b < 120

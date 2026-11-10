@@ -308,6 +308,11 @@ Al ejecutar un caso, el Estado pasa a `automatizado` o `manual`, con enlace a su
 | INT-025 | 2 | Trazo muy largo | Más de 5000 puntos | Toma la primera parte y avisa | automatizado: tests-ui/unit/logica.test.ts, sidecar/tests/test_pincel.py (el aviso en pantalla no tiene E2E) |
 | INT-026 | 2 | Pincel en sus extremos | Tamaño 1 y 512, puntos en las esquinas | Máscara válida; fuera de rango se rechaza | automatizado: sidecar/tests/test_pincel.py, tests-ui/unit/logica.test.ts |
 | INT-027 | 2 | Trazo tras reiniciar el sidecar o recuperar | Recuperar una edición con un trazo | Se oculta toda la caja del trazo y sigue diciendo "trazo a mano" | automatizado: sidecar/tests/test_segmentar.py (máscara perdida), tests-ui/unit/logica.test.ts (origen recuperado) |
+| INT-028 | 3 | Ocultar con emoji | Elegir cada emoji en una cara, una zona manual y un objeto de video; exportar a JPG y PNG | El emoji se ajusta a la cara (óvalo) o a la silueta, y tapa el rectángulo completo en zonas dibujadas a mano, sin rectángulo negro; la exportación pasa la verificación | automatizado: sidecar/tests/test_exportar.py, tests-ui/unit/logica.test.ts. Falta revisar en pantalla, en claro y oscuro (manual) |
+| INT-030 | 3 | Zoom del visor | Acercar y alejar con botones, Ctrl + rueda y teclas + − 0; probar los extremos 100 % y 800 % | El punto bajo el cursor se queda en su lugar; en los extremos el botón se desactiva y no pasa del límite; la exportación no cambia | automatizado: tests-ui/unit/logica.test.ts (niveles, límites, ajuste y anclaje), tests-ui/e2e/app.spec.ts (botones, teclas y extremos, en claro y oscuro). Ctrl + rueda y el anclaje al cursor sin E2E |
+| INT-031 | 3 | Moverse por la imagen ampliada | Arrastrar con "Solo ver", con el botón central y con las flechas; usar clic, rectángulo y pincel ya ampliada | Se mueve sin seleccionar nada; las herramientas marcan el punto correcto con cualquier zoom | pendiente: manual. El punto se calcula con el mismo `aPuntoDeImagen`, ya probado |
+| INT-032 | 3 | Resaltado entre panel e imagen | Pasar el mouse y el foco por las filas, y el mouse por las marcas; clic en una marca con "Solo ver" | Se resalta la misma zona en ambos lados; el clic lleva el foco a su fila; con teclado, la imagen ampliada se mueve hasta la zona; en alto contraste se ve con el color del sistema | automatizado: tests-ui/unit/logica.test.ts (zona bajo el puntero), tests-ui/e2e/app.spec.ts (fila y marca a la vez, clic en la marca lleva el foco a su fila, axe, capturas en claro y oscuro). Alto contraste y movimiento con teclado de la imagen ampliada: manual |
+| INT-029 | 3 | Emoji tras recuperar | Elegir un emoji, cerrar de golpe y recuperar | El emoji elegido se conserva | automatizado: tests-ui/unit/logica.test.ts (sin E2E) |
 
 ## Seguridad y privacidad (SEG)
 
@@ -327,6 +332,9 @@ Al ejecutar un caso, el Estado pasa a `automatizado` o `manual`, con enlace a su
 | SEG-012 | 6 | "Reportar un problema" sin datos sensibles | Generar el archivo y revisarlo | Sin imágenes; logs anonimizados; solo sale si lo mandas tú | pendiente |
 | SEG-013 | 4 | Embeddings fuera del disco | Cerrar proyecto sin elegir guardar y buscar restos | Nada en disco | pendiente |
 | SEG-014 | 1 | Sin estimación de edad | Revisar la salida, reportes y logs | Ningún dato de edad | automatizado: sidecar/tests/test_analisis.py |
+| SEG-015 | 3 | Emoji irreversible | Dos entradas distintas bajo cada emoji, con y sin silueta, y un difuminado vecino | Misma salida en lo que el emoji tapa (caja, silueta u óvalo de la cara): ahí, lo transparente del emoji muestra su color principal, sin rectángulo negro, y el vecino no toma color de lo oculto | automatizado: sidecar/tests/test_efectos.py |
+| SEG-017 | 3 | El óvalo del emoji contiene la cara | Caras de 4 a 400 px, proporción 0.5 a 2, en el centro, cerca y pegadas a la orilla de la foto | El óvalo, o la caja completa si toca la orilla, contiene toda la caja del detector | automatizado: sidecar/tests/test_efectos.py (propiedad con hypothesis); revisión aparte por fuerza bruta de 31 720 casos sin fallas |
+| SEG-016 | 3 | Emoji alterado o ausente | Cambiar el hash esperado o el nombre de un PNG de `sidecar/recursos/emojis` | Error tipado `MODELO_NO_DISPONIBLE`; nunca se oculta con otra cosa ni se exporta | automatizado: sidecar/tests/test_efectos.py |
 
 ## Regla 1: validación de entradas (VAL)
 

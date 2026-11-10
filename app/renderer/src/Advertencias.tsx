@@ -17,10 +17,13 @@ import {
   tituloVeredicto,
   veredicto,
   type NivelMostrado,
+  type Resaltado,
   type Revision,
 } from '../../shared/logica';
 import { leerEnRango } from '../../shared/numeros';
 import { DialogoPorQue } from './Dialogos';
+import { eventosResaltar } from './resaltar';
+import { OpcionesEmoji } from './OpcionesEmoji';
 
 function IconoNivel({ nivel }: { nivel: NivelMostrado }): React.JSX.Element {
   switch (nivel) {
@@ -101,9 +104,12 @@ interface Props {
   alCambiar: (cambio: (r: Revision) => Revision) => void;
   alOcultarTodo: () => void;
   alOcultarAlto: () => void;
+  /** Zona resaltada a la vez aquí y en la imagen. */
+  resaltado?: Resaltado | null;
+  alResaltar?: (r: Resaltado | null) => void;
 }
 
-export function Advertencias({ hallazgos, revision, alCambiar, alOcultarTodo, alOcultarAlto }: Props): React.JSX.Element | null {
+export function Advertencias({ hallazgos, revision, alCambiar, alOcultarTodo, alOcultarAlto, resaltado = null, alResaltar }: Props): React.JSX.Element | null {
   const [porQue, setPorQue] = useState<Regla | null>(null);
   const [intensidadTexto, setIntensidadTexto] = useState<string | null>(null);
   if (hallazgos.length === 0) return null;
@@ -117,7 +123,7 @@ export function Advertencias({ hallazgos, revision, alCambiar, alOcultarTodo, al
   return (
     <section aria-label="Lista de advertencias">
       {visibles.length > 0 && (
-        <div className="grupo-acciones">
+        <div className="grupo-acciones acciones-masivas">
           <button type="button" className="boton" onClick={alOcultarAlto}>Ocultar todo lo de riesgo alto</button>
           <button type="button" className="boton" onClick={alOcultarTodo}>Ocultar todo lo detectado</button>
         </div>
@@ -129,7 +135,13 @@ export function Advertencias({ hallazgos, revision, alCambiar, alOcultarTodo, al
           const decision = revision.decisiones[h.id];
           const nivel = nivelMostrado(h, revision);
           return (
-            <li key={h.id} className={`advertencia ${nivel === 'pregunta' ? 'nivel-pregunta' : nivel}`} data-regla={h.regla_id}>
+            <li
+              key={h.id}
+              className={`advertencia ${nivel === 'pregunta' ? 'nivel-pregunta' : nivel}${h.caja !== null && resaltado?.id === h.id ? ' resaltada' : ''}`}
+              data-regla={h.regla_id}
+              data-zona={h.caja !== null ? h.id : undefined}
+              {...(h.caja !== null ? eventosResaltar(h.id, resaltado, alResaltar) : {})}
+            >
               <p className="nivel">
                 <IconoNivel nivel={nivel} /> {etiquetaNivelMostrado(nivel)}
                 <IconoCategoria regla={regla} />
@@ -170,6 +182,7 @@ export function Advertencias({ hallazgos, revision, alCambiar, alOcultarTodo, al
                       <option value="difuminado">Difuminado</option>
                       <option value="pixelado">Pixelado</option>
                       <option value="solido">Bloque sólido</option>
+                      <OpcionesEmoji />
                     </select>
                   </label>
                 </div>
@@ -203,7 +216,7 @@ export function Advertencias({ hallazgos, revision, alCambiar, alOcultarTodo, al
           <p id="ayuda-intensidad" className={leida.ok ? 'suave' : 'error-campo'} role={leida.ok ? undefined : 'alert'}>
             {!leida.ok && 'Escribe un número entero del 1 al 100. Se conserva el último valor válido.'}
             {baja && 'Con poca intensidad es más fácil reconocer lo que hay debajo. '}
-            {leida.ok && 'El difuminado y el pixelado conservan los colores de tu foto, y con herramientas especiales alguien podría reconstruir parte. Para la máxima protección, usa Bloque sólido.'}
+            {leida.ok && 'El difuminado y el pixelado conservan los colores de tu foto, y con herramientas especiales alguien podría reconstruir parte. Para la máxima protección, usa Bloque sólido o un emoji.'}
           </p>
         </div>
       )}

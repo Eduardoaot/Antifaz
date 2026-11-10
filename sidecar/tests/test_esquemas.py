@@ -47,13 +47,16 @@ def test_dilatacion_pct_valida(bueno: float) -> None:
     assert validar_oculta(dilatacion_pct=bueno).dilatacion_pct == bueno
 
 
-@pytest.mark.parametrize("malo", ["", "SOLIDO", "emoji", "ninguno", None, 1, [], {}])
+@pytest.mark.parametrize("malo", ["", "SOLIDO", "emoji", "emoji_", "EMOJI_GATO", "emoji_perro", "😀", "ninguno", None, 1, [], {}])
 def test_efecto_desconocido_nunca_cae_en_sin_efecto(malo: Any) -> None:
     with pytest.raises(ValidationError):
         validar_oculta(efecto=malo)
 
 
-@pytest.mark.parametrize("efecto", ["solido", "difuminado", "pixelado"])
+@pytest.mark.parametrize(
+    "efecto",
+    ["solido", "difuminado", "pixelado", "emoji_sonrisa", "emoji_lentes", "emoji_gato", "emoji_estrella"],
+)
 def test_efectos_validos(efecto: str) -> None:
     assert validar_oculta(efecto=efecto).efecto == efecto
 
@@ -148,3 +151,18 @@ def test_demasiados_ocultamientos() -> None:
 def test_solicitud_invalida(mala: dict[str, Any]) -> None:
     with pytest.raises(ValidationError):
         Solicitud.model_validate(mala)
+
+
+@pytest.mark.parametrize("forma", ["caja", "elipse"])
+def test_forma_valida(forma: str) -> None:
+    assert validar_oculta(forma=forma).forma == forma
+
+
+def test_forma_por_defecto_es_la_caja_completa() -> None:
+    assert validar_oculta().forma == "caja"
+
+
+@pytest.mark.parametrize("mala", ["", "circulo", "ELIPSE", None, 1, [], {}])
+def test_forma_invalida(mala: Any) -> None:
+    with pytest.raises(ValidationError):
+        validar_oculta(forma=mala)

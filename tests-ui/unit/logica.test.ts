@@ -1,7 +1,7 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { catalogo, etiquetaNivel, reglaDe, urlsDeFuentes, type Nivel } from '../../app/shared/catalogo';
-import { esquemaAvisoCierre, esquemaEdicion, esquemaOcultamiento, esquemaTrazo, LIMITES, textoCierre, type Analisis, type Hallazgo, type Motivo, type Punto } from '../../app/shared/contrato';
+import { EMOJIS, ETIQUETA_EMOJI, esEmoji, esquemaAvisoCierre, esquemaEdicion, esquemaEfecto, esquemaOcultamiento, esquemaTrazo, LIMITES, textoCierre, type Analisis, type Hallazgo, type Motivo, type Punto } from '../../app/shared/contrato';
 import {
   HISTORIAL_PASOS,
   REVISION_INICIAL,
@@ -48,6 +48,16 @@ import {
   tituloVeredicto,
   veredicto,
   type Veredicto,
+  NIVELES_ZOOM,
+  anchoAjustado,
+  desplazamientoAnclado,
+  ladoEtiqueta,
+  limitarCorte,
+  limitarZoom,
+  opacidadRotulo,
+  pasoZoom,
+  textoZoom,
+  zonaEnPunto,
 } from '../../app/shared/logica';
 
 const cara = (id: string, x = 10): Hallazgo => ({
@@ -131,11 +141,57 @@ describe('ocultamientos', () => {
 
   it('todo ocultamiento cumple el contrato con el sidecar', () => {
     fc.assert(
-      fc.property(fc.integer({ min: 1, max: 100 }), fc.constantFrom('solido', 'difuminado', 'pixelado') as fc.Arbitrary<'solido'>, (intensidad, efecto) => {
+      fc.property(fc.integer({ min: 1, max: 100 }), fc.constantFrom(...esquemaEfecto.options), (intensidad, efecto) => {
         const r = elegirEfecto({ ...decidir(REVISION_INICIAL, 'a', 'ocultar'), intensidad }, 'a', efecto);
         return construirOcultamientos(r, [cara('a')]).every((o) => esquemaOcultamiento.safeParse(o).success);
       }),
     );
+  });
+});
+
+describe('emoji', () => {
+  it('cada emoji es un efecto válido con su nombre para lectores de pantalla', () => {
+    for (const e of EMOJIS) {
+      expect(esquemaEfecto.safeParse(e).success).toBe(true);
+      expect(esEmoji(e)).toBe(true);
+      expect(ETIQUETA_EMOJI[e].length).toBeGreaterThan(2);
+    }
+    for (const otro of ['solido', 'difuminado', 'pixelado'] as const) expect(esEmoji(otro)).toBe(false);
+  });
+
+  it.each(['emoji', 'emoji_perro', 'EMOJI_GATO', '😀', ''])('rechaza el efecto %j', (malo) => {
+    expect(esquemaEfecto.safeParse(malo).success).toBe(false);
+  });
+
+  it('una cara con emoji sale tal cual hacia el sidecar, con forma de óvalo para ajustarse', () => {
+    const r = elegirEfecto(decidir(REVISION_INICIAL, 'a', 'ocultar'), 'a', 'emoji_gato');
+    expect(efectoDe(r, cara('a'))).toBe('emoji_gato');
+    expect(construirOcultamientos(r, [cara('a')])[0]).toMatchObject({ efecto: 'emoji_gato', forma: 'elipse' });
+  });
+
+  it('solo las caras van con óvalo: lo demás y lo manual se tapa completo', () => {
+    const placa: Hallazgo = { ...cara('p'), regla_id: 'MAT-01' };
+    let r = ocultarTodo(REVISION_INICIAL, [placa]);
+    r = agregarManual(r, 'm', { x: 1, y: 1, ancho: 10, alto: 10 }, null, 'rectangulo');
+    expect(construirOcultamientos(r, [placa]).map((o) => o.forma)).toEqual(['caja', 'caja']);
+  });
+
+  it.each([undefined, 'circulo', 'ELIPSE', null])('rechaza la forma %j', (mala) => {
+    const base = construirOcultamientos(decidir(REVISION_INICIAL, 'a', 'ocultar'), [cara('a')])[0];
+    expect(esquemaOcultamiento.safeParse({ ...base, forma: mala }).success).toBe(false);
+  });
+
+  it('una zona manual también acepta emoji', () => {
+    const r = agregarManual(REVISION_INICIAL, 'm', { x: 1, y: 1, ancho: 10, alto: 10 }, null, 'rectangulo');
+    const conEmoji = efectoDeManual(r, 'm', 'emoji_estrella');
+    expect(conEmoji.manuales[0]?.efecto).toBe('emoji_estrella');
+    expect(construirOcultamientos(conEmoji, []).every((o) => esquemaOcultamiento.safeParse(o).success)).toBe(true);
+  });
+
+  it('la recuperación tras un cierre conserva el emoji elegido', () => {
+    const r = elegirEfecto(decidir(REVISION_INICIAL, 'a', 'ocultar'), 'a', 'emoji_lentes');
+    const guardada = esquemaEdicion.parse(JSON.parse(JSON.stringify(aEdicion('3f2b6c1e-8a4d-4b7e-9c2a-1d5e6f7a8b9c', r))));
+    expect(desdeEdicion(guardada).efectos.a).toBe('emoji_lentes');
   });
 });
 
@@ -561,6 +617,123 @@ describe('aviso de cierre con cambios sin exportar', () => {
   });
 });
 
+describe('visor: zoom', () => {
+  it('los niveles van de 1 a 8 en orden y coinciden con los límites', () => {
+    expect(NIVELES_ZOOM[0]).toBe(LIMITES.zoom.min);
+    expect(NIVELES_ZOOM.at(-1)).toBe(LIMITES.zoom.max);
+    expect([...NIVELES_ZOOM].sort((a, b) => a - b)).toEqual([...NIVELES_ZOOM]);
+  });
+
+  it.each([
+    [0, 1], [0.99, 1], [1, 1], [8, 8], [8.01, 8], [100, 8], [-1, 1],
+    [Number.NaN, 1], [Number.POSITIVE_INFINITY, 1], [Number.NEGATIVE_INFINITY, 1],
+  ])('limitarZoom(%s) = %s', (entrada, esperado) => {
+    expect(limitarZoom(entrada)).toBe(esperado);
+  });
+
+  it('acerca y aleja por niveles, y en los extremos se queda', () => {
+    expect(pasoZoom(1, 1)).toBe(1.5);
+    expect(pasoZoom(1.5, -1)).toBe(1);
+    expect(pasoZoom(1, -1)).toBe(1);
+    expect(pasoZoom(8, 1)).toBe(8);
+    expect(pasoZoom(2.5, 1)).toBe(3);
+    expect(pasoZoom(2.5, -1)).toBe(2);
+    expect(pasoZoom(Number.NaN, 1)).toBe(1.5);
+  });
+
+  it('propiedad: cualquier serie de pasos queda dentro de los límites', () => {
+    fc.assert(
+      fc.property(fc.array(fc.constantFrom(1 as const, -1 as const), { maxLength: 40 }), (pasos) => {
+        let z: number = LIMITES.zoom.porDefecto;
+        for (const p of pasos) z = pasoZoom(z, p);
+        return z >= LIMITES.zoom.min && z <= LIMITES.zoom.max && (NIVELES_ZOOM as readonly number[]).includes(z);
+      }),
+    );
+  });
+
+  it.each([
+    [-1, 0], [0, 0], [0.4, 0], [50, 50], [99.6, 100], [100, 100], [101, 100],
+    [Number.NaN, 50], [Number.POSITIVE_INFINITY, 50], [Number.NEGATIVE_INFINITY, 50],
+  ])('limitarCorte(%s) = %s', (entrada, esperado) => {
+    expect(limitarCorte(entrada)).toBe(esperado);
+  });
+
+  it.each([
+    [0, 0], [10, 0], [18, 0.5], [26, 1], [100, 1], [-5, 0], [Number.NaN, 0], [Number.POSITIVE_INFINITY, 0],
+  ])('opacidadRotulo(%s) = %s', (espacio, esperado) => {
+    expect(opacidadRotulo(espacio)).toBe(esperado);
+  });
+
+  it('el número de una zona va arriba, abajo si toca el borde superior, y dentro si no cabe fuera', () => {
+    // Imagen de 1000 px de alto: el margen es 80 px.
+    expect(ladoEtiqueta({ x: 0, y: 80, ancho: 10, alto: 10 }, 1000)).toBe('arriba');
+    expect(ladoEtiqueta({ x: 0, y: 79, ancho: 10, alto: 10 }, 1000)).toBe('abajo');
+    expect(ladoEtiqueta({ x: 0, y: 0, ancho: 10, alto: 920 }, 1000)).toBe('abajo');
+    expect(ladoEtiqueta({ x: 0, y: 0, ancho: 10, alto: 921 }, 1000)).toBe('dentro');
+    expect(ladoEtiqueta({ x: 0, y: 0, ancho: 10, alto: 10 }, 0)).toBe('dentro');
+    expect(ladoEtiqueta({ x: 0, y: 0, ancho: 10, alto: 10 }, Number.NaN)).toBe('dentro');
+  });
+
+  it('muestra el nivel en porcentaje', () => {
+    expect(textoZoom(1)).toBe('100 %');
+    expect(textoZoom(1.5)).toBe('150 %');
+    expect(textoZoom(99)).toBe('800 %');
+  });
+
+  it('ajusta la imagen a lo que cabe, por ancho o por alto', () => {
+    expect(anchoAjustado(800, 600, 4000, 3000)).toBe(800);
+    expect(anchoAjustado(800, 300, 4000, 3000)).toBe(400);
+    expect(anchoAjustado(800, null, 1000, 4000)).toBe(800);
+    expect(anchoAjustado(800.9, null, 1000, 1000)).toBe(800);
+    expect(anchoAjustado(0, 600, 10, 10)).toBeNull();
+    expect(anchoAjustado(800, 600, 0, 10)).toBeNull();
+    expect(anchoAjustado(Number.NaN, 600, 10, 10)).toBeNull();
+    expect(anchoAjustado(0.2, null, 10, 10)).toBe(1);
+  });
+
+  it('una foto chica no se estira más del 200 % al ajustar', () => {
+    // La playa: 470 px de ancho en una columna de 980 px se queda en 940, no en 980.
+    expect(anchoAjustado(980, 600, 470, 210)).toBe(940);
+    expect(anchoAjustado(980, 600, 470, 210, 1)).toBe(470);
+    expect(anchoAjustado(800, 600, 10, 10)).toBe(20);
+    // Si el tope no es válido, no limita.
+    expect(anchoAjustado(980, 600, 470, 210, Number.NaN)).toBe(980);
+    expect(anchoAjustado(980, 600, 470, 210, 0)).toBe(980);
+    expect(LIMITES.ajusteMaxEscala).toBe(2);
+  });
+
+  it('el punto bajo el cursor se queda bajo el cursor, sin pasarse de los bordes', () => {
+    expect(desplazamientoAnclado(0.5, 200, 1600, 400)).toBe(600);
+    expect(desplazamientoAnclado(0, 200, 1600, 400)).toBe(0);
+    expect(desplazamientoAnclado(1, 0, 1600, 400)).toBe(1200);
+    expect(desplazamientoAnclado(0.5, 200, 300, 400)).toBe(0);
+    expect(desplazamientoAnclado(Number.NaN, 200, 1600, 400)).toBe(0);
+  });
+});
+
+describe('visor: zona bajo el puntero', () => {
+  const zonas = [
+    { id: 'grande', caja: { x: 0, y: 0, ancho: 100, alto: 100 } },
+    { id: 'chica', caja: { x: 40, y: 40, ancho: 10, alto: 10 } },
+  ];
+
+  it('elige la zona que contiene el punto y, si hay varias, la más chica', () => {
+    expect(zonaEnPunto(5, 5, zonas)).toBe('grande');
+    expect(zonaEnPunto(45, 45, zonas)).toBe('chica');
+  });
+
+  it('los bordes: incluye el primer píxel y excluye el que sigue al último', () => {
+    expect(zonaEnPunto(40, 40, zonas)).toBe('chica');
+    expect(zonaEnPunto(49, 49, zonas)).toBe('chica');
+    expect(zonaEnPunto(50, 50, zonas)).toBe('grande');
+    expect(zonaEnPunto(100, 0, zonas)).toBeNull();
+    expect(zonaEnPunto(-1, 0, zonas)).toBeNull();
+  });
+
+  it('sin zonas no elige nada', () => {
+    expect(zonaEnPunto(1, 1, [])).toBeNull();
+  });
+});
 
 describe('nivel mostrado: menos alarma con lo cotidiano, nunca menos con lo grave', () => {
   const placa = (requiere: boolean): Hallazgo => ({ id: 'p', regla_id: 'MAT-01', caja: { x: 0, y: 0, ancho: 9, alto: 9 }, confianza: requiere ? 0.2 : 0.9, requiere_revision: requiere, posicion: 'al centro' });

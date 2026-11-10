@@ -2,22 +2,25 @@
 
 Decisión del responsable (2026-11-06): el difuminado y el pixelado usan los colores de la imagen,
 porque se ven naturales, aunque técnicas de reconstrucción podrían recuperar parte del contenido
-(ver docs/INVESTIGACION.md). Solo el bloque sólido no depende de lo que había debajo.
+(ver docs/INVESTIGACION.md). Solo el bloque sólido y el emoji no dependen de lo que había debajo:
+el emoji crece hasta tapar lo que oculta (la silueta, el óvalo de una cara o la caja completa), y lo
+que no alcance queda con su color principal, nunca con la foto.
 """
 
 from __future__ import annotations
 
 import math
 from collections.abc import Mapping, Sequence
-from typing import assert_never
+from typing import assert_never, cast
 
 import cv2
 import numpy as np
 from numpy.typing import NDArray
 
+from . import emojis
 from .cargador import Pixeles
 from .errores import Codigo, ErrorRevisor
-from .esquemas import Ocultamiento, TipoEfecto
+from .esquemas import Ocultamiento, TipoEfecto, TipoEmoji, es_emoji
 
 COLOR_SOLIDO = (0, 0, 0)
 SIGMA_MIN = 25.0
@@ -28,6 +31,12 @@ PIXEL_MAX = 256
 INTENSIDAD_REFERENCIA = 80
 # Por debajo no se ve, pero el color se recupera con solo subir el alfa.
 ALFA_INVISIBLE = 8
+# Hasta cuántas veces el lado mayor de su caja puede crecer un emoji para taparla sin relleno visible.
+EMOJI_ESCALA_MAX = 2.0
+# Por encima, el emoji se escala solo en la parte visible, para no reservar un cuadro gigante en memoria.
+EMOJI_LADO_COMPLETO = 2048
+# Puntos de la orilla que se revisan al buscar el tamaño del emoji. El relleno cubre lo que se escape.
+EMOJI_PUNTOS_MAX = 4096
 
 
 def region_dilatada(o: Ocultamiento, alto: int, ancho: int) -> tuple[int, int, int, int]:
@@ -78,6 +87,112 @@ def _pixelar(salida: Pixeles, fuente: Pixeles, x0: int, y0: int, x1: int, y1: in
     salida[y0:y1, x0:x1, :3] = cv2.resize(colores, (ancho, alto), interpolation=cv2.INTER_NEAREST)
 
 
+def _caja_con_margen(o: Ocultamiento) -> tuple[int, int, int, int]:
+    """La zona con margen sin recortar al borde de la foto. El óvalo y el centro del emoji salen de aquí."""
+    margen = max(o.dilatacion_px, math.ceil(min(o.ancho, o.alto) * o.dilatacion_pct / 100))
+    return o.x - margen, o.y - margen, o.x + o.ancho + margen, o.y + o.alto + margen
+
+
+def _elipse(o: Ocultamiento, region: tuple[int, int, int, int]) -> NDArray[np.bool_]:
+    """Óvalo inscrito en la zona con margen, en coordenadas de la región.
+
+    Con el margen que la app da a las caras (x1.3 y 10 %), este óvalo contiene la caja completa que dio
+    el detector, aun cerca del borde de la foto: se calcula sin recortar y luego se recorta.
+    """
+    ux0, uy0, ux1, uy1 = _caja_con_margen(o)
+    x0, y0, x1, y1 = region
+    cx, cy = (ux0 + ux1 - 1) / 2, (uy0 + uy1 - 1) / 2
+    a, b = (ux1 - ux0) / 2, (uy1 - uy0) / 2
+    yy, xx = np.ogrid[y0:y1, x0:x1]
+    return ((xx - cx) / a) ** 2 + ((yy - cy) / b) ** 2 <= 1.0
+
+
+def lado_emoji(opaco: NDArray[np.bool_], dx: NDArray[np.float64], dy: NDArray[np.float64]) -> int:
+    """Lado, en píxeles de la foto, con el que la parte opaca del emoji tapa todos los puntos dados.
+
+    Los puntos se miden desde el centro del emoji. Crece hasta EMOJI_ESCALA_MAX veces el tamaño de lo
+    que tapa; si ni así alcanza (las puntas de una estrella), lo que falte ya tiene su color principal.
+    """
+    n = opaco.shape[0]
+    base = max(1, math.ceil(2 * max(float(np.abs(dx).max()), float(np.abs(dy).max())) + 1))
+
+    def cubre(lado: int) -> bool:
+        u = np.floor(dx * n / lado + n / 2).astype(np.int64)
+        v = np.floor(dy * n / lado + n / 2).astype(np.int64)
+        dentro = (u >= 0) & (u < n) & (v >= 0) & (v < n)
+        return bool(dentro.all() and opaco[v, u].all())
+
+    tope = math.ceil(base * EMOJI_ESCALA_MAX)
+    if not cubre(tope):
+        return tope
+    bajo, alto = 1, tope
+    while bajo < alto:
+        medio = (bajo + alto) // 2
+        if cubre(medio):
+            alto = medio
+        else:
+            bajo = medio + 1
+    return bajo
+
+
+def _orilla(objetivo: NDArray[np.bool_]) -> tuple[NDArray[np.intp], NDArray[np.intp]]:
+    """Los píxeles del borde de lo que se tapa: si la orilla queda cubierta, el interior también."""
+    lleno = np.pad(objetivo, 1).astype(np.uint8)
+    adentro = cv2.erode(lleno, np.ones((3, 3), np.uint8))[1:-1, 1:-1].astype(bool)
+    ys, xs = np.nonzero(objetivo & ~adentro)
+    paso = max(1, len(xs) // EMOJI_PUNTOS_MAX)
+    return ys[::paso], xs[::paso]
+
+
+def _pegar_emoji(
+    salida: Pixeles,
+    emoji: TipoEmoji,
+    region: tuple[int, int, int, int],
+    centro: tuple[float, float],
+    objetivo: NDArray[np.bool_],
+) -> tuple[int, int, int, int]:
+    """Centrado y del tamaño justo para tapar `objetivo`. Devuelve la región que tocó, recortada a la foto.
+
+    Dentro de `objetivo`, lo transparente deja ver el color principal ya pintado; fuera, la foto, que ahí
+    no hay nada que ocultar.
+    """
+    alto_img, ancho_img = salida.shape[:2]
+    original = emojis.cargar(emoji)
+    n = original.shape[0]
+    x0, y0, _, _ = region
+    ys, xs = _orilla(objetivo)
+    if xs.size == 0:
+        return region
+    cx, cy = centro
+    dx = xs.astype(np.float64) + (x0 - cx)
+    dy = ys.astype(np.float64) + (y0 - cy)
+    lado = lado_emoji(emojis.opaco(emoji), dx, dy)
+    ex0, ey0 = math.floor(cx - lado / 2 + 0.5), math.floor(cy - lado / 2 + 0.5)
+    rx0, ry0 = max(0, ex0), max(0, ey0)
+    rx1, ry1 = min(ancho_img, ex0 + lado), min(alto_img, ey0 + lado)
+    if rx0 >= rx1 or ry0 >= ry1:
+        return region
+    if lado <= EMOJI_LADO_COMPLETO:
+        recorte = cv2.resize(original, (lado, lado), interpolation=cv2.INTER_AREA)[
+            ry0 - ey0 : ry1 - ey0, rx0 - ex0 : rx1 - ex0
+        ]
+    else:
+        # Enorme: solo se calcula la parte que cae dentro de la foto, para no agotar la memoria.
+        escala = lado / n
+        matriz = np.array([[escala, 0, ex0 - rx0], [0, escala, ey0 - ry0]], dtype=np.float64)
+        recorte = cv2.warpAffine(
+            original, matriz, (rx1 - rx0, ry1 - ry0), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT
+        )
+    alfa = recorte[:, :, 3:4].astype(np.float32) / 255.0
+    fondo = salida[ry0:ry1, rx0:rx1, :3].astype(np.float32)
+    mezcla = recorte[:, :, :3].astype(np.float32) * alfa + fondo * (1.0 - alfa)
+    salida[ry0:ry1, rx0:rx1, :3] = np.clip(np.rint(mezcla), 0, 255).astype(np.uint8)
+    if salida.shape[2] == 4:
+        salida[ry0:ry1, rx0:rx1, 3] = np.maximum(salida[ry0:ry1, rx0:rx1, 3], recorte[:, :, 3])
+    # La región final abarca la caja y lo que tocó el emoji.
+    return min(rx0, region[0]), min(ry0, region[1]), max(rx1, region[2]), max(ry1, region[3])
+
+
 def _aplicar_efecto(
     salida: Pixeles,
     fuente: Pixeles,
@@ -95,6 +210,9 @@ def _aplicar_efecto(
             _difuminar(salida, fuente, x0, y0, x1, y1, intensidad)
         case "pixelado":
             _pixelar(salida, fuente, x0, y0, x1, y1, intensidad)
+        case "emoji_sonrisa" | "emoji_lentes" | "emoji_gato" | "emoji_estrella":
+            # Primero un relleno fijo: es lo que lo hace irreversible. El emoji se pega encima después.
+            salida[y0:y1, x0:x1, :3] = emojis.color_principal(efecto)
         case _ as inalcanzable:
             assert_never(inalcanzable)
     if salida.shape[2] == 4:
@@ -127,6 +245,30 @@ def _silueta(
     return cv2.dilate(lienzo, nucleo).astype(bool)
 
 
+def _forma(
+    o: Ocultamiento,
+    region: tuple[int, int, int, int],
+    mascaras: Mapping[str, NDArray[np.bool_]],
+    alto: int,
+    ancho: int,
+) -> NDArray[np.bool_] | None:
+    """Lo que de verdad se tapa dentro de la región. None es la caja completa.
+
+    La silueta manda si existe. Sin ella, un emoji sobre una cara tapa el óvalo de la cara para poder
+    ajustarse a ella; cualquier otra cosa tapa la caja completa.
+    """
+    silueta = _silueta(o, region, mascaras)
+    if silueta is not None:
+        return silueta
+    if es_emoji(o.efecto) and o.forma == "elipse":
+        # Si la caja toca la orilla, la app la recortó al ampliarla y ya no está centrada en la cara:
+        # el óvalo podría dejar fuera una esquina. Ahí se tapa la caja completa.
+        if o.x == 0 or o.y == 0 or o.x + o.ancho >= ancho or o.y + o.alto >= alto:
+            return None
+        return _elipse(o, region)
+    return None
+
+
 def aplicar(
     pixeles: Pixeles,
     ocultamientos: Sequence[Ocultamiento],
@@ -136,20 +278,30 @@ def aplicar(
     siluetas = mascaras if mascaras is not None else {}
     alto, ancho = pixeles.shape[:2]
     regiones = [region_dilatada(o, alto, ancho) for o in ocultamientos]
-    # Los bloques sólidos van primero: un difuminado vecino no debe tomar color de lo que tapan.
+    recortes = [_forma(o, r, siluetas, alto, ancho) for o, r in zip(ocultamientos, regiones, strict=True)]
+    # Los bloques sólidos y los emojis primero: un difuminado vecino no debe tomar color de lo que tapan.
     fuente = pixeles.copy()
-    recortes = [_silueta(o, r, siluetas) for o, r in zip(ocultamientos, regiones, strict=True)]
     for o, (x0, y0, x1, y1), silueta in zip(ocultamientos, regiones, recortes, strict=True):
-        if o.efecto == "solido":
+        if o.efecto == "solido" or es_emoji(o.efecto):
             if silueta is None:
                 fuente[y0:y1, x0:x1, :3] = COLOR_SOLIDO
             else:
                 fuente[y0:y1, x0:x1, :3][silueta] = COLOR_SOLIDO
     salida = fuente.copy()
+    finales: list[tuple[int, int, int, int]] = []
     for o, (x0, y0, x1, y1), silueta in zip(ocultamientos, regiones, recortes, strict=True):
         previo = salida[y0:y1, x0:x1].copy()
         _aplicar_efecto(salida, fuente, o.efecto, x0, y0, x1, y1, o.intensidad)
         if silueta is not None:
             salida[y0:y1, x0:x1][~silueta] = previo[~silueta]
+        if es_emoji(o.efecto):
+            # El emoji puede salir de su caja: la región que se verifica al exportar es la que tocó.
+            ux0, uy0, ux1, uy1 = _caja_con_margen(o)
+            objetivo = silueta if silueta is not None else np.ones((y1 - y0, x1 - x0), dtype=bool)
+            centro = ((ux0 + ux1) / 2, (uy0 + uy1) / 2)
+            emoji = cast(TipoEmoji, o.efecto)
+            finales.append(_pegar_emoji(salida, emoji, (x0, y0, x1, y1), centro, objetivo))
+        else:
+            finales.append((x0, y0, x1, y1))
     limpiar_transparentes(salida)
-    return salida, regiones
+    return salida, finales

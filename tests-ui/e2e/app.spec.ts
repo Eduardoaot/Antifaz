@@ -785,7 +785,7 @@ for (const tema of ['claro', 'oscuro'] as const) {
       const desborde = await pagina.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
       expect(desborde, 'scroll horizontal').toBeLessThanOrEqual(0);
       const fondo = await pagina.evaluate(() => getComputedStyle(document.body).backgroundColor);
-      expect(fondo).toBe(tema === 'oscuro' ? 'rgb(19, 18, 42)' : 'rgb(247, 247, 251)');
+      expect(fondo).toBe(tema === 'oscuro' ? 'rgb(18, 18, 25)' : 'rgb(246, 246, 249)');
       await sinViolaciones(pagina);
       await pagina.screenshot({ path: join(CAPTURAS, `${tema}-${nombre}.png`), fullPage: true });
     });
@@ -814,14 +814,121 @@ for (const tema of ['claro', 'oscuro'] as const) {
   });
 }
 
+for (const tema of ['claro', 'oscuro'] as const) {
+  test(`visor: zoom, resaltado entre panel e imagen y teclado, tema ${tema}`, async () => {
+    sesion = await lanzar();
+    const { pagina } = sesion;
+    await pagina.getByLabel('Tema').selectOption(tema);
+    await abrir(sesion, [m('cara con ñ.jpg')]);
+    await expect(veredicto(pagina)).toBeVisible({ timeout: 60_000 });
+    const lienzo = pagina.getByTestId('lienzo');
+    const nivel = pagina.locator('.nivel-zoom');
+    const antes = await lienzo.boundingBox();
+    if (antes === null) throw new Error('sin lienzo');
+
+    // Zoom con botones: en el extremo inferior, "Alejar" no hace nada.
+    await expect(nivel).toHaveText('100 %');
+    await expect(pagina.getByRole('button', { name: 'Alejar' })).toBeDisabled();
+    await pagina.getByRole('button', { name: 'Acercar' }).click();
+    await pagina.getByRole('button', { name: 'Acercar' }).click();
+    await expect(nivel).toHaveText('200 %');
+    const despues = await lienzo.boundingBox();
+    if (despues === null) throw new Error('sin lienzo');
+    expect(despues.width / antes.width).toBeCloseTo(2, 1);
+
+    // Resaltado desde el panel: la fila y su marca, a la vez.
+    const fila = pagina.locator('[data-regla="CAR-01"]');
+    const zona = await fila.getAttribute('data-zona');
+    if (zona === null) throw new Error('la fila de la cara no tiene zona');
+    const marca = pagina.locator(`[data-marca="${zona}"]`);
+    await fila.hover();
+    await expect(fila).toHaveClass(/resaltada/);
+    await expect(marca).toHaveClass(/resaltada/);
+    await sinViolaciones(pagina);
+    await pagina.screenshot({ path: join(CAPTURAS, `${tema}-visor-zoom.png`) });
+
+    // De vuelta al 100 %: con "Solo ver", pasar por la marca la resalta y un clic lleva a su fila.
+    await pagina.getByRole('button', { name: 'Ajustar' }).click();
+    await expect(nivel).toHaveText('100 %');
+    const caja = await marca.boundingBox();
+    if (caja === null) throw new Error('sin marca');
+    await pagina.mouse.move(caja.x + caja.width / 2, caja.y + caja.height / 2);
+    await expect(fila).toHaveClass(/resaltada/);
+    await pagina.mouse.click(caja.x + caja.width / 2, caja.y + caja.height / 2);
+    await expect(fila.getByRole('button').first()).toBeFocused();
+    await pagina.screenshot({ path: join(CAPTURAS, `${tema}-visor-resaltado.png`) });
+
+    // Teclado: + acerca, − aleja y 0 ajusta. Nunca pasa de 800 %.
+    await pagina.getByRole('group', { name: 'Imagen', exact: true }).focus();
+    await pagina.keyboard.press('+');
+    await expect(nivel).toHaveText('150 %');
+    for (let i = 0; i < 10; i++) await pagina.keyboard.press('+');
+    await expect(nivel).toHaveText('800 %');
+    await expect(pagina.getByRole('button', { name: 'Acercar' })).toBeDisabled();
+    await pagina.keyboard.press('-');
+    await expect(nivel).toHaveText('600 %');
+    await pagina.keyboard.press('0');
+    await expect(nivel).toHaveText('100 %');
+  });
+}
+
+for (const tema of ['claro', 'oscuro'] as const) {
+  test(`visor: comparar antes y después y números fuera de la zona, tema ${tema}`, async () => {
+    sesion = await lanzar();
+    const { pagina } = sesion;
+    await pagina.getByLabel('Tema').selectOption(tema);
+    await abrir(sesion, [m('cara con ñ.jpg')]);
+    await expect(veredicto(pagina)).toBeVisible({ timeout: 60_000 });
+    const fila = pagina.locator('[data-regla="CAR-01"]');
+    await fila.getByRole('button', { name: /^Ocultar/ }).click();
+    const zona = await fila.getAttribute('data-zona');
+    if (zona === null) throw new Error('la fila de la cara no tiene zona');
+    const marca = pagina.locator(`[data-marca="${zona}"]`);
+    await expect(marca).toHaveClass(/ocultar/);
+
+    // El número no tapa la cara: queda fuera de la caja de la zona.
+    const caja = await marca.boundingBox();
+    const numero = await marca.locator('span').boundingBox();
+    if (caja === null || numero === null) throw new Error('sin marca');
+    expect(numero.y + numero.height <= caja.y || numero.y >= caja.y + caja.height).toBe(true);
+
+    // Comparar: aparece la original, se ocultan las marcas y las herramientas no actúan.
+    const comparar = pagina.getByRole('button', { name: 'Comparar antes y después' });
+    await comparar.click();
+    await expect(comparar).toHaveAttribute('aria-pressed', 'true');
+    const original = pagina.locator('img.original');
+    await expect(original).toBeVisible();
+    await expect(pagina.locator('.marca')).toHaveCount(0);
+    const corte = pagina.getByLabel('Original a la izquierda, tu copia a la derecha');
+    await corte.fill('20');
+    await expect(original).toHaveAttribute('style', /inset\(0px 80%|inset\(0 80%/);
+    await sinViolaciones(pagina);
+    await pagina.screenshot({ path: join(CAPTURAS, `${tema}-visor-comparar.png`) });
+
+    await pagina.getByRole('button', { name: 'Dibujar rectángulo' }).click();
+    const lienzo = await pagina.getByTestId('lienzo').boundingBox();
+    if (lienzo === null) throw new Error('sin lienzo');
+    await pagina.mouse.move(lienzo.x + lienzo.width * 0.6, lienzo.y + lienzo.height * 0.6);
+    await pagina.mouse.down();
+    await pagina.mouse.move(lienzo.x + lienzo.width * 0.9, lienzo.y + lienzo.height * 0.9, { steps: 5 });
+    await pagina.mouse.up();
+    await expect(pagina.locator('[data-manual]')).toHaveCount(0);
+
+    // Al salir, vuelven las marcas y la original desaparece.
+    await comparar.click();
+    await expect(original).toHaveCount(0);
+    await expect(marca).toBeVisible();
+  });
+}
+
 test('cambiar el tema con la app abierta cambia los colores sin reiniciar', async () => {
   sesion = await lanzar();
   const { pagina } = sesion;
   const fondo = (): Promise<string> => pagina.evaluate(() => getComputedStyle(document.body).backgroundColor);
   await pagina.getByLabel('Tema').selectOption('claro');
-  await expect.poll(fondo).toBe('rgb(247, 247, 251)');
+  await expect.poll(fondo).toBe('rgb(246, 246, 249)');
   await pagina.getByLabel('Tema').selectOption('oscuro');
-  await expect.poll(fondo).toBe('rgb(19, 18, 42)');
+  await expect.poll(fondo).toBe('rgb(18, 18, 25)');
   await pagina.getByLabel('Tema').selectOption('sistema');
   await expect(pagina.getByLabel('Tema')).toHaveValue('sistema');
 });

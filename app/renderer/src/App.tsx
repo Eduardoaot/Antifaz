@@ -49,6 +49,7 @@ import {
   type Caja,
   type Herramienta,
   type Historial,
+  type Resaltado,
   type Revision,
 } from '../../shared/logica';
 import { Advertencias, Cobertura } from './Advertencias';
@@ -57,6 +58,7 @@ import { Confirmacion } from './Dialogos';
 import { Guia } from './Guia';
 import { Manual } from './Manual';
 import { ModoVideo } from './ModoVideo';
+import { irAFila } from './resaltar';
 import { Visor } from './Visor';
 
 export type EstadoAnalisis =
@@ -107,8 +109,13 @@ export function App(): React.JSX.Element {
   const [tamanoPincel, setTamanoPincel] = useState<number>(LIMITES.pincel.porDefecto);
   const [zonaTotal, setZonaTotal] = useState<ZonaNueva | null>(null);
   const [avisoCierre, setAvisoCierre] = useState<AvisoCierre | null>(null);
+  // Zona resaltada a la vez en la imagen y en el panel. Solo es visual: no cambia ninguna decisión.
+  // Se guarda con su foto, porque los ids de zona ("cara-0") se repiten entre fotos.
+  const [resaltadoDe, setResaltadoDe] = useState<{ archivoId: string | null; resaltado: Resaltado | null }>({ archivoId: null, resaltado: null });
   const colaOcupada = useRef(false);
   const seleccion = elegido ?? archivos[0]?.info.id ?? null;
+  const resaltado = resaltadoDe.archivoId === seleccion ? resaltadoDe.resaltado : null;
+  const setResaltado = useCallback((r: Resaltado | null): void => { setResaltadoDe({ archivoId: seleccion, resaltado: r }); }, [seleccion]);
 
   const actual = useMemo(() => archivos.find((a) => a.info.id === seleccion) ?? null, [archivos, seleccion]);
   const analisis = actual?.estado.tipo === 'listo' ? actual.estado.analisis : null;
@@ -461,14 +468,17 @@ export function App(): React.JSX.Element {
       <AnimacionInicio />
       <a className="saltar" href="#principal">Saltar al contenido</a>
       <header className="cabecera">
-        <picture>
-          <source srcSet={logoOscuro} media="(prefers-color-scheme: dark)" />
-          <img className="logo" src={logoClaro} alt={MARCA.nombre} />
-        </picture>
-        <p className="eslogan">{MARCA.eslogan}</p>
+        <div className="identidad">
+          <picture>
+            <source srcSet={logoOscuro} media="(prefers-color-scheme: dark)" />
+            <img className="logo" src={logoClaro} alt={MARCA.nombre} />
+          </picture>
+          <p className="eslogan">{MARCA.eslogan}</p>
+        </div>
+        {/* Una sola acción principal a la vista: Exportar. Abrir es secundaria; la pantalla vacía tiene la suya. */}
         <div className="acciones">
           {enFotos ? (
-            <button type="button" className="boton primario" onClick={() => { void abrir(); }}>
+            <button type="button" className="boton" onClick={() => { void abrir(); }}>
               <FolderOpen aria-hidden="true" /> Abrir fotos
             </button>
           ) : (
@@ -476,23 +486,25 @@ export function App(): React.JSX.Element {
               <IconoFoto aria-hidden="true" /> Fotos
             </button>
           )}
-          <button type="button" className="boton" aria-pressed={vista === 'video'} onClick={() => { setVista((v) => (v === 'video' ? 'revision' : 'video')); }}>
+          <button type="button" className="boton fantasma" aria-pressed={vista === 'video'} onClick={() => { setVista((v) => (v === 'video' ? 'revision' : 'video')); }}>
             <Film aria-hidden="true" /> Video
           </button>
-          <button type="button" className="boton" aria-pressed={vista === 'guia'} onClick={() => { setVista((v) => (v === 'guia' ? 'revision' : 'guia')); }}>
+          <button type="button" className="boton fantasma" aria-pressed={vista === 'guia'} onClick={() => { setVista((v) => (v === 'guia' ? 'revision' : 'guia')); }}>
             <BookOpen aria-hidden="true" /> Guía de privacidad
           </button>
           {enFotos && (<>
-          <button type="button" className="boton" disabled={!actual || exportando || actual.historial.pasado.length === 0} onClick={() => { moverHistorial(deshacer, 'Se deshizo el último cambio.'); }}>
+          <span className="separador" aria-hidden="true" />
+          <button type="button" className="boton fantasma" disabled={!actual || exportando || actual.historial.pasado.length === 0} onClick={() => { moverHistorial(deshacer, 'Se deshizo el último cambio.'); }}>
             <Undo2 aria-hidden="true" /> Deshacer
           </button>
-          <button type="button" className="boton" disabled={!actual || exportando || actual.historial.futuro.length === 0} onClick={() => { moverHistorial(rehacer, 'Se rehizo el cambio.'); }}>
+          <button type="button" className="boton fantasma" disabled={!actual || exportando || actual.historial.futuro.length === 0} onClick={() => { moverHistorial(rehacer, 'Se rehizo el cambio.'); }}>
             <Redo2 aria-hidden="true" /> Rehacer
           </button>
           <button type="button" className="boton primario" disabled={analisis === null || exportando} onClick={pedirExportar}>
             <Save aria-hidden="true" /> {exportando ? 'Guardando…' : 'Exportar copia'}
           </button>
           </>)}
+          <span className="separador" aria-hidden="true" />
           <label className="campo-tema">
             Tema
             <select
@@ -626,6 +638,9 @@ export function App(): React.JSX.Element {
                 alDibujar={pedirCaja}
                 alPintar={(puntos) => { void pintar(puntos); }}
                 alFuera={() => { setAnuncio('Ese punto queda fuera de la imagen.'); }}
+                resaltado={resaltado}
+                alResaltar={setResaltado}
+                alElegirZona={irAFila}
               />
             </>
           )}
@@ -676,6 +691,8 @@ export function App(): React.JSX.Element {
                 alCambiar={(cambio) => { cambiarRevision(actual.info.id, cambio); }}
                 alOcultarTodo={() => { cambiarRevision(actual.info.id, (r) => ocultarTodo(r, hallazgos)); setAnuncio('Marcamos para ocultar todo lo detectado.'); }}
                 alOcultarAlto={() => { cambiarRevision(actual.info.id, (r) => ocultarRiesgoAlto(r, hallazgos)); setAnuncio('Marcamos para ocultar lo de riesgo alto.'); }}
+                resaltado={resaltado}
+                alResaltar={setResaltado}
               />
               <Manual
                 key={`manual-${actual.info.id}`}
@@ -691,6 +708,8 @@ export function App(): React.JSX.Element {
                 alBuscarEnPunto={(x, y) => { void buscarEnPunto(x, y); }}
                 alQuitar={(id) => { cambiarRevision(actual.info.id, (r) => quitarManual(r, id)); setAnuncio('Quitamos tu zona.'); }}
                 alCambiarEfecto={(id, efecto) => { cambiarRevision(actual.info.id, (r) => efectoDeManual(r, id, efecto)); }}
+                resaltado={resaltado}
+                alResaltar={setResaltado}
               />
               </fieldset>
               <section aria-labelledby="titulo-resumen" className="resumen">
