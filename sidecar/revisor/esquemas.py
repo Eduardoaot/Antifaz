@@ -20,6 +20,8 @@ PUNTOS_TRAZO_MAX = 5000
 # Tamaño del sticker sobre una cara, en veces el que se elige solo. Coincide con LIMITES.escalaSticker.
 ESCALA_STICKER_MIN = 0.25
 ESCALA_STICKER_MAX = 2.0
+# Posición del sticker, en fracciones de los semiejes de su zona. Coincide con LIMITES.posicionSticker.
+POSICION_STICKER_MAX = 2.0
 
 
 class Estricto(BaseModel):
@@ -61,6 +63,10 @@ class Ocultamiento(Estricto):
     nucleo: CajaImagen | None = None
     # Tamaño del emoji en veces el que se elige solo. Nunca queda más chico de lo que tapa el núcleo.
     escala: Annotated[float, Field(ge=ESCALA_STICKER_MIN, le=ESCALA_STICKER_MAX)] = 1.0
+    # Desplazamiento del emoji en fracciones de los semiejes de su zona. Solo cuenta con núcleo, y el
+    # emoji crece lo necesario para seguir tapándolo.
+    desplazamiento_x: Annotated[float, Field(ge=-POSICION_STICKER_MAX, le=POSICION_STICKER_MAX)] = 0.0
+    desplazamiento_y: Annotated[float, Field(ge=-POSICION_STICKER_MAX, le=POSICION_STICKER_MAX)] = 0.0
 
     @model_validator(mode="after")
     def nucleo_dentro(self) -> Ocultamiento:

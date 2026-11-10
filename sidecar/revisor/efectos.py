@@ -114,13 +114,14 @@ def _ovalo_nucleo(
     alto: int,
     ancho: int,
 ) -> NDArray[np.bool_] | None:
-    """La cara del detector con el margen mínimo, en coordenadas de la región, si el emoji se encoge.
+    """La cara del detector con el margen mínimo, en coordenadas de la región, si el emoji se ajusta.
 
-    Solo aplica a un emoji sobre una cara (óvalo, sin silueta y lejos de la orilla) con escala menor que
-    1. En cualquier otro caso es None y el emoji tapa su zona completa, como siempre.
+    Solo aplica a un emoji sobre una cara (óvalo, sin silueta y lejos de la orilla) que se encogió o se
+    movió. En cualquier otro caso es None y el emoji tapa su zona completa, centrado, como siempre.
     """
     n = o.nucleo
-    if n is None or o.escala >= 1 or not es_emoji(o.efecto) or o.forma != "elipse":
+    movido = o.desplazamiento_x != 0 or o.desplazamiento_y != 0
+    if n is None or (o.escala >= 1 and not movido) or not es_emoji(o.efecto) or o.forma != "elipse":
         return None
     if _silueta(o, region, mascaras) is not None:
         return None
@@ -179,12 +180,14 @@ def _pegar_emoji(
     objetivo: NDArray[np.bool_],
     escala: float = 1.0,
     minimo: NDArray[np.bool_] | None = None,
+    pegar_en: tuple[float, float] | None = None,
 ) -> tuple[int, int, int, int]:
-    """Centrado y del tamaño justo para tapar `objetivo`, por `escala`. Devuelve la región que tocó.
+    """Del tamaño justo para tapar `objetivo` desde `centro`, por `escala`. Devuelve la región que tocó.
 
-    Con `minimo` puede quedar más chico que `objetivo`, pero nunca tanto que deje de tapar `minimo`. Sin
-    él, nunca es más chico que `objetivo`. Lo transparente deja ver el color principal ya pintado en lo
-    que se oculta; fuera de eso, la foto, que ahí no hay nada que ocultar.
+    Con `minimo` puede quedar más chico que `objetivo` y pegarse en `pegar_en`, pero nunca tanto que,
+    desde ahí, deje de tapar `minimo`: si hace falta, crece. Sin él, va en `centro` y nunca es más chico
+    que `objetivo`. Lo transparente deja ver el color principal ya pintado en lo que se oculta; fuera de
+    eso, la foto, que ahí no hay nada que ocultar.
     """
     alto_img, ancho_img = salida.shape[:2]
     original = emojis.cargar(emoji)
@@ -202,6 +205,8 @@ def _pegar_emoji(
     if minimo is None:
         lado = max(lado, justo)
     else:
+        if pegar_en is not None:
+            cx, cy = pegar_en
         mys, mxs = _orilla(minimo)
         if mxs.size > 0:
             mdx = mxs.astype(np.float64) + (x0 - cx)
@@ -346,8 +351,15 @@ def aplicar(
             # El tamaño se mide siempre contra la zona completa: la escala es relativa a ese tamaño.
             objetivo = forma if forma is not None else np.ones((y1 - y0, x1 - x0), dtype=bool)
             centro = ((ux0 + ux1) / 2, (uy0 + uy1) / 2)
+            # Movido, en fracciones de los semiejes. Solo cuenta si la cara del detector manda.
+            pegar_en = (
+                centro[0] + o.desplazamiento_x * (ux1 - ux0) / 2,
+                centro[1] + o.desplazamiento_y * (uy1 - uy0) / 2,
+            )
             emoji = cast(TipoEmoji, o.efecto)
-            finales.append(_pegar_emoji(salida, emoji, (x0, y0, x1, y1), centro, objetivo, o.escala, nucleo))
+            finales.append(
+                _pegar_emoji(salida, emoji, (x0, y0, x1, y1), centro, objetivo, o.escala, nucleo, pegar_en)
+            )
         else:
             finales.append((x0, y0, x1, y1))
     limpiar_transparentes(salida)

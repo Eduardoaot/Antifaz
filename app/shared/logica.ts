@@ -1,12 +1,15 @@
 /** Lógica pura de la revisión de una foto. Sin React ni Electron, para probarla a fondo. */
 import { catalogo, etiquetaNivel, reglaDe, type Nivel, type Regla } from './catalogo';
 import {
+  EMOJI_ESCALA_MAX,
   esEmoji,
+  FRACCION_OPACA_EMOJI,
   LIMITES,
   type Analisis,
   type Decision,
   type Edicion,
   type Efecto,
+  type Emoji,
   type Hallazgo,
   type Motivo,
   type Ocultamiento,
@@ -41,6 +44,13 @@ export interface Revision {
   manuales: readonly ZonaManual[];
   /** Tamaño del sticker de cada cara, en veces el que la app elige sola. Sin entrada, 1. */
   escalas: Readonly<Record<string, number>>;
+  /** Posición del sticker de cada cara, en fracciones de los semiejes de su zona. Sin entrada, centrado. */
+  posiciones: Readonly<Record<string, Posicion>>;
+}
+
+export interface Posicion {
+  x: number;
+  y: number;
 }
 
 export const REVISION_INICIAL: Revision = {
@@ -50,6 +60,7 @@ export const REVISION_INICIAL: Revision = {
   hayMenores: null,
   manuales: [],
   escalas: {},
+  posiciones: {},
 };
 
 export interface Historial {
@@ -115,16 +126,20 @@ export function efectoDe(r: Revision, h: Hallazgo): Efecto {
   return r.efectos[h.id] ?? (h.regla_id === 'CAR-01' ? 'difuminado' : 'solido');
 }
 
-// --- Tamaño del sticker sobre una cara ----------------------------------------------------------
+// --- Tamaño y posición del sticker sobre una cara ------------------------------------------------
 
 // Al centésimo: 0.95 debe ser 0.95, no 0.9500000000000001, para compararlo y guardarlo tal cual.
 const redondearPaso = (v: number): number =>
   Math.round(Math.round(v / LIMITES.escalaSticker.paso) * LIMITES.escalaSticker.paso * 100) / 100;
 
-/** Solo un emoji sobre una cara con su caja del detector puede cambiar de tamaño. */
+/** Solo un emoji sobre una cara con su caja del detector puede cambiar de tamaño y moverse. */
 export function ajustaSticker(r: Revision, h: Hallazgo): boolean {
   return h.regla_id === 'CAR-01' && h.caja !== null && h.nucleo !== undefined && h.nucleo !== null && esEmoji(efectoDe(r, h));
 }
+
+/** El margen que el sidecar agrega a una zona de cara (`region_dilatada` en efectos.py). */
+const margenZona = (c: Caja): number =>
+  Math.max(LIMITES.dilatacionPx.porDefecto, Math.ceil((Math.min(c.ancho, c.alto) * LIMITES.dilatacionPct.porDefecto) / 100));
 
 /**
  * Hasta dónde puede encogerse el sticker: lo que mide la cara del detector frente a la zona con margen.
@@ -133,7 +148,7 @@ export function ajustaSticker(r: Revision, h: Hallazgo): boolean {
 export function escalaMinimaSticker(h: Hallazgo): number {
   const { min } = LIMITES.escalaSticker;
   if (h.caja === null || h.nucleo === undefined || h.nucleo === null) return 1;
-  const margen = Math.max(LIMITES.dilatacionPx.porDefecto, Math.ceil((Math.min(h.caja.ancho, h.caja.alto) * LIMITES.dilatacionPct.porDefecto) / 100));
+  const margen = margenZona(h.caja);
   const nucleo = LIMITES.dilatacionPx.porDefecto;
   const proporcion = Math.max(
     (h.nucleo.ancho + 2 * nucleo) / (h.caja.ancho + 2 * margen),
@@ -154,11 +169,92 @@ export function limitarEscala(valor: number): number {
 
 export const escalaDe = (r: Revision, id: string): number => r.escalas[id] ?? LIMITES.escalaSticker.porDefecto;
 
-export function cambiarEscala(r: Revision, id: string, valor: number): Revision {
-  const escala = limitarEscala(valor);
-  if (escala === escalaDe(r, id)) return r;
-  const resto = Object.fromEntries(Object.entries(r.escalas).filter(([clave]) => clave !== id));
-  return { ...r, escalas: escala === LIMITES.escalaSticker.porDefecto ? resto : { ...resto, [id]: escala } };
+const sinClave = <T,>(m: Readonly<Record<string, T>>, id: string): Record<string, T> =>
+  Object.fromEntries(Object.entries(m).filter(([clave]) => clave !== id));
+
+export const posicionDe = (r: Revision, id: string): Posicion => r.posiciones[id] ?? { x: 0, y: 0 };
+
+/** Al centésimo, hacia el centro: redondear nunca debe sacar al sticker de donde tapa la cara. */
+const haciaElCentro = (v: number): number => Math.trunc(v * 100) / 100 || 0;
+
+/**
+ * Cuánto puede alejarse el centro, en semiejes. Al centésimo y hacia abajo, con tolerancia para que
+ * 0.85 − 0.75 dé 0.1 y no 0.09: redondear nunca debe alargarlo.
+ */
+const radioSticker = (h: Hallazgo, escala: number): number =>
+  Math.max(0, Math.floor(((Number.isFinite(escala) ? escala : 0) - escalaMinimaSticker(h)) * 100 + 1e-6) / 100);
+
+/**
+ * La posición más cercana a la pedida desde la que el sticker, con esa escala, sigue tapando la cara.
+ * En fracciones de los semiejes, la cara cabe en un círculo de radio `escalaMinimaSticker` y el emoji
+ * tapa uno de radio `escala`: el centro puede alejarse hasta la diferencia. Más lejos, se queda en el
+ * borde (el imán). El sidecar lo comprueba en píxeles y, si no alcanza, agranda el emoji.
+ */
+export function limitarPosicion(h: Hallazgo, escala: number, p: Posicion): Posicion {
+  const { max } = LIMITES.posicionSticker;
+  const recorte = (v: number): number => (Number.isFinite(v) ? Math.min(max, Math.max(-max, v)) : 0);
+  const x = recorte(p.x);
+  const y = recorte(p.y);
+  const radio = radioSticker(h, escala);
+  const distancia = Math.hypot(x, y);
+  const factor = distancia > radio ? (distancia === 0 ? 0 : radio / distancia) : 1;
+  return { x: haciaElCentro(x * factor), y: haciaElCentro(y * factor) };
+}
+
+/** Verdadero si el sticker ya no puede alejarse más del centro con su tamaño actual. */
+export function enElTope(h: Hallazgo, escala: number, p: Posicion): boolean {
+  const radio = radioSticker(h, escala);
+  return Math.hypot(p.x, p.y) >= radio - 0.011;
+}
+
+export interface CambioSticker {
+  escala?: number;
+  posicion?: Posicion;
+}
+
+/**
+ * Cambia el tamaño, la posición o ambos. El tamaño nunca baja del mínimo de la cara, y al encogerlo
+ * el sticker se acerca al centro lo necesario para seguir tapándola.
+ */
+export function ajustarSticker(r: Revision, h: Hallazgo, cambio: CambioSticker): Revision {
+  const escala = cambio.escala === undefined ? escalaDe(r, h.id) : Math.max(escalaMinimaSticker(h), limitarEscala(cambio.escala));
+  const posicion = limitarPosicion(h, escala, cambio.posicion ?? posicionDe(r, h.id));
+  const previa = posicionDe(r, h.id);
+  if (escala === escalaDe(r, h.id) && posicion.x === previa.x && posicion.y === previa.y) return r;
+  const sin = <T,>(m: Readonly<Record<string, T>>): Record<string, T> => sinClave(m, h.id);
+  const centrado = posicion.x === 0 && posicion.y === 0;
+  return {
+    ...r,
+    escalas: escala === LIMITES.escalaSticker.porDefecto ? sin(r.escalas) : { ...sin(r.escalas), [h.id]: escala },
+    posiciones: centrado ? sin(r.posiciones) : { ...sin(r.posiciones), [h.id]: posicion },
+  };
+}
+
+export const stickerAjustado = (r: Revision, id: string): boolean => id in r.escalas || id in r.posiciones;
+
+/** Regresa el sticker al tamaño y lugar que la app eligió sola. */
+export function restablecerSticker(r: Revision, id: string): Revision {
+  if (!stickerAjustado(r, id)) return r;
+  return { ...r, escalas: sinClave(r.escalas, id), posiciones: sinClave(r.posiciones, id) };
+}
+
+/**
+ * Dónde se ve el sticker, en píxeles de la imagen: centro y lado. Aproximado (la imagen real la dibuja
+ * el sidecar); sirve para el marco con el que se mueve y se cambia de tamaño.
+ */
+export function geometriaSticker(caja: Caja, emoji: Emoji, escala: number, p: Posicion): { cx: number; cy: number; lado: number } {
+  const margen = margenZona(caja);
+  const semiX = caja.ancho / 2 + margen;
+  const semiY = caja.alto / 2 + margen;
+  const base = 2 * Math.max(semiX, semiY);
+  const justo = Math.min(base / FRACCION_OPACA_EMOJI[emoji], base * EMOJI_ESCALA_MAX);
+  return { cx: caja.x + caja.ancho / 2 + p.x * semiX, cy: caja.y + caja.alto / 2 + p.y * semiY, lado: justo * escala };
+}
+
+/** Semiejes del óvalo de la zona, en píxeles de la imagen: convierten un arrastre en posición. */
+export function semiejesZona(caja: Caja): { x: number; y: number } {
+  const margen = margenZona(caja);
+  return { x: caja.ancho / 2 + margen, y: caja.alto / 2 + margen };
 }
 
 export function construirOcultamientos(r: Revision, hallazgos: readonly Hallazgo[]): Ocultamiento[] {
@@ -176,6 +272,8 @@ export function construirOcultamientos(r: Revision, hallazgos: readonly Hallazgo
       forma: h.regla_id === 'CAR-01' ? 'elipse' : 'caja',
       nucleo: ajustaSticker(r, h) ? (h.nucleo ?? null) : null,
       escala: ajustaSticker(r, h) ? escalaDe(r, h.id) : LIMITES.escalaSticker.porDefecto,
+      desplazamiento_x: ajustaSticker(r, h) ? posicionDe(r, h.id).x : 0,
+      desplazamiento_y: ajustaSticker(r, h) ? posicionDe(r, h.id).y : 0,
     });
   }
   for (const z of r.manuales) {
@@ -195,6 +293,8 @@ export function construirOcultamientos(r: Revision, hallazgos: readonly Hallazgo
       forma: 'caja',
       nucleo: null,
       escala: LIMITES.escalaSticker.porDefecto,
+      desplazamiento_x: 0,
+      desplazamiento_y: 0,
     });
   }
   return salida;
@@ -547,6 +647,7 @@ export function aEdicion(archivoId: string, r: Revision): Edicion {
     hayMenores: r.hayMenores,
     manuales: r.manuales.map((z) => ({ ...z })),
     escalas: { ...r.escalas },
+    posiciones: Object.fromEntries(Object.entries(r.posiciones).map(([id, p]) => [id, { ...p }])),
   };
 }
 
@@ -558,6 +659,7 @@ export function desdeEdicion(e: Edicion): Revision {
     hayMenores: e.hayMenores,
     manuales: e.manuales.map((z) => ({ ...z, origen: z.origen ?? origenPorMascara(z.mascara_id) })),
     escalas: e.escalas,
+    posiciones: e.posiciones,
   };
 }
 
@@ -568,6 +670,7 @@ export function hayCambios(r: Revision): boolean {
     r.hayMenores !== null ||
     r.manuales.length > 0 ||
     Object.keys(r.escalas).length > 0 ||
+    Object.keys(r.posiciones).length > 0 ||
     r.intensidad !== LIMITES.intensidad.porDefecto
   );
 }

@@ -7,8 +7,15 @@ import {
   REVISION_INICIAL,
   aEdicion,
   aPuntoDeImagen,
+  ajustarSticker,
   ajustaSticker,
-  cambiarEscala,
+  enElTope,
+  geometriaSticker,
+  limitarPosicion,
+  posicionDe,
+  restablecerSticker,
+  semiejesZona,
+  stickerAjustado,
   escalaDe,
   escalaMinimaSticker,
   limitarEscala,
@@ -241,15 +248,15 @@ describe('tamaño del sticker sobre una cara', () => {
   });
 
   it('cambiar el tamaño se guarda, volver a 1 lo quita, y repetirlo no gasta un paso', () => {
-    const r = cambiarEscala(conEmoji(), 'a', 0.8);
+    const r = ajustarSticker(conEmoji(), conNucleo(), { escala: 0.8 });
     expect(escalaDe(r, 'a')).toBe(0.8);
     expect(hayCambios({ ...REVISION_INICIAL, escalas: r.escalas })).toBe(true);
-    expect(cambiarEscala(r, 'a', 0.8)).toBe(r);
-    expect(cambiarEscala(r, 'a', 1).escalas).toEqual({});
+    expect(ajustarSticker(r, conNucleo(), { escala: 0.8 })).toBe(r);
+    expect(ajustarSticker(r, conNucleo(), { escala: 1 }).escalas).toEqual({});
   });
 
   it('va al sidecar con la caja del detector solo si es un emoji', () => {
-    const r = cambiarEscala(conEmoji(), 'a', 0.8);
+    const r = ajustarSticker(conEmoji(), conNucleo(), { escala: 0.8 });
     const [o] = construirOcultamientos(r, [conNucleo()]);
     expect(o).toMatchObject({ forma: 'elipse', escala: 0.8, nucleo: { x: 115, y: 115, ancho: 100, alto: 100 } });
     expect(esquemaOcultamiento.safeParse(o).success).toBe(true);
@@ -270,12 +277,99 @@ describe('tamaño del sticker sobre una cara', () => {
   });
 
   it('la recuperación conserva el tamaño, y las guardadas antes no lo traen', () => {
-    const r = cambiarEscala(conEmoji(), 'a', 1.5);
+    const r = ajustarSticker(conEmoji(), conNucleo(), { escala: 1.5 });
     const e = esquemaEdicion.parse(JSON.parse(JSON.stringify(aEdicion('3f2b6c1e-8a4d-4b7e-9c2a-1d5e6f7a8b9c', r))));
     expect(desdeEdicion(e).escalas).toEqual({ a: 1.5 });
     const { escalas: _, ...vieja } = e;
     expect(esquemaEdicion.parse(vieja).escalas).toEqual({});
     expect(esquemaEdicion.safeParse({ ...e, escalas: { a: 3 } }).success).toBe(false);
+  });
+
+  it('moverlo se guarda mientras tape la cara; más lejos se queda en el tope (imán)', () => {
+    const h = conNucleo();
+    // Con escala 1 y mínimo 0.75, el centro puede alejarse hasta 0.25 semiejes.
+    const r = ajustarSticker(conEmoji(), h, { posicion: { x: 0.1, y: -0.1 } });
+    expect(posicionDe(r, 'a')).toEqual({ x: 0.1, y: -0.1 });
+    expect(enElTope(h, 1, posicionDe(r, 'a'))).toBe(false);
+    const lejos = ajustarSticker(conEmoji(), h, { posicion: { x: 1, y: 0 } });
+    expect(posicionDe(lejos, 'a')).toEqual({ x: 0.25, y: 0 });
+    expect(enElTope(h, 1, posicionDe(lejos, 'a'))).toBe(true);
+    expect(stickerAjustado(lejos, 'a')).toBe(true);
+    expect(hayCambios({ ...REVISION_INICIAL, posiciones: lejos.posiciones })).toBe(true);
+  });
+
+  it('en el tamaño mínimo no se mueve, y al encogerlo se acerca al centro', () => {
+    const h = conNucleo();
+    const minimo = ajustarSticker(conEmoji(), h, { escala: 0.1 });
+    expect(escalaDe(minimo, 'a')).toBe(0.75);
+    expect(ajustarSticker(minimo, h, { posicion: { x: 0.5, y: 0 } })).toBe(minimo);
+    const movido = ajustarSticker(conEmoji(), h, { posicion: { x: 0.25, y: 0 } });
+    expect(posicionDe(ajustarSticker(movido, h, { escala: 0.85 }), 'a')).toEqual({ x: 0.1, y: 0 });
+  });
+
+  it('restablecer quita tamaño y posición; sin ajustes no gasta un paso', () => {
+    const h = conNucleo();
+    const r = ajustarSticker(ajustarSticker(conEmoji(), h, { escala: 1.5 }), h, { posicion: { x: 0.2, y: 0.3 } });
+    const limpio = restablecerSticker(r, 'a');
+    expect(limpio.escalas).toEqual({});
+    expect(limpio.posiciones).toEqual({});
+    expect(stickerAjustado(limpio, 'a')).toBe(false);
+    expect(restablecerSticker(limpio, 'a')).toBe(limpio);
+  });
+
+  it.each([
+    [{ x: Number.NaN, y: 0 }, { x: 0, y: 0 }],
+    [{ x: Number.POSITIVE_INFINITY, y: 0 }, { x: 0, y: 0 }],
+    [{ x: 0, y: -9 }, { x: 0, y: -0.25 }],
+    [{ x: 0.123, y: 0 }, { x: 0.12, y: 0 }],
+  ])('limitarPosicion(%j) con escala 1 = %j', (entrada, esperado) => {
+    expect(limitarPosicion(conNucleo(), 1, entrada)).toEqual(esperado);
+  });
+
+  it('propiedad: la posición limitada nunca deja de tapar la cara', () => {
+    const h = conNucleo();
+    const minimo = escalaMinimaSticker(h);
+    fc.assert(fc.property(fc.double(), fc.double(), fc.double({ min: 0, max: 3, noNaN: true }), (x, y, escala) => {
+      const p = limitarPosicion(h, escala, { x, y });
+      return Math.hypot(p.x, p.y) <= Math.max(0, escala - minimo) + 1e-6 && Number.isFinite(p.x) && Number.isFinite(p.y);
+    }));
+  });
+
+  it('el marco: centro y lado aproximados en píxeles de la imagen', () => {
+    // Zona de 130 px: margen 13, semiejes 78, base 156.
+    const caja = { x: 100, y: 100, ancho: 130, alto: 130 };
+    const sonrisa = geometriaSticker(caja, 'emoji_sonrisa', 1, { x: 0, y: 0 });
+    expect(sonrisa.cx).toBe(165);
+    expect(sonrisa.cy).toBe(165);
+    expect(sonrisa.lado).toBeCloseTo(156 / 0.87, 6);
+    // La estrella llega al tope: el doble de la base.
+    expect(geometriaSticker(caja, 'emoji_estrella', 1, { x: 0, y: 0 }).lado).toBe(312);
+    expect(geometriaSticker(caja, 'emoji_sonrisa', 0.5, { x: 0.25, y: -0.5 })).toMatchObject({ cx: 165 + 19.5, cy: 165 - 39 });
+    expect(semiejesZona(caja)).toEqual({ x: 78, y: 78 });
+  });
+
+  it('va al sidecar con su desplazamiento, y otros efectos van centrados', () => {
+    const h = conNucleo();
+    const r = ajustarSticker(conEmoji(), h, { posicion: { x: 0.2, y: -0.1 } });
+    const [o] = construirOcultamientos(r, [h]);
+    expect(o).toMatchObject({ desplazamiento_x: 0.2, desplazamiento_y: -0.1 });
+    expect(esquemaOcultamiento.safeParse(o).success).toBe(true);
+    const [d] = construirOcultamientos(elegirEfecto(r, 'a', 'difuminado'), [h]);
+    expect(d).toMatchObject({ desplazamiento_x: 0, desplazamiento_y: 0 });
+    for (const malo of [2.01, -2.01, Number.NaN, '0', null, undefined]) {
+      expect(esquemaOcultamiento.safeParse({ ...o, desplazamiento_x: malo }).success).toBe(false);
+      expect(esquemaOcultamiento.safeParse({ ...o, desplazamiento_y: malo }).success).toBe(false);
+    }
+  });
+
+  it('la recuperación conserva la posición, y las guardadas antes no la traen', () => {
+    const r = ajustarSticker(conEmoji(), conNucleo(), { posicion: { x: -0.2, y: 0.1 } });
+    const e = esquemaEdicion.parse(JSON.parse(JSON.stringify(aEdicion('3f2b6c1e-8a4d-4b7e-9c2a-1d5e6f7a8b9c', r))));
+    expect(desdeEdicion(e).posiciones).toEqual({ a: { x: -0.2, y: 0.1 } });
+    const { posiciones: _, ...vieja } = e;
+    expect(esquemaEdicion.parse(vieja).posiciones).toEqual({});
+    expect(esquemaEdicion.safeParse({ ...e, posiciones: { a: { x: 3, y: 0 } } }).success).toBe(false);
+    expect(esquemaEdicion.safeParse({ ...e, posiciones: { a: { x: 0 } } }).success).toBe(false);
   });
 });
 

@@ -1,25 +1,31 @@
 import { Maximize, SquareSplitHorizontal, ZoomIn, ZoomOut } from 'lucide-react';
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
-import { LIMITES, type Hallazgo, type Ocultamiento, type Punto } from '../../shared/contrato';
+import { esEmoji, LIMITES, type Hallazgo, type Ocultamiento, type Punto } from '../../shared/contrato';
 import {
+  ajustaSticker,
   agregarPuntoTrazo,
   anchoAjustado,
   aPuntoDeImagen,
   cajaEntre,
   desplazamientoAnclado,
+  efectoDe,
+  escalaDe,
   ladoEtiqueta,
   limitarCorte,
   limitarZoom,
   opacidadRotulo,
   pasoZoom,
+  posicionDe,
   textoZoom,
   zonaEnPunto,
   type Caja,
+  type CambioSticker,
   type Herramienta,
   type Resaltado,
   type Revision,
 } from '../../shared/logica';
 import type { Archivo } from './App';
+import { MarcoSticker } from './Sticker';
 
 interface Props {
   archivo: Archivo;
@@ -37,6 +43,10 @@ interface Props {
   alResaltar?: (r: Resaltado | null) => void;
   /** Con "Solo ver", un clic en una marca lleva a su fila del panel. */
   alElegirZona?: (id: string) => void;
+  /** Sticker de una cara elegido para moverlo o cambiar su tamaño. El panel abre sus controles. */
+  seleccionSticker?: string | null;
+  alSeleccionarSticker?: (id: string | null) => void;
+  alAjustarSticker?: (h: Hallazgo, cambio: CambioSticker) => void;
 }
 
 const porcentajes = (c: Caja, ancho: number, alto: number): React.CSSProperties => ({
@@ -70,7 +80,7 @@ interface Arrastre {
 }
 
 /** La imagen la dibuja el sidecar con los mismos efectos que la exportación: lo que ves es lo que sale. */
-export function Visor({ archivo, hallazgos, ocultamientos, revision, herramienta, tamanoPincel, alClic, alDibujar, alPintar, alFuera, resaltado = null, alResaltar, alElegirZona }: Props): React.JSX.Element {
+export function Visor({ archivo, hallazgos, ocultamientos, revision, herramienta, tamanoPincel, alClic, alDibujar, alPintar, alFuera, resaltado = null, alResaltar, alElegirZona, seleccionSticker = null, alSeleccionarSticker, alAjustarSticker }: Props): React.JSX.Element {
   const { id, ancho, alto, nombre } = archivo.info;
   const clave = JSON.stringify(ocultamientos);
   const [url, setUrl] = useState<string | null>(null);
@@ -229,6 +239,11 @@ export function Visor({ archivo, hallazgos, ocultamientos, revision, herramienta
     ...(revision?.manuales ?? []).map((z) => ({ id: z.id, caja: { x: z.x, y: z.y, ancho: z.ancho, alto: z.alto } })),
   ];
 
+  // Stickers de caras que se pueden mover: solo con "Solo ver", para no competir con las herramientas.
+  const editables = !comparando && herramienta === 'ninguna' && revision !== null && alAjustarSticker !== undefined;
+  const stickers = editables ? conCaja.filter((h) => revision.decisiones[h.id] === 'ocultar' && ajustaSticker(revision, h)) : [];
+  const elegido = stickers.find((h) => h.id === seleccionSticker);
+
   // Con el teclado en el panel, la imagen ampliada se mueve para mostrar la zona.
   useEffect(() => {
     if (resaltado?.origen !== 'foco' || !ampliada) return;
@@ -253,6 +268,8 @@ export function Visor({ archivo, hallazgos, ocultamientos, revision, herramienta
   };
 
   const alBajar = (e: PointerEvent): void => {
+    // Un clic fuera del sticker elegido lo suelta; el sticker mismo no deja llegar su clic hasta aquí.
+    if (seleccionSticker !== null && e.button === 0) alSeleccionarSticker?.(null);
     // Botón central siempre, o "Solo ver" con el principal: mover la imagen.
     if (e.button === 1 || (!comparando && herramienta === 'ninguna' && e.button === 0)) {
       const v = ventana.current;
@@ -353,8 +370,31 @@ export function Visor({ archivo, hallazgos, ocultamientos, revision, herramienta
     setActual(null);
   };
 
+  /** Con un sticker elegido: flechas lo mueven (Mayús, más), [ y ] cambian su tamaño, Esc lo suelta. */
+  const teclaSticker = (e: KeyboardEvent): boolean => {
+    if (elegido === undefined || revision === null || alAjustarSticker === undefined) return false;
+    const { paso, pasoGrande } = LIMITES.posicionSticker;
+    const d = e.shiftKey ? pasoGrande : paso;
+    const p = posicionDe(revision, elegido.id);
+    const escala = escalaDe(revision, elegido.id);
+    switch (e.key) {
+      case 'ArrowUp': alAjustarSticker(elegido, { posicion: { x: p.x, y: p.y - d } }); return true;
+      case 'ArrowDown': alAjustarSticker(elegido, { posicion: { x: p.x, y: p.y + d } }); return true;
+      case 'ArrowLeft': alAjustarSticker(elegido, { posicion: { x: p.x - d, y: p.y } }); return true;
+      case 'ArrowRight': alAjustarSticker(elegido, { posicion: { x: p.x + d, y: p.y } }); return true;
+      case '[': alAjustarSticker(elegido, { escala: escala - LIMITES.escalaSticker.paso }); return true;
+      case ']': alAjustarSticker(elegido, { escala: escala + LIMITES.escalaSticker.paso }); return true;
+      case 'Escape': alSeleccionarSticker?.(null); return true;
+      default: return false;
+    }
+  };
+
   const alTecla = (e: KeyboardEvent): void => {
     if (e.ctrlKey || e.altKey || e.metaKey) return;
+    if (teclaSticker(e)) {
+      e.preventDefault();
+      return;
+    }
     if (e.key === '+' || e.key === '=') cambiarZoom(pasoZoom(zoom, 1));
     else if (e.key === '-') cambiarZoom(pasoZoom(zoom, -1));
     else if (e.key === '0') cambiarZoom(LIMITES.zoom.min);
@@ -379,7 +419,11 @@ export function Visor({ archivo, hallazgos, ocultamientos, revision, herramienta
         <span className="solo-lector" id="pista-zoom">
           {comparando
             ? 'Arrastra la línea o usa el control de abajo. Las herramientas están en pausa.'
-            : ampliada
+            : elegido !== undefined
+              ? 'Arrastra el sticker o usa las flechas. Las esquinas o [ y ] cambian su tamaño. Esc para terminar.'
+              : stickers.length > 0
+                ? 'Arrastra un sticker para moverlo. Ctrl + rueda o + y − para acercar.'
+                : ampliada
               ? herramienta === 'ninguna' ? 'Arrastra la imagen para moverte.' : 'Muévete con la rueda, las barras o el botón central del mouse.'
               : 'Ctrl + rueda o las teclas + y − para acercar.'}
         </span>
@@ -428,6 +472,24 @@ export function Visor({ archivo, hallazgos, ocultamientos, revision, herramienta
                 <span className={etiqueta(z)}>T{i + 1}</span>
               </div>
             ))}
+            {revision !== null && stickers.map((h) => {
+              const efecto = efectoDe(revision, h);
+              if (!esEmoji(efecto)) return null;
+              return (
+                <MarcoSticker
+                  key={`sticker-${h.id}`}
+                  hallazgo={h}
+                  emoji={efecto}
+                  revision={revision}
+                  ancho={ancho}
+                  alto={alto}
+                  lienzo={lienzo}
+                  seleccionado={h.id === seleccionSticker}
+                  alSeleccionar={(sid) => { alSeleccionarSticker?.(sid); }}
+                  alAjustar={(hz, cambio) => { alAjustarSticker?.(hz, cambio); }}
+                />
+              );
+            })}
             {dibujo !== null && <div aria-hidden="true" className="marca sin-decidir" style={porcentajes(dibujo, ancho, alto)} />}
             {trazo !== null && (
               <svg aria-hidden="true" className="trazo" viewBox={`0 0 ${ancho} ${alto}`} preserveAspectRatio="none">

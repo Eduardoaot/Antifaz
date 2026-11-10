@@ -14,6 +14,11 @@ export const LIMITES = {
    * ajusta a la cara que vio el detector; el sidecar nunca lo deja más chico que eso.
    */
   escalaSticker: { min: 0.25, max: 2, porDefecto: 1, paso: 0.05 },
+  /**
+   * Posición del sticker de una cara, en fracciones de los semiejes del óvalo de su zona (0 es centrado).
+   * Solo se mueve mientras siga tapando la cara del detector; el sidecar lo agranda si hiciera falta.
+   */
+  posicionSticker: { max: 2, paso: 0.05, pasoGrande: 0.25 },
   loteArchivos: 500,
   ocultamientos: 5000,
   jpegCalidad: { min: 60, max: 100, porDefecto: 92 },
@@ -50,6 +55,20 @@ export const esquemaEfecto = z.enum(['solido', 'difuminado', 'pixelado', ...EMOJ
 export type Efecto = z.infer<typeof esquemaEfecto>;
 
 export const esEmoji = (e: Efecto): e is Emoji => (EMOJIS as readonly string[]).includes(e);
+
+/**
+ * Diámetro del círculo totalmente opaco de cada emoji, en fracción de su lado. Solo sirve para dibujar
+ * el marco al moverlo; la imagen real la calcula el sidecar. sidecar/tests/test_efectos.py lo comprueba.
+ */
+export const FRACCION_OPACA_EMOJI: Readonly<Record<Emoji, number>> = {
+  emoji_sonrisa: 0.87,
+  emoji_lentes: 0.87,
+  emoji_gato: 0.59,
+  emoji_estrella: 0.48,
+};
+
+/** Hasta cuántas veces el lado de su zona crece el emoji. Coincide con EMOJI_ESCALA_MAX de efectos.py. */
+export const EMOJI_ESCALA_MAX = 2;
 
 export const ETIQUETA_EMOJI: Readonly<Record<Emoji, string>> = {
   emoji_sonrisa: '😀 Carita sonriente',
@@ -106,6 +125,9 @@ export const esquemaOcultamiento = z.strictObject({
   nucleo: esquemaCajaImagen.nullable(),
   /** Tamaño del emoji en veces el que la app elige sola. Los demás efectos lo ignoran. */
   escala: z.number().min(LIMITES.escalaSticker.min).max(LIMITES.escalaSticker.max),
+  /** Desplazamiento del emoji en fracciones de los semiejes de su zona. Solo con `nucleo`. */
+  desplazamiento_x: z.number().min(-LIMITES.posicionSticker.max).max(LIMITES.posicionSticker.max),
+  desplazamiento_y: z.number().min(-LIMITES.posicionSticker.max).max(LIMITES.posicionSticker.max),
 }).refine((o) => o.nucleo === null || nucleoDentro(o.nucleo, o), {
   message: 'La cara debe quedar dentro de su zona',
   path: ['nucleo'],
@@ -302,6 +324,8 @@ const esquemaManual = z.strictObject({
   origen: esquemaOrigen.optional(),
 });
 
+const coordenadaSticker = z.number().min(-LIMITES.posicionSticker.max).max(LIMITES.posicionSticker.max);
+
 export const esquemaEdicion = z.strictObject({
   archivoId: esquemaArchivoId,
   decisiones: z.record(z.string(), esquemaDecision),
@@ -311,6 +335,8 @@ export const esquemaEdicion = z.strictObject({
   manuales: z.array(esquemaManual).max(LIMITES.ocultamientos).default([]),
   // Opcional: las recuperaciones guardadas antes de poder cambiar el tamaño del sticker no lo traen.
   escalas: z.record(z.string(), z.number().min(LIMITES.escalaSticker.min).max(LIMITES.escalaSticker.max)).default({}),
+  // Opcional por la misma razón: las anteriores a poder mover el sticker no lo traen.
+  posiciones: z.record(z.string(), z.strictObject({ x: coordenadaSticker, y: coordenadaSticker })).default({}),
 });
 export type Edicion = z.infer<typeof esquemaEdicion>;
 

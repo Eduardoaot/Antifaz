@@ -1,16 +1,22 @@
-import { AlertCircle, AlertTriangle, Baby, Bath, Car, CircleHelp, CreditCard, Crosshair, Eye, EyeOff, Flag, Gem, IdCard, Info, MapPin, Monitor, Phone, Plane, QrCode, Shirt, Stethoscope, Users } from 'lucide-react';
+import { AlertCircle, AlertTriangle, ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Baby, Bath, Car, CircleHelp, CreditCard, Crosshair, Eye, EyeOff, Flag, Gem, IdCard, Info, MapPin, Monitor, Move, Phone, Plane, QrCode, Shirt, Stethoscope, Users } from 'lucide-react';
 import { useId, useState } from 'react';
 import { reglaDe, type Regla } from '../../shared/catalogo';
 import { esquemaEfecto, LIMITES, type Analisis, type Hallazgo } from '../../shared/contrato';
 import {
+  ajustarSticker,
   ajustaSticker,
-  cambiarEscala,
   decidir,
   describirHallazgo,
   efectoDe,
   elegirEfecto,
   escalaDe,
+  enElTope,
   escalaMinimaSticker,
+  posicionDe,
+  restablecerSticker,
+  stickerAjustado,
+  type CambioSticker,
+  type Posicion,
   etiquetaNivelMostrado,
   nivelMostrado,
   reglasNoRevisadas,
@@ -93,52 +99,95 @@ function textoTamano(valor: number, minimo: number): string {
   return 'Es el tamaño que elegimos: tapa la cara con un margen.';
 }
 
-interface PropsTamano {
+function textoPosicion(h: Hallazgo, escala: number, p: Posicion): string | null {
+  if (escala <= escalaMinimaSticker(h)) return 'Para moverlo, primero hazlo más grande.';
+  if (p.x === 0 && p.y === 0) return null;
+  return enElTope(h, escala, p) ? 'Hasta aquí: más lejos dejaría ver la cara.' : 'Lo moviste del centro.';
+}
+
+interface PropsAjuste {
   hallazgo: Hallazgo;
   numero: number | undefined;
   revision: Revision;
-  alCambiar: (cambio: (r: Revision) => Revision) => void;
+  abierto: boolean;
+  alAbrir: (abierto: boolean) => void;
+  alAjustar: (h: Hallazgo, cambio: CambioSticker) => void;
+  alRestablecer: (id: string) => void;
 }
 
-/** Tamaño del sticker de una cara. Se guarda al soltar: un paso de deshacer y una vista previa por ajuste. */
-function TamanoSticker({ hallazgo, numero, revision, alCambiar }: PropsTamano): React.JSX.Element {
+/**
+ * Un solo botón en la fila: abre el tamaño, la cruceta para moverlo y "Restablecer". Es la ruta con
+ * teclado de lo mismo que se hace arrastrando en la foto, y se abre también al elegir el sticker ahí.
+ */
+function AjusteSticker({ hallazgo, numero, revision, abierto, alAbrir, alAjustar, alRestablecer }: PropsAjuste): React.JSX.Element {
   const id = useId();
   const [moviendo, setMoviendo] = useState<number | null>(null);
   const guardada = escalaDe(revision, hallazgo.id);
+  const posicion = posicionDe(revision, hallazgo.id);
   const minimo = escalaMinimaSticker(hallazgo);
   const valor = Math.max(minimo, moviendo ?? guardada);
   const porcentaje = `${String(Math.round(valor * 100))} %`;
+  const ajustado = stickerAjustado(revision, hallazgo.id);
+  const zona = <span className="solo-lector"> de la zona {numero}</span>;
   const confirmar = (): void => {
     if (moviendo === null) return;
     setMoviendo(null);
-    alCambiar((r) => cambiarEscala(r, hallazgo.id, moviendo));
+    alAjustar(hallazgo, { escala: moviendo });
   };
+  const { paso } = LIMITES.posicionSticker;
+  const mover = (dx: number, dy: number): void => {
+    alAjustar(hallazgo, { posicion: { x: posicion.x + dx, y: posicion.y + dy } });
+  };
+  const enPosicion = textoPosicion(hallazgo, valor, posicion);
   return (
-    <div className="tamano-sticker">
-      <label htmlFor={`${id}-control`}>
-        Tamaño del sticker<span className="solo-lector"> de la zona {numero}</span>
-      </label>
-      <input
-        id={`${id}-control`}
-        type="range"
-        min={minimo}
-        max={LIMITES.escalaSticker.max}
-        step={LIMITES.escalaSticker.paso}
-        value={valor}
-        aria-valuetext={porcentaje}
-        aria-describedby={`${id}-ayuda`}
-        onChange={(e) => { setMoviendo(Number(e.target.value)); }}
-        onPointerUp={confirmar}
-        onKeyUp={confirmar}
-        onBlur={confirmar}
-      />
-      <output htmlFor={`${id}-control`}>{porcentaje}</output>
-      {guardada !== LIMITES.escalaSticker.porDefecto && moviendo === null && (
-        <button type="button" className="enlace" onClick={() => { alCambiar((r) => cambiarEscala(r, hallazgo.id, LIMITES.escalaSticker.porDefecto)); }}>
-          Volver al tamaño original<span className="solo-lector"> de la zona {numero}</span>
-        </button>
+    <div className="ajuste-sticker">
+      <button type="button" className="boton" aria-expanded={abierto} aria-controls={`${id}-panel`} onClick={() => { alAbrir(!abierto); }}>
+        <Move aria-hidden="true" /> Ajustar sticker{zona}
+        {ajustado && <span className="marca-ajustado"> · ajustado</span>}
+      </button>
+      {abierto && (
+        <div id={`${id}-panel`} className="tamano-sticker" role="group" aria-label={`Ajustes del sticker de la zona ${String(numero)}`}>
+          <label htmlFor={`${id}-control`}>Tamaño{zona}</label>
+          <input
+            id={`${id}-control`}
+            type="range"
+            min={minimo}
+            max={LIMITES.escalaSticker.max}
+            step={LIMITES.escalaSticker.paso}
+            value={valor}
+            aria-valuetext={porcentaje}
+            aria-describedby={`${id}-ayuda`}
+            onChange={(e) => { setMoviendo(Number(e.target.value)); }}
+            onPointerUp={confirmar}
+            onKeyUp={confirmar}
+            onBlur={confirmar}
+          />
+          <output htmlFor={`${id}-control`}>{porcentaje}</output>
+          <div className="cruceta" role="group" aria-label="Mover el sticker">
+            <button type="button" className="boton chico arriba" aria-label="Mover arriba" title="Mover arriba (↑)" onClick={() => { mover(0, -paso); }}>
+              <ArrowUp aria-hidden="true" />
+            </button>
+            <button type="button" className="boton chico izquierda" aria-label="Mover a la izquierda" title="Mover a la izquierda (←)" onClick={() => { mover(-paso, 0); }}>
+              <ArrowLeft aria-hidden="true" />
+            </button>
+            <button type="button" className="boton chico derecha" aria-label="Mover a la derecha" title="Mover a la derecha (→)" onClick={() => { mover(paso, 0); }}>
+              <ArrowRight aria-hidden="true" />
+            </button>
+            <button type="button" className="boton chico abajo" aria-label="Mover abajo" title="Mover abajo (↓)" onClick={() => { mover(0, paso); }}>
+              <ArrowDown aria-hidden="true" />
+            </button>
+          </div>
+          <p id={`${id}-ayuda`} className="suave" aria-live="polite">
+            {textoTamano(valor, minimo)}
+            {enPosicion !== null && <> {enPosicion}</>}
+          </p>
+          {ajustado && moviendo === null && (
+            <button type="button" className="enlace" onClick={() => { alRestablecer(hallazgo.id); }}>
+              Restablecer{zona}
+            </button>
+          )}
+        </div>
       )}
-      <p id={`${id}-ayuda`} className="suave">{textoTamano(valor, minimo)}</p>
     </div>
   );
 }
@@ -168,9 +217,12 @@ interface Props {
   /** Zona resaltada a la vez aquí y en la imagen. */
   resaltado?: Resaltado | null;
   alResaltar?: (r: Resaltado | null) => void;
+  /** Sticker elegido, el mismo en la foto y aquí: su fila abre los ajustes. */
+  seleccionSticker?: string | null;
+  alSeleccionarSticker?: (id: string | null) => void;
 }
 
-export function Advertencias({ hallazgos, revision, alCambiar, alOcultarTodo, alOcultarAlto, resaltado = null, alResaltar }: Props): React.JSX.Element | null {
+export function Advertencias({ hallazgos, revision, alCambiar, alOcultarTodo, alOcultarAlto, resaltado = null, alResaltar, seleccionSticker = null, alSeleccionarSticker }: Props): React.JSX.Element | null {
   const [porQue, setPorQue] = useState<Regla | null>(null);
   const [intensidadTexto, setIntensidadTexto] = useState<string | null>(null);
   if (hallazgos.length === 0) return null;
@@ -247,7 +299,15 @@ export function Advertencias({ hallazgos, revision, alCambiar, alOcultarTodo, al
                     </select>
                   </label>
                   {decision === 'ocultar' && ajustaSticker(revision, h) && (
-                    <TamanoSticker hallazgo={h} numero={numero} revision={revision} alCambiar={alCambiar} />
+                    <AjusteSticker
+                      hallazgo={h}
+                      numero={numero}
+                      revision={revision}
+                      abierto={seleccionSticker === h.id}
+                      alAbrir={(abrir) => { alSeleccionarSticker?.(abrir ? h.id : null); }}
+                      alAjustar={(hz, cambio) => { alCambiar((r) => ajustarSticker(r, hz, cambio)); }}
+                      alRestablecer={(sid) => { alCambiar((r) => restablecerSticker(r, sid)); }}
+                    />
                   )}
                 </div>
               )}

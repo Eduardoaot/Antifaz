@@ -27,6 +27,7 @@ import { esquemaAvisoCierre, esquemaTema, ERROR_INTERNO, LIMITES, textoCierre, T
 import {
   aEdicion,
   agregarManual,
+  ajustarSticker,
   aplicarCambio,
   aplicarDecisionesIniciales,
   construirOcultamientos,
@@ -116,6 +117,10 @@ export function App(): React.JSX.Element {
   const seleccion = elegido ?? archivos[0]?.info.id ?? null;
   const resaltado = resaltadoDe.archivoId === seleccion ? resaltadoDe.resaltado : null;
   const setResaltado = useCallback((r: Resaltado | null): void => { setResaltadoDe({ archivoId: seleccion, resaltado: r }); }, [seleccion]);
+  // Sticker de una cara elegido para ajustarlo, el mismo en la foto y en el panel. Con su foto, como el resaltado.
+  const [stickerDe, setStickerDe] = useState<{ archivoId: string | null; id: string | null }>({ archivoId: null, id: null });
+  const sticker = stickerDe.archivoId === seleccion ? stickerDe.id : null;
+  const setSticker = useCallback((id: string | null): void => { setStickerDe({ archivoId: seleccion, id }); }, [seleccion]);
 
   const actual = useMemo(() => archivos.find((a) => a.info.id === seleccion) ?? null, [archivos, seleccion]);
   const analisis = actual?.estado.tipo === 'listo' ? actual.estado.analisis : null;
@@ -641,6 +646,9 @@ export function App(): React.JSX.Element {
                 resaltado={resaltado}
                 alResaltar={setResaltado}
                 alElegirZona={irAFila}
+                seleccionSticker={sticker}
+                alSeleccionarSticker={setSticker}
+                alAjustarSticker={(h, cambio) => { cambiarRevision(actual.info.id, (r) => ajustarSticker(r, h, cambio)); }}
               />
             </>
           )}
@@ -693,6 +701,8 @@ export function App(): React.JSX.Element {
                 alOcultarAlto={() => { cambiarRevision(actual.info.id, (r) => ocultarRiesgoAlto(r, hallazgos)); setAnuncio('Marcamos para ocultar lo de riesgo alto.'); }}
                 resaltado={resaltado}
                 alResaltar={setResaltado}
+                seleccionSticker={sticker}
+                alSeleccionarSticker={setSticker}
               />
               <Manual
                 key={`manual-${actual.info.id}`}

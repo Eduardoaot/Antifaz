@@ -599,3 +599,88 @@ def test_cara_del_detector_fuera_de_su_zona_se_rechaza(nucleo: dict[str, int]) -
     with pytest.raises(ValidationError):
         _cara(nucleo=nucleo)
 
+
+
+# --- Posición del sticker sobre una cara ------------------------------------------------------------
+
+
+@pytest.mark.parametrize("efecto", ["emoji_sonrisa", "emoji_gato", "emoji_estrella"])
+@pytest.mark.parametrize(("dx", "dy"), [(0.25, 0.0), (-2.0, 0.0), (0.0, 2.0), (2.0, -2.0)])
+@pytest.mark.parametrize("escala", [0.8, 1.0, 2.0])
+def test_sticker_movido_nunca_destapa_la_cara_del_detector(efecto: str, dx: float, dy: float, escala: float) -> None:
+    """Aunque lo pidan lejísimos, la cara del detector no depende de lo que había debajo."""
+    a = _imagen()
+    o = _cara(efecto, escala, desplazamiento_x=dx, desplazamiento_y=dy)
+    salida_a, _ = efectos.aplicar(a, [o])
+    salida_b, _ = efectos.aplicar(255 - a, [o])
+    ovalo, (x0, y0, x1, y1) = _ovalo_nucleo(o)
+    assert np.array_equal(salida_a[y0:y1, x0:x1][ovalo], salida_b[y0:y1, x0:x1][ovalo])
+
+
+def test_mover_el_sticker_lo_lleva_hacia_ese_lado() -> None:
+    a = _imagen()
+    centrado, regiones_c = efectos.aplicar(a, [_cara(escala=1.2)])
+    derecha, regiones_d = efectos.aplicar(a, [_cara(escala=1.2, desplazamiento_x=0.25)])
+    assert not np.array_equal(centrado, derecha)
+    assert regiones_d[0][2] > regiones_c[0][2], "el emoji no llegó más a la derecha"
+    arriba, regiones_a = efectos.aplicar(a, [_cara(escala=1.2, desplazamiento_y=-0.25)])
+    assert regiones_a[0][1] < regiones_c[0][1], "el emoji no subió"
+    assert not np.array_equal(centrado, arriba)
+
+
+@pytest.mark.parametrize("efecto", [*EFECTOS, "emoji_sonrisa"])
+def test_sin_cara_del_detector_el_desplazamiento_no_cuenta(efecto: str) -> None:
+    """Sin núcleo no hay contra qué comprobar que siga tapando: el emoji se queda centrado."""
+    a = _imagen()
+    normal, _ = efectos.aplicar(a, [_cara(efecto, nucleo=None)])
+    movido, _ = efectos.aplicar(a, [_cara(efecto, nucleo=None, desplazamiento_x=0.5, desplazamiento_y=-0.5)])
+    assert np.array_equal(normal, movido)
+
+
+@given(
+    dx=st.floats(-2.0, 2.0),
+    dy=st.floats(-2.0, 2.0),
+    escala=st.floats(0.25, 2.0),
+    efecto=st.sampled_from(EMOJIS),
+)
+def test_propiedad_sticker_movido_tapa_la_cara_del_detector(dx: float, dy: float, escala: float, efecto: str) -> None:
+    a = _imagen()
+    o = _cara(efecto, escala, desplazamiento_x=dx, desplazamiento_y=dy)
+    salida_a, _ = efectos.aplicar(a, [o])
+    salida_b, _ = efectos.aplicar(255 - a, [o])
+    ovalo = efectos._ovalo_nucleo(o, efectos.region_dilatada(o, 200, 300), {}, 200, 300)  # pyright: ignore[reportPrivateUsage]
+    x0, y0, x1, y1 = efectos.region_dilatada(o, 200, 300)
+    if ovalo is None:
+        # Centrado y sin encoger: tapa el óvalo de la zona completa, como siempre.
+        ovalo = efectos._elipse(o, (x0, y0, x1, y1))  # pyright: ignore[reportPrivateUsage]
+    assert np.array_equal(salida_a[y0:y1, x0:x1][ovalo], salida_b[y0:y1, x0:x1][ovalo])
+
+
+@pytest.mark.parametrize("valor", [2.01, -2.01, float("nan"), float("inf")])
+@pytest.mark.parametrize("campo", ["desplazamiento_x", "desplazamiento_y"])
+def test_desplazamiento_fuera_de_rango_se_rechaza(campo: str, valor: float) -> None:
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError):
+        _cara(**{campo: valor})
+
+
+def test_la_interfaz_conoce_la_parte_opaca_de_cada_emoji() -> None:
+    """El marco de la UI usa estas fracciones (FRACCION_OPACA_EMOJI en contrato.ts): deben coincidir."""
+    import re
+    from pathlib import Path
+
+    from revisor import emojis
+
+    contrato = (Path(__file__).resolve().parents[2] / "app" / "shared" / "contrato.ts").read_text(encoding="utf-8")
+    bloque = contrato.split("FRACCION_OPACA_EMOJI", 1)[1].split("};", 1)[0]
+    en_ui = {nombre: float(valor) for nombre, valor in re.findall(r"(emoji_\w+): ([0-9.]+)", bloque)}
+    assert set(en_ui) == set(EMOJIS)
+    for emoji in EMOJIS:
+        opaco = emojis.opaco(emoji)  # type: ignore[arg-type]
+        n = opaco.shape[0]
+        yy, xx = np.mgrid[0:n, 0:n]
+        radio = float(np.hypot(yy - (n - 1) / 2, xx - (n - 1) / 2)[~opaco].min())
+        assert abs(en_ui[emoji] - 2 * radio / n) < 0.01, emoji
+    tope = re.search(r"export const EMOJI_ESCALA_MAX = ([0-9.]+);", contrato)
+    assert tope is not None and float(tope.group(1)) == efectos.EMOJI_ESCALA_MAX

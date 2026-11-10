@@ -3,7 +3,7 @@ import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFile
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import AxeBuilder from '@axe-core/playwright';
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import marca from '../../brand/brand.json';
 import { abrir, cerrar, crearMuestras, entorno, lanzar, llaveGuardada, matarArbol, PYTHON, RAIZ, simularGuardar, type Sesion } from './ayuda';
 
@@ -113,54 +113,129 @@ test('flujo completo: cara, ¿Por qué?, ocultar y exportar sin metadatos', asyn
   }
 });
 
+const cuentaCaras = (ruta: string): string => execFileSync(
+  PYTHON,
+  ['-c', 'import sys;from pathlib import Path;from revisor import cargador;from revisor.caras import DetectorCaras;i=cargador.abrir(sys.argv[1]);print(len(DetectorCaras(Path("modelos")).detectar(i.pixeles,0.25)))', ruta],
+  { cwd: join(RAIZ, 'sidecar') },
+).toString().trim();
+
+async function caraConSticker(tema: 'claro' | 'oscuro'): Promise<Locator> {
+  sesion = await lanzar();
+  const { pagina } = sesion;
+  await pagina.getByLabel('Tema').selectOption(tema);
+  await abrir(sesion, [m('cara con ñ.jpg')]);
+  await expect(veredicto(pagina)).toBeVisible({ timeout: 60_000 });
+  const cara = pagina.locator('[data-regla="CAR-01"]');
+  await pagina.getByRole('button', { name: 'Sí, ocultar las caras' }).click();
+  await cara.getByLabel(/^Efecto/).selectOption('emoji_sonrisa');
+  return cara;
+}
+
 for (const tema of ['claro', 'oscuro'] as const) {
-  test(`sticker en una cara: cambia de tamaño sin destaparla, tema ${tema}`, async () => {
-    sesion = await lanzar();
+  test(`sticker en una cara: el panel cambia tamaño y posición sin destaparla, tema ${tema}`, async () => {
+    const cara = await caraConSticker(tema);
     const { pagina, app } = sesion;
-    await pagina.getByLabel('Tema').selectOption(tema);
-    await abrir(sesion, [m('cara con ñ.jpg')]);
-    await expect(veredicto(pagina)).toBeVisible({ timeout: 60_000 });
-    const cara = pagina.locator('[data-regla="CAR-01"]');
-    await pagina.getByRole('button', { name: 'Sí, ocultar las caras' }).click();
-    await cara.getByLabel(/^Efecto/).selectOption('emoji_sonrisa');
 
-    const tamano = cara.getByRole('slider', { name: /^Tamaño del sticker/ });
+    // Un solo botón en la fila: los ajustes se abren al pedirlos.
+    const ajustar = cara.getByRole('button', { name: /^Ajustar sticker/ });
+    await expect(ajustar).toHaveAttribute('aria-expanded', 'false');
+    await expect(cara.getByRole('slider')).toHaveCount(0);
+    await ajustar.click();
+    await expect(ajustar).toHaveAttribute('aria-expanded', 'true');
+    const tamano = cara.getByRole('slider', { name: /^Tamaño/ });
     await expect(tamano).toHaveValue('1');
-    await expect(cara.locator('.tamano-sticker output')).toHaveText('100 %');
 
-    // Con teclado: Inicio lleva al mínimo y se guarda al soltar la tecla.
+    // Inicio lleva al mínimo; ahí no se puede mover.
     await tamano.focus();
     await pagina.keyboard.press('Home');
     await expect(cara).toContainText('Es lo más chico: tapa justo la cara.');
-    await expect(cara.getByRole('button', { name: /^Volver al tamaño original/ })).toBeVisible();
-    await pagina.waitForTimeout(800);
-    await sinViolaciones(pagina);
-    await pagina.screenshot({ path: join(CAPTURAS, `sticker-chico-${tema}.png`) });
+    await expect(cara).toContainText('Para moverlo, primero hazlo más grande.');
 
+    // Más grande, y la cruceta lo mueve hasta el tope (el imán).
     await pagina.keyboard.press('End');
     await expect(cara.locator('.tamano-sticker output')).toHaveText('200 %');
+    const derecha = cara.getByRole('button', { name: 'Mover a la derecha' });
+    await derecha.click();
+    await expect(cara).toContainText('Lo moviste del centro.');
+    for (let i = 0; i < 40; i += 1) await derecha.click();
+    await expect(cara).toContainText('Hasta aquí: más lejos dejaría ver la cara.');
+    await expect(ajustar).toContainText('ajustado');
     await pagina.waitForTimeout(800);
-    await pagina.screenshot({ path: join(CAPTURAS, `sticker-grande-${tema}.png`) });
+    await sinViolaciones(pagina);
+    await pagina.screenshot({ path: join(CAPTURAS, `sticker-panel-${tema}.png`) });
 
-    // Deshacer regresa al mínimo: cada ajuste es un solo paso.
+    // Deshacer regresa un paso de la cruceta.
     await pagina.locator('body').click({ position: { x: 5, y: 5 } });
     await pagina.keyboard.press('Control+z');
-    await expect(tamano).not.toHaveValue('2');
+    await expect(cara).toContainText('Lo moviste del centro.');
 
+    // En el tope, más chico lo acerca al centro: exportado, la cara no se detecta.
     await tamano.focus();
     await pagina.keyboard.press('Home');
     const salida = join(mkdtempSync(join(tmpdir(), 'revisor-salida-')), 'sticker.jpg');
     await simularGuardar(app, salida);
     await pagina.getByRole('button', { name: 'Exportar copia' }).click();
     await expect(pagina.getByTestId('anuncio')).toContainText('con 1 zona oculta');
-    const caras = execFileSync(
-      PYTHON,
-      ['-c', 'import sys;from pathlib import Path;from revisor import cargador;from revisor.caras import DetectorCaras;i=cargador.abrir(sys.argv[1]);print(len(DetectorCaras(Path("modelos")).detectar(i.pixeles,0.25)))', salida],
-      { cwd: join(RAIZ, 'sidecar') },
-    ).toString().trim();
-    expect(caras, 'con el sticker al mínimo, la cara exportada aún se detecta').toBe('0');
+    expect(cuentaCaras(salida), 'con el sticker ajustado, la cara exportada aún se detecta').toBe('0');
+
+    await cara.getByRole('button', { name: /^Restablecer/ }).click();
+    await expect(ajustar).not.toContainText('ajustado');
   });
 }
+
+test('sticker en una cara: se arrastra y se agranda en la foto, y el teclado lo mueve', async () => {
+  const cara = await caraConSticker('claro');
+  const { pagina, app } = sesion;
+  await pagina.waitForTimeout(800);
+  const marco = pagina.locator('[data-sticker]');
+  await expect(marco).toHaveCount(1);
+  const caja0 = await marco.boundingBox();
+  if (caja0 === null) throw new Error('sin marco');
+
+  // Arrastrar desde el centro: lo elige, abre sus ajustes en el panel y lo mueve.
+  const cx = caja0.x + caja0.width / 2;
+  const cy = caja0.y + caja0.height / 2;
+  await pagina.mouse.move(cx, cy);
+  await pagina.mouse.down();
+  await pagina.mouse.move(cx + 6, cy, { steps: 3 });
+  await expect(pagina.locator('.ovalo-cara'), 'mientras arrastras se ve la cara que no puede destaparse').toBeVisible();
+  await pagina.mouse.move(cx + 400, cy - 400, { steps: 8 });
+  await pagina.mouse.up();
+  await expect(cara.getByRole('button', { name: /^Ajustar sticker/ })).toHaveAttribute('aria-expanded', 'true');
+  await expect(marco).toHaveClass(/seleccionado/);
+  // A tamaño normal casi no se aleja: el imán lo deja en el tope.
+  await expect(cara).toContainText('Hasta aquí: más lejos dejaría ver la cara.');
+
+  // La esquina lo agranda.
+  const caja1 = await marco.boundingBox();
+  const esquina = await pagina.locator('[data-manija="se"]').boundingBox();
+  if (caja1 === null || esquina === null) throw new Error('sin esquina');
+  await pagina.mouse.move(esquina.x + esquina.width / 2, esquina.y + esquina.height / 2);
+  await pagina.mouse.down();
+  await pagina.mouse.move(esquina.x + 80, esquina.y + 80, { steps: 6 });
+  await pagina.mouse.up();
+  const caja2 = await marco.boundingBox();
+  expect(caja2?.width ?? 0).toBeGreaterThan(caja1.width);
+  await expect(cara.locator('.tamano-sticker output')).not.toHaveText('100 %');
+
+  // Con teclado en la imagen: flechas, [ y ], y Esc lo suelta.
+  await pagina.getByRole('group', { name: 'Imagen' }).focus();
+  const antes = await marco.boundingBox();
+  await pagina.keyboard.press('ArrowLeft');
+  await expect.poll(async () => (await marco.boundingBox())?.x ?? 0).toBeLessThan(antes?.x ?? 0);
+  await pagina.keyboard.press('[');
+  await pagina.keyboard.press('Escape');
+  await expect(marco).not.toHaveClass(/seleccionado/);
+  await expect(cara.getByRole('button', { name: /^Ajustar sticker/ })).toHaveAttribute('aria-expanded', 'false');
+  await pagina.waitForTimeout(800);
+  await pagina.screenshot({ path: join(CAPTURAS, 'sticker-arrastrado.png') });
+
+  const salida = join(mkdtempSync(join(tmpdir(), 'revisor-salida-')), 'arrastrado.jpg');
+  await simularGuardar(app, salida);
+  await pagina.getByRole('button', { name: 'Exportar copia' }).click();
+  await expect(pagina.getByTestId('anuncio')).toContainText('con 1 zona oculta');
+  expect(cuentaCaras(salida), 'con el sticker movido, la cara exportada aún se detecta').toBe('0');
+});
 
 test('foto sin nada: lo dice sin prometer de más', async () => {
   sesion = await lanzar();

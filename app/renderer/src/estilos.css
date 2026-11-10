@@ -383,11 +383,43 @@ summary { cursor: pointer; min-height: 1.75rem; font-weight: 500; }
 .controles label { display: flex; align-items: center; gap: 0.5rem; flex-basis: 100%; }
 .controles label select { flex: 1; min-width: 0; }
 /* Tamaño del sticker: etiqueta arriba, control con su porcentaje y la ayuda abajo. */
+.ajuste-sticker { flex-basis: 100%; display: grid; gap: 0.5rem; }
+.ajuste-sticker > .boton { justify-self: start; }
+.marca-ajustado { color: var(--texto-suave); font-weight: 400; }
+/* Ajustes del sticker: un subpanel con su sangría, para que se lea como parte de la fila. */
+.tamano-sticker { border-left: 2px solid var(--borde-control); padding-left: 0.75rem; }
 .tamano-sticker { flex-basis: 100%; display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 0.25rem 0.75rem; }
 .tamano-sticker label, .tamano-sticker p, .tamano-sticker .enlace { grid-column: 1 / -1; }
 .tamano-sticker input { width: 100%; min-width: 0; }
 .tamano-sticker output { font-variant-numeric: tabular-nums; min-width: 3.5rem; text-align: end; }
 .tamano-sticker p { margin: 0; font-size: 0.9375rem; }
+.cruceta {
+  grid-column: 1 / -1; justify-self: start; display: grid; gap: 0.25rem;
+  grid-template-columns: repeat(3, 2.25rem); grid-template-areas: '. ar .' 'iz . de' '. ab .';
+}
+.cruceta .arriba { grid-area: ar; }
+.cruceta .izquierda { grid-area: iz; }
+.cruceta .derecha { grid-area: de; }
+.cruceta .abajo { grid-area: ab; }
+
+/* Sticker sobre la foto: se arrastra para moverlo; elegido, sus esquinas cambian el tamaño. */
+.sticker { position: absolute; pointer-events: auto; cursor: move; touch-action: none; border-radius: 6px; }
+.sticker:hover { outline: 2px dashed #fff; box-shadow: 0 0 0 2px #000; }
+.sticker.seleccionado { z-index: 2; border: 2px solid #fff; outline: 2px solid var(--marca); box-shadow: 0 0 0 4px rgb(0 0 0 / 0.35); }
+.sticker.moviendo { cursor: grabbing; }
+.sticker .fantasma { display: block; width: 100%; height: 100%; opacity: 0.85; pointer-events: none; }
+.sticker .manija {
+  position: absolute; width: 14px; height: 14px; border-radius: 50%;
+  background: #fff; border: 2px solid var(--marca); box-shadow: 0 0 0 1px #000;
+}
+/* El área para tomarla es más grande que el punto que se ve: 26 px. */
+.sticker .manija::before { content: ''; position: absolute; inset: -8px; }
+.sticker .manija.no { left: 0; top: 0; transform: translate(-50%, -50%); cursor: nwse-resize; }
+.sticker .manija.ne { left: 100%; top: 0; transform: translate(-50%, -50%); cursor: nesw-resize; }
+.sticker .manija.so { left: 0; top: 100%; transform: translate(-50%, -50%); cursor: nesw-resize; }
+.sticker .manija.se { left: 100%; top: 100%; transform: translate(-50%, -50%); cursor: nwse-resize; }
+/* Mientras se arrastra: la cara que nunca puede quedar al descubierto. */
+.ovalo-cara { position: absolute; z-index: 1; border: 2px dashed #fff; outline: 1px dashed #000; border-radius: 50%; pointer-events: none; }
 .advertencias { display: grid; gap: 0.75rem; }
 .advertencia {
   display: grid; gap: 0.625rem; padding: 0.875rem 1rem;
@@ -540,6 +572,10 @@ summary { cursor: pointer; min-height: 1.75rem; font-weight: 500; }
   .rotulo { background: Canvas; color: CanvasText; border: 1px solid CanvasText; }
   .marca span { background: Canvas; color: CanvasText; border: 1px solid CanvasText; }
   .trazo polyline { stroke: Highlight; }
+  .sticker:hover, .sticker.seleccionado { outline-color: Highlight; border-color: CanvasText; box-shadow: none; }
+  .sticker .manija { background: Canvas; border-color: Highlight; box-shadow: none; }
+  .ovalo-cara { border-color: Highlight; outline-color: CanvasText; }
+  .tamano-sticker { border-left-color: CanvasText; }
 }
 
 @media (prefers-reduced-motion: reduce) {
