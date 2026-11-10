@@ -27,8 +27,67 @@ def _salida(*filas: list[float]) -> np.ndarray:
 
 
 def test_decodifica_y_escala_al_tamano_real() -> None:
+    # 64 px de zona más 15% por lado: 10 px.
     zonas = decodificar_zonas(_salida(_fila("FEMALE_BREAST_EXPOSED", 0.9, 160, 160, 32, 32)), 640, 480, 0.25)
-    assert zonas == [Zona("DES-01", 288, 288, 64, 64, pytest.approx(0.9))]  # type: ignore[arg-type]
+    assert zonas == [Zona("DES-01", 278, 278, 84, 84, pytest.approx(0.9))]  # type: ignore[arg-type]
+
+
+# --- Pecho en una sola zona y margen (qa/RANGOS.md, contenido.pareja_pecho y contenido.margen_zona) ---
+
+
+def _z(x: int, y: int, ancho: int = 40, alto: int = 40, regla: str = "SUG-01", confianza: float = 0.8) -> Zona:
+    return Zona(regla, x, y, ancho, alto, confianza)
+
+
+def test_los_dos_lados_del_pecho_quedan_en_una_zona() -> None:
+    filas = _salida(_fila("FEMALE_BREAST_COVERED", 0.8, 100, 100, 20, 20), _fila("FEMALE_BREAST_COVERED", 0.7, 122, 100, 20, 20))
+    (zona,) = decodificar_zonas(filas, 320, 320, 0.25)
+    # Unión de x 90-132 e y 90-110, más 15% por lado (6 y 3 px).
+    assert (zona.regla_id, zona.x, zona.y, zona.ancho, zona.alto) == ("SUG-01", 84, 87, 54, 26)
+    assert zona.confianza == pytest.approx(0.8)
+
+
+def test_si_un_lado_esta_descubierto_la_zona_es_desnudez() -> None:
+    filas = _salida(_fila("FEMALE_BREAST_COVERED", 0.8, 100, 100, 20, 20), _fila("FEMALE_BREAST_EXPOSED", 0.6, 122, 100, 20, 20))
+    (zona,) = decodificar_zonas(filas, 320, 320, 0.25)
+    assert zona.regla_id == "DES-01"
+
+
+def test_otras_partes_no_se_unen_al_pecho() -> None:
+    filas = _salida(_fila("FEMALE_BREAST_COVERED", 0.8, 100, 100, 20, 20), _fila("BUTTOCKS_COVERED", 0.8, 122, 100, 20, 20))
+    assert len(decodificar_zonas(filas, 320, 320, 0.25)) == 2
+
+
+@pytest.mark.parametrize(
+    ("b", "pareja"),
+    [
+        (_z(64, 0), True),  # separación 24 = 0.6 × 40: el límite se une
+        (_z(65, 0), False),  # 25 px: ya son dos personas
+        (_z(30, 0), True),  # se enciman
+        (_z(50, 20), True),  # solape vertical 20 = 0.5 × 40: el límite se une
+        (_z(50, 21), False),  # 19 px de solape: a distinta altura
+        (_z(50, 0, 80, 80), True),  # el doble de grande: todavía pareja
+        (_z(50, 0, 81, 40), False),  # más del doble de ancho
+        (_z(50, 0, 40, 81), False),  # más del doble de alto
+    ],
+)
+def test_limites_de_pareja(b: Zona, pareja: bool) -> None:
+    assert (len(contenido.unir_pechos([_z(0, 0), b])) == 1) is pareja
+
+
+def test_cada_lado_se_une_con_el_mas_cercano() -> None:
+    # Dos personas juntas: a-b y c-d. b y c también cumplen, pero están más lejos que sus parejas.
+    a, b, c, d = _z(0, 0), _z(45, 0), _z(105, 0), _z(150, 0)
+    assert sorted((z.x, z.ancho) for z in contenido.unir_pechos([c, a, d, b])) == [(0, 85), (105, 85)]
+
+
+def test_un_lado_sin_pareja_se_conserva() -> None:
+    assert contenido.unir_pechos([_z(0, 0)]) == [_z(0, 0)]
+    assert contenido.unir_pechos([]) == []
+
+
+def test_el_margen_no_se_sale_de_la_imagen() -> None:
+    assert contenido.con_margen(_z(2, 3, 100, 100), 104, 300) == _z(0, 0, 104, 118)
 
 
 def test_cubierto_es_sugerente_y_descubierto_es_desnudez() -> None:

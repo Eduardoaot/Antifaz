@@ -85,6 +85,8 @@ Cada parámetro de este archivo tiene pruebas parametrizadas de mínimo-1, míni
 | `contenido.umbral_bano` | decimal | n/a | n/a | 0.6 (propuesta sin medir) | Constante interna. Comparación aparte de las frases de riesgo para no quitarle puntaje a la desnudez. Solo avisa, con riesgo bajo |
 | `nivel.mostrado` | regla, no número | n/a | n/a | Nivel del catálogo | La pregunta de menores es neutral hasta responderla; con un "sí", ella, las caras y el baño suben a alto. Con poca confianza, medio baja a bajo. Alto nunca baja |
 | `contenido.umbral_zonas` | decimal | n/a | n/a | 0.25 (propuesta, favorece recall) | Constante interna. Por debajo de `umbral_revision` se marca con duda |
+| `contenido.pareja_pecho` | regla con tres decimales | n/a | n/a | Solape vertical ≥ 0.5 del más bajo; separación ≤ 0.6 del más ancho; tamaño ≤ 2 veces el otro (propuesta, revisada en 14 fotos) | Constante interna. Los dos lados del pecho se unen en una zona; si uno está descubierto, la zona es desnudez. Cada lado se une con su pareja más cercana; uno sin pareja queda solo |
+| `contenido.margen_zona` | decimal, por lado | n/a | n/a | 0.15 del tamaño de la zona (propuesta) | Constante interna. Solo en zonas de desnudez y contenido sugerente. Se recorta al borde de la imagen |
 | `ocr.umbral_texto` | decimal | 0 | 1 | 0.3 (propuesta) | Estándar |
 | `clic.x`, `clic.y` | entero, px de la imagen original | 0 | Ancho-1, alto-1 | n/a | Fuera de la imagen: se ignora y se avisa "Ese punto queda fuera de la imagen". El sidecar lo rechaza |
 
