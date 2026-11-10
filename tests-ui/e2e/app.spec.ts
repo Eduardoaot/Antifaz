@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 import marca from '../../brand/brand.json';
-import { abrir, cerrar, crearMuestras, entorno, lanzar, llaveGuardada, matarArbol, PYTHON, RAIZ, simularGuardar, type Sesion } from './ayuda';
+import { abrir, cerrar, crearMuestras, entorno, irA, lanzar, llaveGuardada, matarArbol, PYTHON, RAIZ, simularGuardar, type Sesion } from './ayuda';
 
 const CAPTURAS = join(RAIZ, 'tests-ui', 'capturas');
 mkdirSync(CAPTURAS, { recursive: true });
@@ -55,6 +55,7 @@ test('arranca con marca, aviso legal y sin violaciones de accesibilidad', async 
   await expect(pagina.getByRole('heading', { name: 'Revisa tus fotos antes de publicarlas' })).toBeVisible();
   await expect(pagina.getByText('herramienta orientativa y no constituye asesoría legal')).toBeVisible();
   await expect(pagina.getByRole('img', { name: marca.nombre })).toBeVisible();
+  for (const accion of ['Deshacer', 'Rehacer', 'Exportar copia']) await expect(pagina.getByRole('button', { name: accion })).toHaveCount(0);
   await sinViolaciones(pagina);
 });
 
@@ -63,6 +64,7 @@ test('flujo completo: cara, ¿Por qué?, ocultar y exportar sin metadatos', asyn
   const { pagina, app } = sesion;
   await abrir(sesion, [m('cara con ñ.jpg')]);
   await expect(veredicto(pagina)).toHaveText('Revisa estas advertencias', { timeout: 60_000 });
+  for (const accion of ['Deshacer', 'Rehacer', 'Exportar copia']) await expect(pagina.getByRole('button', { name: accion })).toBeVisible();
 
   const cara = pagina.locator('[data-regla="CAR-01"]');
   // Una cara sola no es alarma: riesgo bajo. La pregunta de menores es neutral hasta que se responde.
@@ -231,7 +233,7 @@ test('texto y código: los encuentra, los tapa y el dato no sale en la copia', a
 test('Guía de privacidad: se consulta sin ninguna foto', async () => {
   sesion = await lanzar();
   const { pagina } = sesion;
-  await pagina.getByRole('button', { name: 'Guía de privacidad' }).click();
+  await irA(pagina, 'Guía de privacidad');
   await expect(pagina.getByRole('heading', { name: 'Guía de privacidad', level: 1 })).toBeVisible();
   await expect(pagina.getByRole('heading', { name: 'Armas y grupos armados' })).toBeVisible();
   await expect(pagina.getByText('Placas de autos y motos', { exact: true })).toBeVisible();
@@ -240,7 +242,7 @@ test('Guía de privacidad: se consulta sin ninguna foto', async () => {
   await expect(pagina.getByRole('dialog')).toContainText('Aún no tenemos una fuente oficial directa');
   await sinViolaciones(pagina);
   await pagina.keyboard.press('Escape');
-  await pagina.getByRole('button', { name: 'Guía de privacidad' }).click();
+  await irA(pagina, 'Guía de privacidad');
   await expect(pagina.getByRole('heading', { name: 'Revisa tus fotos antes de publicarlas' })).toBeVisible();
 });
 
@@ -450,9 +452,9 @@ test('lote de 500 y de 501: pregunta, nada se descarta en silencio y la interfaz
   const segundos = (Date.now() - inicio) / 1000;
   await expect(pagina.getByRole('alert').filter({ hasText: '1 foto más:' })).toContainText('hasta 500 fotos abiertas a la vez');
   // Con la cola llena, la interfaz sigue respondiendo y se puede cancelar.
-  await pagina.getByRole('button', { name: 'Guía de privacidad' }).click();
+  await irA(pagina, 'Guía de privacidad');
   await expect(pagina.getByRole('heading', { name: 'Guía de privacidad', level: 1 })).toBeVisible({ timeout: 2_000 });
-  await pagina.getByRole('button', { name: 'Guía de privacidad' }).click();
+  await irA(pagina, 'Guía de privacidad');
   await pagina.getByRole('button', { name: 'Cancelar revisión' }).click();
   await expect(pagina.getByRole('button', { name: 'Cancelar revisión' })).toHaveCount(0, { timeout: 60_000 });
   await expect(pagina.getByText('Revisando…')).toHaveCount(0);
@@ -850,7 +852,7 @@ for (const tema of ['claro', 'oscuro'] as const) {
     await expect(veredicto(pagina)).toBeVisible({ timeout: 60_000 });
     await pagina.getByRole('button', { name: /^Ocultar zona/ }).click();
     const botones = [
-      pagina.getByRole('button', { name: 'Abrir fotos' }).first(),
+      pagina.getByRole('button', { name: 'Menú' }),
       pagina.getByRole('button', { name: 'Exportar copia' }),
       pagina.getByRole('button', { name: /^Ocultar zona/ }),
       pagina.getByRole('button', { name: /^Dejar visible/ }),
@@ -1010,7 +1012,7 @@ test('zoom del 200%, colores forzados y simulación de daltonismo', async () => 
 test('modo de video: se entra sin archivo, dice lo que no hace y es accesible', async () => {
   sesion = await lanzar();
   const { pagina } = sesion;
-  await pagina.getByRole('button', { name: 'Video' }).click();
+  await irA(pagina, 'Video');
   await expect(pagina.getByRole('heading', { name: 'Revisa un video antes de publicarlo' })).toBeVisible();
   await expect(pagina.getByText('hasta 3 segundos')).toBeVisible();
   await expect(pagina.getByText('Todavía no detectamos nada solos en video')).toBeVisible();
@@ -1021,7 +1023,7 @@ test('modo de video: se entra sin archivo, dice lo que no hace y es accesible', 
     await pagina.getByLabel('Tema').selectOption(tema);
     await pagina.screenshot({ path: join(CAPTURAS, `video-vacio-${tema}.png`) });
   }
-  await pagina.getByRole('button', { name: 'Fotos' }).click();
+  await irA(pagina, 'Fotos');
   await expect(pagina.getByRole('heading', { name: 'Revisa tus fotos antes de publicarlas' })).toBeVisible();
   await expect(pagina.locator('#principal')).toHaveCount(1);
 });
