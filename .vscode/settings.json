@@ -1,3 +1,7 @@
 {
-  "github.copilot.chat.commitMessageGeneration.includeCoAuthoredByTrailer": false
+  "github.copilot.chat.commitMessageGeneration.includeCoAuthoredByTrailer": false,
+  // El sidecar tiene su propio entorno (uv sync): sin esto, Pylance usa el Python del sistema y
+  // marca cv2, numpy y sus tipos como faltantes aunque el código esté bien.
+  "python.defaultInterpreterPath": "${workspaceFolder}/sidecar/.venv/Scripts/python.exe",
+  "python.analysis.extraPaths": ["${workspaceFolder}/sidecar"]
 }

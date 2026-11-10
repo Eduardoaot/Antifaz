@@ -373,85 +373,89 @@ export function Visor({ archivo, hallazgos, ocultamientos, revision, herramienta
   if (url === null) return <p className="suave">Preparando la vista previa…</p>;
   return (
     <figure className="visor">
-      <div className="barra-visor" role="group" aria-label="Zoom de la imagen">
-        <button type="button" className="boton chico" aria-label="Alejar" disabled={zoom <= LIMITES.zoom.min} onClick={() => { cambiarZoom(pasoZoom(zoom, -1)); }}>
-          <ZoomOut aria-hidden="true" />
-        </button>
-        <output className="nivel-zoom" aria-live="polite" aria-label={`Zoom al ${textoZoom(zoom)}`}>{textoZoom(zoom)}</output>
-        <button type="button" className="boton chico" aria-label="Acercar" disabled={zoom >= LIMITES.zoom.max} onClick={() => { cambiarZoom(pasoZoom(zoom, 1)); }}>
-          <ZoomIn aria-hidden="true" />
-        </button>
-        <button type="button" className="boton compacto" disabled={!ampliada} onClick={() => { cambiarZoom(LIMITES.zoom.min); }}>
-          <Maximize aria-hidden="true" /> Ajustar
-        </button>
-        <span className="separador" aria-hidden="true" />
-        <button type="button" className="boton compacto" aria-pressed={comparando} onClick={alternarComparar}>
-          <SquareSplitHorizontal aria-hidden="true" /> Comparar antes y después
-        </button>
-        <span className="suave pista-zoom" id="pista-zoom">
+      {/* El marco ancla la barra flotante al área visible: con zoom, la imagen se desplaza y la barra no. */}
+      <div className="marco-visor">
+        <span className="solo-lector" id="pista-zoom">
           {comparando
             ? 'Arrastra la línea o usa el control de abajo. Las herramientas están en pausa.'
             : ampliada
               ? herramienta === 'ninguna' ? 'Arrastra la imagen para moverte.' : 'Muévete con la rueda, las barras o el botón central del mouse.'
               : 'Ctrl + rueda o las teclas + y − para acercar.'}
         </span>
-      </div>
-      <div
-        ref={ventana}
-        className={`ventana-lienzo${ampliada ? ' ampliada' : ''}`}
-        tabIndex={0}
-        role="group"
-        aria-label="Imagen"
-        aria-describedby="pista-zoom"
-        onKeyDown={alTecla}
-      >
         <div
-          ref={lienzo}
-          className={`lienzo ${comparando ? 'comparando' : `herramienta-${herramienta}`}${arrastrando ? ' arrastrando' : ''}${sobreZona ? ' sobre-zona' : ''}${dibujando ? ' dibujando' : ''}`}
-          style={{ aspectRatio: `${ancho} / ${alto}`, width: ajuste === null ? '100%' : `${Math.round(ajuste * zoom)}px` }}
-          data-testid="lienzo"
-          onPointerDown={alBajar}
-          onPointerMove={alMover}
-          onPointerUp={alSoltar}
-          onPointerLeave={() => { if (resaltado?.origen === 'imagen') alResaltar?.(null); }}
-          onPointerCancel={() => { arrastre.current = null; moviendoCorte.current = false; setArrastrando(false); setTrazo(null); setInicio(null); setActual(null); }}
+          ref={ventana}
+          className={`ventana-lienzo${ampliada ? ' ampliada' : ''}`}
+          tabIndex={0}
+          role="group"
+          aria-label="Imagen"
+          aria-describedby="pista-zoom"
+          onKeyDown={alTecla}
         >
-          <img src={url} draggable={false} alt={`Vista previa de ${nombre}. El detalle está en el panel de advertencias.`} />
-          {original !== null && (
-            <>
-              {/* La parte izquierda muestra la original; la derecha, la copia con lo que decidiste ocultar. */}
-              <img className="original" src={original} draggable={false} alt={`Original de ${nombre}, sin ocultar nada, en el ${corte} % izquierdo.`} style={{ clipPath: `inset(0 ${100 - corte}% 0 0)` }} />
-              <div className="corte" aria-hidden="true" style={{ left: `${corte}%` }}><span /></div>
-              {corte >= 15 && <span className="rotulo antes" aria-hidden="true">Original</span>}
-              {corte <= 85 && <span className="rotulo despues" aria-hidden="true">Tu copia</span>}
-            </>
-          )}
-          {!comparando && conCaja.map((h, i) => {
-            const caja = h.caja;
-            if (caja === null) return null;
-            return (
-              <div key={h.id} aria-hidden="true" data-marca={h.id} className={`marca ${revision?.decisiones[h.id] ?? 'sin-decidir'}${claseMarca(h.id)}`} style={porcentajes(caja, ancho, alto)}>
-                <span className={etiqueta(caja)}>{i + 1}</span>
+          <div
+            ref={lienzo}
+            className={`lienzo ${comparando ? 'comparando' : `herramienta-${herramienta}`}${arrastrando ? ' arrastrando' : ''}${sobreZona ? ' sobre-zona' : ''}${dibujando ? ' dibujando' : ''}`}
+            style={{ aspectRatio: `${ancho} / ${alto}`, width: ajuste === null ? '100%' : `${Math.round(ajuste * zoom)}px` }}
+            data-testid="lienzo"
+            onPointerDown={alBajar}
+            onPointerMove={alMover}
+            onPointerUp={alSoltar}
+            onPointerLeave={() => { if (resaltado?.origen === 'imagen') alResaltar?.(null); }}
+            onPointerCancel={() => { arrastre.current = null; moviendoCorte.current = false; setArrastrando(false); setTrazo(null); setInicio(null); setActual(null); }}
+          >
+            <img src={url} draggable={false} alt={`Vista previa de ${nombre}. El detalle está en el panel de advertencias.`} />
+            {original !== null && (
+              <>
+                {/* La parte izquierda muestra la original; la derecha, la copia con lo que decidiste ocultar. */}
+                <img className="original" src={original} draggable={false} alt={`Original de ${nombre}, sin ocultar nada, en el ${corte} % izquierdo.`} style={{ clipPath: `inset(0 ${100 - corte}% 0 0)` }} />
+                <div className="corte" aria-hidden="true" style={{ left: `${corte}%` }}><span /></div>
+                {corte >= 15 && <span className="rotulo antes" aria-hidden="true">Original</span>}
+                {corte <= 85 && <span className="rotulo despues" aria-hidden="true">Tu copia</span>}
+              </>
+            )}
+            {!comparando && conCaja.map((h, i) => {
+              const caja = h.caja;
+              if (caja === null) return null;
+              return (
+                <div key={h.id} aria-hidden="true" data-marca={h.id} className={`marca ${revision?.decisiones[h.id] ?? 'sin-decidir'}${claseMarca(h.id)}`} style={porcentajes(caja, ancho, alto)}>
+                  <span className={etiqueta(caja)}>{i + 1}</span>
+                </div>
+              );
+            })}
+            {!comparando && revision?.manuales.map((z, i) => (
+              <div key={z.id} aria-hidden="true" data-marca={z.id} className={`marca ocultar manual${claseMarca(z.id)}`} style={porcentajes(z, ancho, alto)}>
+                <span className={etiqueta(z)}>T{i + 1}</span>
               </div>
-            );
-          })}
-          {!comparando && revision?.manuales.map((z, i) => (
-            <div key={z.id} aria-hidden="true" data-marca={z.id} className={`marca ocultar manual${claseMarca(z.id)}`} style={porcentajes(z, ancho, alto)}>
-              <span className={etiqueta(z)}>T{i + 1}</span>
-            </div>
-          ))}
-          {dibujo !== null && <div aria-hidden="true" className="marca sin-decidir" style={porcentajes(dibujo, ancho, alto)} />}
-          {trazo !== null && (
-            <svg aria-hidden="true" className="trazo" viewBox={`0 0 ${ancho} ${alto}`} preserveAspectRatio="none">
-              <polyline
-                points={trazo.map((p) => `${p.x + 0.5},${p.y + 0.5}`).join(' ')}
-                strokeWidth={tamanoPincel}
-                fill="none"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          )}
+            ))}
+            {dibujo !== null && <div aria-hidden="true" className="marca sin-decidir" style={porcentajes(dibujo, ancho, alto)} />}
+            {trazo !== null && (
+              <svg aria-hidden="true" className="trazo" viewBox={`0 0 ${ancho} ${alto}`} preserveAspectRatio="none">
+                <polyline
+                  points={trazo.map((p) => `${p.x + 0.5},${p.y + 0.5}`).join(' ')}
+                  strokeWidth={tamanoPincel}
+                  fill="none"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            )}
+          </div>
+        </div>
+        {/* Herramientas de vista: compactas, sobre la esquina, para no competir con la foto. */}
+        <div className={`barra-visor${dibujando ? ' atenuada' : ''}${ampliada ? ' con-barras' : ''}`} role="group" aria-label="Vista de la imagen">
+          <button type="button" className="boton chico" aria-label="Alejar" title="Alejar (−)" disabled={zoom <= LIMITES.zoom.min} onClick={() => { cambiarZoom(pasoZoom(zoom, -1)); }}>
+            <ZoomOut aria-hidden="true" />
+          </button>
+          <output className="nivel-zoom" aria-live="polite" aria-label={`Zoom al ${textoZoom(zoom)}`}>{textoZoom(zoom)}</output>
+          <button type="button" className="boton chico" aria-label="Acercar" title="Acercar (+)" disabled={zoom >= LIMITES.zoom.max} onClick={() => { cambiarZoom(pasoZoom(zoom, 1)); }}>
+            <ZoomIn aria-hidden="true" />
+          </button>
+          <button type="button" className="boton chico" aria-label="Ajustar" title="Ajustar a la ventana (0)" disabled={!ampliada} onClick={() => { cambiarZoom(LIMITES.zoom.min); }}>
+            <Maximize aria-hidden="true" />
+          </button>
+          <span className="separador" aria-hidden="true" />
+          <button type="button" className="boton chico" aria-label="Comparar antes y después" title="Comparar antes y después" aria-pressed={comparando} onClick={alternarComparar}>
+            <SquareSplitHorizontal aria-hidden="true" />
+          </button>
         </div>
       </div>
       {comparando && (

@@ -269,14 +269,37 @@ summary { cursor: pointer; min-height: 1.75rem; }
   .ventana-lienzo.ampliada { height: 75vh; }
 }
 
-/* Zoom del visor */
-.barra-visor { display: flex; flex-wrap: wrap; align-items: center; gap: 0.375rem; }
-.nivel-zoom {
-  min-width: 4.5rem; text-align: center;
-  font: 400 0.875rem 'Inter', 'Segoe UI', sans-serif; font-variant-numeric: tabular-nums;
+/*
+ * Herramientas de vista: barra flotante en la esquina inferior derecha del área, fuera del contenido
+ * que se desplaza. Fondo oscuro translúcido con difuminado: el texto blanco se lee sobre fotos claras y
+ * oscuras (sobre blanco puro queda cerca de 5:1). Con zoom se aparta de las barras de desplazamiento.
+ */
+.marco-visor { position: relative; min-width: 0; }
+.barra-visor {
+  position: absolute; right: 0.75rem; bottom: 0.75rem; z-index: 2;
+  display: flex; align-items: center; gap: 0.125rem; padding: 0.25rem;
+  background: rgb(17 17 24 / 0.62); color: #fff;
+  -webkit-backdrop-filter: blur(12px) saturate(140%); backdrop-filter: blur(12px) saturate(140%);
+  border: 1px solid rgb(255 255 255 / 0.14); border-radius: 12px;
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.25);
+  transition: opacity 120ms ease-out;
 }
-.boton.compacto { min-height: 2rem; padding: 0.25rem 0.625rem; }
-.pista-zoom { font-size: 0.875rem; margin-left: 0.25rem; }
+.barra-visor.con-barras { right: calc(0.75rem + 17px); bottom: calc(0.75rem + 17px); }
+/* Mientras dibujas o pintas, la barra se aparta como los números de las zonas. */
+.barra-visor.atenuada { opacity: 0.25; }
+.barra-visor.atenuada:hover, .barra-visor.atenuada:focus-within { opacity: 1; }
+.barra-visor .boton {
+  min-height: 2rem; min-width: 2rem; border-radius: 8px;
+  background: transparent; border-color: transparent; color: inherit;
+}
+.barra-visor .boton:hover:not(:disabled):not([aria-pressed='true']) { background: rgb(255 255 255 / 0.16); }
+.barra-visor .boton:disabled { opacity: 0.4; }
+.barra-visor .boton[aria-pressed='true'] { background: var(--marca); border-color: var(--marca); color: var(--sobre-marca); }
+.barra-visor .separador { height: 1.25rem; margin-inline: 0.125rem; background: rgb(255 255 255 / 0.25); }
+.nivel-zoom {
+  min-width: 3.25rem; text-align: center; color: inherit;
+  font: 500 0.8125rem 'Inter', 'Segoe UI', sans-serif; font-variant-numeric: tabular-nums;
+}
 .lienzo.herramienta-ninguna { cursor: default; }
 .ventana-lienzo.ampliada .lienzo.herramienta-ninguna { cursor: grab; }
 .lienzo.sobre-zona { cursor: pointer; }
@@ -299,6 +322,8 @@ summary { cursor: pointer; min-height: 1.75rem; }
   .nivel { background: none; color: CanvasText; }
   .marca { border-color: Highlight; outline-color: CanvasText; }
   .ventana-lienzo { border: 1px solid CanvasText; }
+  .barra-visor { background: Canvas; color: CanvasText; border-color: CanvasText; backdrop-filter: none; box-shadow: none; }
+  .barra-visor .separador { background: CanvasText; }
   .trazo { mix-blend-mode: normal; }
   .corte { background: CanvasText; box-shadow: none; }
   .corte span { background: Canvas; border-color: Highlight; }
