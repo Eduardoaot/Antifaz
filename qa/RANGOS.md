@@ -124,6 +124,7 @@ FFmpeg 9.0.2 y exiftool 13.61, con hash fijado en `sidecar/revisor/herramientas.
 | `tracking.paso_clave` | entero, frames del proxy | 1 | 24 | 6 (medido en docs/benchmarks: 0 % visible; ~144 s por 15 s a proxy 360; bajado de 8 por fugas CSRT en cámara en mano) | Estándar. EdgeTAM corre una sola vez sobre esos keyframes; CSRT rellena cada hueco ida y vuelta y une las máscaras (menos deriva). Si ambos fallan, máscara vacía y `pistas` marca revisión |
 | `tracking.margen_caja_csrt_pct` | decimal, % | n/a | n/a | 15 | Constante interna. Amplía la caja de CSRT antes de unirla a la silueta trasladada |
 | `tracking.margen_caja_csrt_px` | entero, px | n/a | n/a | 8 | Constante interna. Piso del margen de la caja de CSRT |
+| `tracking.cerrar_parpadeos` | booleano | n/a | n/a | sí | Constante interna. Tras el relleno CSRT, tapa huecos de 1 frame y une cada máscara con ±1 vecino para evitar yogurt/cuadro/yogurt |
 | `bloque.frames` | entero, frames | 30 (propuesta) | 3000 (propuesta) | 300 (propuesta) | Estándar |
 | `pista.margen_frames` | entero, frames | 0 | 120 (propuesta) | 5 | Estándar. Oculta antes y después de cada pista. También limita el fail-closed al perder el objeto: solo cerca de la última/siguiente aparición; en el medio de un hueco largo no se inventa cuadro (salida de encuadre) |
 | `pista.margen_perdido_mult` | entero, múltiplo del margen de dilatación | n/a | n/a | 3 | Constante interna. En las orillas de un hueco perdido, dilata la silueta ancla o el corredor con este múltiplo |

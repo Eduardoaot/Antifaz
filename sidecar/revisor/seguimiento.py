@@ -262,6 +262,29 @@ def _indices_clave(total: int, frame_inicio: int, paso: int) -> list[int]:
     return sorted(indices)
 
 
+def _cerrar_parpadeos(mascaras: dict[int, Mascara], total: int) -> None:
+    """Anti-parpadeo fail-closed: tapa huecos de 1 frame y une cada máscara con ±1 vecino.
+
+    Evita el yogurt/cuadro/yogurt cuando CSRT pierde un frame suelto o ida y vuelta no coinciden.
+    No rellena huecos largos (salida de encuadre).
+    """
+    for t in range(1, total - 1):
+        if mascaras[t].any():
+            continue
+        if mascaras[t - 1].any() and mascaras[t + 1].any():
+            mascaras[t] = mascaras[t - 1] | mascaras[t + 1]
+    base = {i: mascaras[i].copy() for i in range(total)}
+    for t in range(total):
+        if not base[t].any():
+            continue
+        m = base[t]
+        if t > 0 and base[t - 1].any():
+            m = m | base[t - 1]
+        if t < total - 1 and base[t + 1].any():
+            m = m | base[t + 1]
+        mascaras[t] = m
+
+
 def _csrt_tramo(
     lista: Sequence[Frame],
     inicio: int,
@@ -361,6 +384,8 @@ class SeguidorHibrido:
 
         for i in range(len(claves) - 1):
             rellenar(claves[i], claves[i + 1])
+
+        _cerrar_parpadeos(mascaras, total)
 
         faltan = [i for i in range(total) if i not in mascaras]
         if faltan:

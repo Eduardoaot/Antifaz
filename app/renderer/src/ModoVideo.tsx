@@ -250,7 +250,7 @@ export function ModoVideo({ activo, alAnunciar, alFallar }: Props): React.JSX.El
           <p><strong>Beta de video:</strong> no detectamos nada automáticamente. Haz clic sobre una persona u objeto y lo seguimos en todo el video.</p>
         </div>
         {errorVista !== null && <p role="alert">No pudimos mostrar este frame. {errorVista}</p>}
-        <figure className="visor">
+        <figure className="visor visor-video">
           {url === null ? (
             <p className="suave">{ocupado === 'siguiendo' ? 'Siguiendo el objeto…' : 'Preparando la vista previa…'}</p>
           ) : (
@@ -262,15 +262,19 @@ export function ModoVideo({ activo, alAnunciar, alFallar }: Props): React.JSX.El
               onPointerUp={alSoltar}
             >
               <img src={url} draggable={false} alt={`Frame en el segundo ${segundos(info, posicion)} de ${info.nombre}, con las zonas ocultas.`} />
+              <p
+                className={`aviso-frame-perdido${revisarFrame ? ' visible' : ''}`}
+                role="status"
+                aria-hidden={!revisarFrame}
+              >
+                En este frame perdimos el objeto. Revisa que no aparezca, o que la zona oculta se vea bien.
+              </p>
             </div>
           )}
           <figcaption className="suave">
             {info.ancho} × {info.alto} px · {info.duracion.toFixed(2)} s · {Math.round(info.fps)} fps{info.tieneAudio ? ' · con audio' : ' · sin audio'}
           </figcaption>
         </figure>
-        {revisarFrame && (
-          <p className="caja-parcial" role="status">En este frame perdimos el objeto. Revisa que no aparezca, o que la zona oculta se vea bien.</p>
-        )}
         <div className="campo-frame">
           <label htmlFor="frame-video">
             Frame {posicion + 1} de {info.posiciones} (segundo {segundos(info, posicion)})

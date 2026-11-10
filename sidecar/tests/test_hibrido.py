@@ -123,3 +123,14 @@ def test_relleno_bidireccional_une_ida_y_vuelta() -> None:
     claves = set(_indices_clave(16, 0, 5))
     intermedios = [i for i in range(16) if i not in claves]
     assert intermedios and all(mascaras[i].any() for i in intermedios)
+
+
+def test_cerrar_parpadeos_tapa_hueco_de_un_frame() -> None:
+    alto, ancho = 40, 40
+    vacia = np.zeros((alto, ancho), dtype=bool)
+    llena = vacia.copy()
+    llena[10:20, 10:20] = True
+    mascaras = {0: llena.copy(), 1: vacia.copy(), 2: llena.copy()}
+    seguimiento._cerrar_parpadeos(mascaras, 3)
+    assert mascaras[1].any()
+    assert mascaras[1][10:20, 10:20].all()
