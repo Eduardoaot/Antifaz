@@ -10,6 +10,7 @@ import {
   ladoEtiqueta,
   limitarCorte,
   limitarZoom,
+  opacidadRotulo,
   pasoZoom,
   textoZoom,
   zonaEnPunto,
@@ -408,8 +409,9 @@ export function Visor({ archivo, hallazgos, ocultamientos, revision, herramienta
                 {/* La parte izquierda muestra la original; la derecha, la copia con lo que decidiste ocultar. */}
                 <img className="original" src={original} draggable={false} alt={`Original de ${nombre}, sin ocultar nada, en el ${corte} % izquierdo.`} style={{ clipPath: `inset(0 ${100 - corte}% 0 0)` }} />
                 <div className="corte" aria-hidden="true" style={{ left: `${corte}%` }}><span /></div>
-                {corte >= 15 && <span className="rotulo antes" aria-hidden="true">Original</span>}
-                {corte <= 85 && <span className="rotulo despues" aria-hidden="true">Tu copia</span>}
+                {/* Se desvanecen cuando la línea se acerca a su lado, para no quedar encima de la otra versión. */}
+                <span className="rotulo antes" aria-hidden="true" style={{ opacity: opacidadRotulo(corte) }}>Original</span>
+                <span className="rotulo despues" aria-hidden="true" style={{ opacity: opacidadRotulo(100 - corte) }}>Tu copia</span>
               </>
             )}
             {!comparando && conCaja.map((h, i) => {

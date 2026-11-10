@@ -515,6 +515,17 @@ export function limitarCorte(v: number): number {
   return Math.min(LIMITES.comparacion.max, Math.max(LIMITES.comparacion.min, Math.round(v)));
 }
 
+/**
+ * Opacidad de un rótulo de la comparación, de 0 a 1, según el % del ancho que queda de su lado.
+ * Un valor no finito lo oculta: mejor sin rótulo que uno encima de la otra versión.
+ */
+export function opacidadRotulo(espacio: number): number {
+  if (!Number.isFinite(espacio)) return 0;
+  const { oculto, visible } = LIMITES.rotuloComparacion;
+  const t = (espacio - oculto) / (visible - oculto);
+  return Math.round(Math.min(1, Math.max(0, t)) * 100) / 100;
+}
+
 /** Dónde va el número de una zona para no tapar lo que marca. */
 export type LadoEtiqueta = 'arriba' | 'abajo' | 'dentro';
 

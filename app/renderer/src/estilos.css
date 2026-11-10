@@ -175,12 +175,22 @@ input[aria-invalid='true'] { border: 2px solid var(--riesgo-alto); }
   position: absolute; top: 50%; left: 50%; width: 1.75rem; height: 1.75rem; transform: translate(-50%, -50%);
   border-radius: 50%; background: #fff; border: 2px solid var(--marca); box-shadow: 0 1px 4px rgb(0 0 0 / 0.35);
 }
+/*
+ * Rótulos de la comparación: el mismo vidrio oscuro que la barra de vista, para leerse sobre cualquier
+ * foto. "Tu copia" lleva el color de marca para distinguirse de un vistazo, sin depender solo del color:
+ * cada uno dice su nombre. La opacidad la pone `opacidadRotulo`; aquí solo se suaviza el cambio.
+ */
 .rotulo {
-  position: absolute; top: 0.5rem; padding: 0.125rem 0.5rem; border-radius: 999px; pointer-events: none;
-  background: rgb(0 0 0 / 0.7); color: #fff; font-size: 0.75rem; font-weight: 600; line-height: 1.5;
+  position: absolute; top: 0.75rem; z-index: 1; pointer-events: none;
+  padding: 0.25rem 0.75rem; border-radius: 999px;
+  background: rgb(17 17 24 / 0.62); color: #fff;
+  -webkit-backdrop-filter: blur(12px) saturate(140%); backdrop-filter: blur(12px) saturate(140%);
+  border: 1px solid rgb(255 255 255 / 0.14); box-shadow: 0 2px 8px rgb(0 0 0 / 0.25);
+  font: 600 0.8125rem/1.4 'Inter', 'Segoe UI', sans-serif; letter-spacing: 0.01em; white-space: nowrap;
+  transition: opacity 160ms ease-out;
 }
-.rotulo.antes { left: 0.5rem; }
-.rotulo.despues { right: 0.5rem; }
+.rotulo.antes { left: 0.75rem; }
+.rotulo.despues { right: 0.75rem; background: var(--marca); color: var(--sobre-marca); border-color: transparent; }
 .barra-comparar { display: grid; gap: 0.25rem; }
 .barra-comparar label { font-size: 0.875rem; }
 .barra-comparar input { width: 100%; accent-color: var(--marca); }

@@ -51,6 +51,7 @@ import {
   ladoEtiqueta,
   limitarCorte,
   limitarZoom,
+  opacidadRotulo,
   pasoZoom,
   textoZoom,
   zonaEnPunto,
@@ -649,6 +650,12 @@ describe('visor: zoom', () => {
     [Number.NaN, 50], [Number.POSITIVE_INFINITY, 50], [Number.NEGATIVE_INFINITY, 50],
   ])('limitarCorte(%s) = %s', (entrada, esperado) => {
     expect(limitarCorte(entrada)).toBe(esperado);
+  });
+
+  it.each([
+    [0, 0], [10, 0], [18, 0.5], [26, 1], [100, 1], [-5, 0], [Number.NaN, 0], [Number.POSITIVE_INFINITY, 0],
+  ])('opacidadRotulo(%s) = %s', (espacio, esperado) => {
+    expect(opacidadRotulo(espacio)).toBe(esperado);
   });
 
   it('el número de una zona va arriba, abajo si toca el borde superior, y dentro si no cabe fuera', () => {
