@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import marca from '../../brand/brand.json';
-import { abrir, cerrar, crearMuestras, entorno, irA, lanzar, llaveGuardada, matarArbol, PYTHON, RAIZ, simularGuardar, type Sesion } from './ayuda';
+import { abrir, cerrar, crearMuestras, elegirTema, entorno, irA, lanzar, llaveGuardada, matarArbol, personalizar, PYTHON, RAIZ, simularGuardar, type Sesion } from './ayuda';
 
 const CAPTURAS = join(RAIZ, 'tests-ui', 'capturas');
 mkdirSync(CAPTURAS, { recursive: true });
@@ -124,13 +124,14 @@ const cuentaCaras = (ruta: string): string => execFileSync(
 async function caraConSticker(tema: 'claro' | 'oscuro'): Promise<Locator> {
   sesion = await lanzar();
   const { pagina } = sesion;
-  await pagina.getByLabel('Tema').selectOption(tema);
+  await elegirTema(pagina, tema);
   await abrir(sesion, [m('cara con ñ.jpg')]);
   await expect(veredicto(pagina)).toBeVisible({ timeout: 60_000 });
   const cara = pagina.locator('[data-regla="CAR-01"]');
   await pagina.getByRole('button', { name: 'Sí, ocultar las caras' }).click();
   // Estrella y no carita: YuNet detecta la carita 😀 como cara (confianza 0.26 a 0.36) aunque la cara
   // real quede tapada, y la prueba no distinguiría una de otra al contar caras en lo exportado.
+  await personalizar(cara);
   await cara.getByLabel(/^Efecto/).selectOption('emoji_estrella');
   return cara;
 }
@@ -304,9 +305,13 @@ test('foto sin nada: lo dice sin prometer de más', async () => {
   const { pagina } = sesion;
   await abrir(sesion, [m('negra.png')]);
   await expect(veredicto(pagina)).toHaveText('No encontramos nada riesgoso en lo que revisamos', { timeout: 60_000 });
-  await expect(pagina.getByText('La revisión es orientativa')).toBeVisible();
-  await expect(pagina.getByText(/Lo que todavía no revisamos \(5\)/)).toBeVisible();
   await sinViolaciones(pagina);
+  // Qué se revisa y qué no ya no se repite en cada foto: está en la Guía.
+  await expect(pagina.getByText(/Lo que todavía no revisamos/)).toHaveCount(0);
+  await irA(pagina, 'Guía de privacidad');
+  await expect(pagina.getByRole('heading', { name: 'Qué revisamos en cada foto' })).toBeVisible();
+  await expect(pagina.getByText(/La revisión es orientativa/)).toBeVisible();
+  await expect(pagina.getByRole('heading', { name: /^Todavía no lo revisamos solos/ })).toBeVisible();
 });
 
 // Muestras sensibles fuera del repo: se corre en local con REVISOR_MUESTRAS apuntando a la carpeta.
@@ -576,7 +581,7 @@ test('lote de 500 y de 501: pregunta, nada se descarta en silencio y la interfaz
   await simularPregunta(sesion, 1);
   await abrir(sesion, rutas.slice(0, 501));
   await expect.poll(() => preguntas(sesion)).toBe(1);
-  await expect(pagina.getByText('Abre una foto o arrástrala aquí.')).toBeVisible();
+  await expect(pagina.getByRole('heading', { name: 'Revisa tus fotos antes de publicarlas' })).toBeVisible();
   await expect(lista).toHaveCount(0);
 
   // 501: si sigues, se abren 500 y se dice cuántas quedaron fuera.
@@ -637,25 +642,38 @@ test('advertencias sin decidir: avisa y deja decidir, sin bloquear', async () =>
   expect(existsSync(salida)).toBe(true);
 });
 
-test('campo de intensidad: rechaza lo inválido y conserva el último valor', async () => {
+test('intensidad: global y por zona, dentro del rango y con su aviso', async () => {
   sesion = await lanzar();
   const { pagina } = sesion;
   await abrir(sesion, [m('cara con ñ.jpg')]);
   await expect(veredicto(pagina)).toBeVisible({ timeout: 60_000 });
-  const campo = pagina.getByLabel('Intensidad del efecto');
-  for (const malo of ['-5', 'abc', '999999', '', '1e10', '0,5', '0', '101', 'x'.repeat(500)]) {
-    await campo.fill(malo);
-    await expect(campo, malo).toHaveAttribute('aria-invalid', 'true');
-    await expect(pagina.getByRole('alert').filter({ hasText: 'Escribe un número entero' })).toBeVisible();
-  }
-  await campo.fill('20');
-  await expect(campo).toHaveAttribute('aria-invalid', 'false');
-  await expect(pagina.getByText(/Con poca intensidad es más fácil reconocer/)).toBeVisible();
+  await pagina.getByRole('button', { name: 'Sí, ocultar las caras' }).click();
+  await pagina.getByRole('button', { name: /^Estilo para todas las zonas/ }).click();
+  const global = pagina.getByRole('slider', { name: 'Intensidad del efecto' });
+  await expect(global).toHaveValue('80');
   await expect(pagina.getByText(/usa Bloque sólido/)).toBeVisible();
-  await campo.fill('1');
-  await expect(campo).toHaveAttribute('aria-invalid', 'false');
-  await campo.fill('100');
-  await expect(campo).toHaveAttribute('aria-invalid', 'false');
+  // Un slider no deja salir del rango: Inicio y Fin llegan a 1 y 100.
+  await global.focus();
+  await pagina.keyboard.press('Home');
+  await expect(global).toHaveValue('1');
+  await expect(pagina.getByText(/Con poca intensidad es más fácil reconocer/)).toBeVisible();
+  await pagina.keyboard.press('End');
+  await expect(global).toHaveValue('100');
+  await expect(pagina.getByText(/Con poca intensidad es más fácil reconocer/)).toHaveCount(0);
+
+  // La de una zona cambia solo esa zona; la global vuelve a mandar en todas.
+  const cara = pagina.locator('[data-regla="CAR-01"]');
+  await personalizar(cara);
+  const propia = cara.getByRole('slider', { name: /^Intensidad/ });
+  await expect(propia).toHaveValue('100');
+  await propia.focus();
+  await pagina.keyboard.press('Home');
+  await expect(propia).toHaveValue('1');
+  await expect(global).toHaveValue('1');
+  await global.focus();
+  await pagina.keyboard.press('End');
+  await expect(propia).toHaveValue('100');
+  await sinViolaciones(pagina);
 });
 
 test('deshacer y rehacer, incluidos los límites y con teclado', async () => {
@@ -960,7 +978,7 @@ for (const tema of ['claro', 'oscuro'] as const) {
     test(`vista ${tema}, ventana ${nombre}: nada se sale y pasa axe`, async () => {
       sesion = await lanzar();
       const { pagina, app } = sesion;
-      await pagina.getByLabel('Tema').selectOption(tema);
+      await elegirTema(pagina, tema);
       await abrir(sesion, [m('cara con ñ.jpg')]);
       await expect(veredicto(pagina)).toBeVisible({ timeout: 60_000 });
       await app.evaluate(({ BrowserWindow }, t) => {
@@ -982,7 +1000,7 @@ for (const tema of ['claro', 'oscuro'] as const) {
   test(`el texto de los botones se lee con el mouse encima, tema ${tema}`, async () => {
     sesion = await lanzar();
     const { pagina } = sesion;
-    await pagina.getByLabel('Tema').selectOption(tema);
+    await elegirTema(pagina, tema);
     await abrir(sesion, [m('cara con ñ.jpg')]);
     await expect(veredicto(pagina)).toBeVisible({ timeout: 60_000 });
     await pagina.getByRole('button', { name: /^Ocultar zona/ }).click();
@@ -1004,7 +1022,7 @@ for (const tema of ['claro', 'oscuro'] as const) {
   test(`visor: zoom, resaltado entre panel e imagen y teclado, tema ${tema}`, async () => {
     sesion = await lanzar();
     const { pagina } = sesion;
-    await pagina.getByLabel('Tema').selectOption(tema);
+    await elegirTema(pagina, tema);
     await abrir(sesion, [m('cara con ñ.jpg')]);
     await expect(veredicto(pagina)).toBeVisible({ timeout: 60_000 });
     const lienzo = pagina.getByTestId('lienzo');
@@ -1059,10 +1077,10 @@ for (const tema of ['claro', 'oscuro'] as const) {
 }
 
 for (const tema of ['claro', 'oscuro'] as const) {
-  test(`visor: comparar antes y después y números fuera de la zona, tema ${tema}`, async () => {
+  test(`visor: comparar antes y después y la explicación junto a la zona, tema ${tema}`, async () => {
     sesion = await lanzar();
     const { pagina } = sesion;
-    await pagina.getByLabel('Tema').selectOption(tema);
+    await elegirTema(pagina, tema);
     await abrir(sesion, [m('cara con ñ.jpg')]);
     await expect(veredicto(pagina)).toBeVisible({ timeout: 60_000 });
     const fila = pagina.locator('[data-regla="CAR-01"]');
@@ -1072,11 +1090,21 @@ for (const tema of ['claro', 'oscuro'] as const) {
     const marca = pagina.locator(`[data-marca="${zona}"]`);
     await expect(marca).toHaveClass(/ocultar/);
 
-    // El número no tapa la cara: queda fuera de la caja de la zona.
+    // Nada encima de la zona: sin número. Un clic en ella explica el riesgo a un lado, sin taparla.
+    await expect(marca.locator('span')).toHaveCount(0);
     const caja = await marca.boundingBox();
-    const numero = await marca.locator('span').boundingBox();
-    if (caja === null || numero === null) throw new Error('sin marca');
-    expect(numero.y + numero.height <= caja.y || numero.y >= caja.y + caja.height).toBe(true);
+    if (caja === null) throw new Error('sin marca');
+    await pagina.mouse.click(caja.x + caja.width / 2, caja.y + caja.height / 2);
+    const tarjeta = pagina.getByRole('dialog', { name: /^Por qué es un riesgo: Caras/ });
+    await expect(tarjeta).toBeVisible();
+    await expect(tarjeta).toContainText('Se detectó una cara');
+    const lugar = await tarjeta.boundingBox();
+    if (lugar === null) throw new Error('sin tarjeta');
+    const tapa = lugar.x < caja.x + caja.width && lugar.x + lugar.width > caja.x && lugar.y < caja.y + caja.height && lugar.y + lugar.height > caja.y;
+    expect(tapa, 'la tarjeta no tapa la zona').toBe(false);
+    await sinViolaciones(pagina);
+    await pagina.keyboard.press('Escape');
+    await expect(tarjeta).toHaveCount(0);
 
     // Comparar: aparece la original, se ocultan las marcas y las herramientas no actúan.
     const comparar = pagina.getByRole('button', { name: 'Comparar antes y después' });
@@ -1091,13 +1119,7 @@ for (const tema of ['claro', 'oscuro'] as const) {
     await sinViolaciones(pagina);
     await pagina.screenshot({ path: join(CAPTURAS, `${tema}-visor-comparar.png`) });
 
-    await pagina.getByRole('button', { name: 'Dibujar rectángulo' }).click();
-    const lienzo = await pagina.getByTestId('lienzo').boundingBox();
-    if (lienzo === null) throw new Error('sin lienzo');
-    await pagina.mouse.move(lienzo.x + lienzo.width * 0.6, lienzo.y + lienzo.height * 0.6);
-    await pagina.mouse.down();
-    await pagina.mouse.move(lienzo.x + lienzo.width * 0.9, lienzo.y + lienzo.height * 0.9, { steps: 5 });
-    await pagina.mouse.up();
+    await expect(pagina.getByRole('button', { name: 'Dibujar rectángulo' })).toBeDisabled();
     await expect(pagina.locator('[data-manual]')).toHaveCount(0);
 
     // Al salir, vuelven las marcas y la original desaparece.
@@ -1111,12 +1133,13 @@ test('cambiar el tema con la app abierta cambia los colores sin reiniciar', asyn
   sesion = await lanzar();
   const { pagina } = sesion;
   const fondo = (): Promise<string> => pagina.evaluate(() => getComputedStyle(document.body).backgroundColor);
-  await pagina.getByLabel('Tema').selectOption('claro');
+  await elegirTema(pagina, 'claro');
   await expect.poll(fondo).toBe('rgb(246, 246, 249)');
-  await pagina.getByLabel('Tema').selectOption('oscuro');
+  await elegirTema(pagina, 'oscuro');
   await expect.poll(fondo).toBe('rgb(18, 18, 25)');
-  await pagina.getByLabel('Tema').selectOption('sistema');
-  await expect(pagina.getByLabel('Tema')).toHaveValue('sistema');
+  await elegirTema(pagina, 'sistema');
+  await irA(pagina, 'Configuración');
+  await expect(pagina.getByRole('dialog', { name: 'Configuración' }).getByLabel('Tema')).toHaveValue('sistema');
 });
 
 test('zoom del 200%, colores forzados y simulación de daltonismo', async () => {
@@ -1155,7 +1178,7 @@ test('modo de video: se entra sin archivo, dice lo que no hace y es accesible', 
   await expect(pagina.locator('#principal')).toHaveCount(1);
   await sinViolaciones(pagina);
   for (const tema of ['claro', 'oscuro'] as const) {
-    await pagina.getByLabel('Tema').selectOption(tema);
+    await elegirTema(pagina, tema);
     await pagina.screenshot({ path: join(CAPTURAS, `video-vacio-${tema}.png`) });
   }
   await irA(pagina, 'Fotos');

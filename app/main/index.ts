@@ -1,4 +1,5 @@
 /** Proceso principal. Es el único con acceso al sistema; el renderer solo usa la API de contrato.ts. */
+import { randomUUID } from 'node:crypto';
 import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { basename, dirname, extname, join, parse, relative, resolve, sep } from 'node:path';
 import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, protocol, safeStorage, session, shell } from 'electron';
@@ -17,20 +18,26 @@ import {
   esquemaListaOcultamientos,
   esquemaListaPistas,
   esquemaPosicion,
+  esquemaPreferenciasCopia,
   esquemaSegmentado,
   esquemaSeguido,
   esquemaVideoExportado,
   esquemaTrazo,
   esquemaTema,
+  PREFERENCIAS_COPIA_INICIALES,
   textoCierre,
   TITULO_CIERRE,
+  type Ajustes,
   type ArchivoCargado,
   type AvisoCierre,
   type Edicion,
+  type Exportado,
+  type PreferenciasCopia,
   type Recuperacion,
   type Resultado,
   type Tema,
 } from '../shared/contrato';
+import { extensionCopia, nombreCopia, nombreLibre } from '../shared/exportacion';
 import { Archivos, planearLote } from './archivos';
 import { Sidecar } from './sidecar';
 import { esVideo, EXTENSIONES_VIDEO, Videos } from './videos';
@@ -108,15 +115,78 @@ const LIMITE_EXPORTAR_VIDEO_MS = 60 * 60 * 1000;
 const rutaAjustes = (): string => join(app.getPath('userData'), 'ajustes.json');
 const rutaRecuperacion = (): string => join(app.getPath('userData'), 'recuperacion.json');
 
-function leerTema(): Tema {
+/** Lo que se guarda en ajustes.json. La carpeta es una ruta: nunca sale de main. */
+interface AjustesGuardados {
+  tema: Tema;
+  copia: PreferenciasCopia;
+  carpeta: string | null;
+}
+
+const AJUSTES_INICIALES: AjustesGuardados = { tema: 'sistema', copia: PREFERENCIAS_COPIA_INICIALES, carpeta: null };
+
+const esquemaAjustesGuardados = z.object({
+  tema: esquemaTema.catch('sistema'),
+  copia: esquemaPreferenciasCopia.catch(PREFERENCIAS_COPIA_INICIALES),
+  carpeta: z.string().min(1).max(32767).nullable().catch(null),
+});
+
+/** Cada parte inválida vuelve a su valor inicial sin borrar las demás. */
+function leerAjustes(): AjustesGuardados {
+  if (!existsSync(rutaAjustes())) return AJUSTES_INICIALES;
   try {
-    const crudo = JSON.parse(readFileSync(rutaAjustes(), 'utf-8')) as { tema?: unknown };
-    return esquemaTema.parse(crudo.tema);
+    const crudo: unknown = JSON.parse(readFileSync(rutaAjustes(), 'utf-8'));
+    const leido = esquemaAjustesGuardados.parse(typeof crudo === 'object' && crudo !== null ? crudo : {});
+    return { tema: leido.tema, copia: leido.copia, carpeta: leido.carpeta };
   } catch (e) {
-    if (existsSync(rutaAjustes())) registrar(`Ajustes inválidos: ${e instanceof Error ? e.name : 'desconocido'}`);
-    return 'sistema';
+    registrar(`Ajustes inválidos: ${e instanceof Error ? e.name : 'desconocido'}`);
+    return AJUSTES_INICIALES;
   }
 }
+
+function guardarAjustes(cambio: Partial<AjustesGuardados>): AjustesGuardados {
+  const nuevos = { ...leerAjustes(), ...cambio };
+  writeFileSync(rutaAjustes(), JSON.stringify(nuevos));
+  return nuevos;
+}
+
+const leerTema = (): Tema => leerAjustes().tema;
+
+/** La carpeta de los ajustes, solo si todavía existe. */
+function carpetaVigente(ajustes: AjustesGuardados): string | null {
+  const { carpeta } = ajustes;
+  if (carpeta === null) return null;
+  try {
+    return statSync(carpeta).isDirectory() ? carpeta : null;
+  } catch (e) {
+    registrar(`La carpeta de copias ya no está: ${e instanceof Error ? e.name : 'desconocido'}`);
+    return null;
+  }
+}
+
+const nombreCarpeta = (carpeta: string): string => basename(carpeta) || carpeta;
+
+/** Lo que ve el renderer: el nombre de la carpeta, nunca su ruta. */
+function ajustesVisibles(ajustes: AjustesGuardados): Ajustes {
+  const carpeta = carpetaVigente(ajustes);
+  return { tema: ajustes.tema, copia: ajustes.copia, carpeta: carpeta === null ? null : nombreCarpeta(carpeta) };
+}
+
+/** Carpetas de los lotes en curso, por id opaco. Se olvidan al cerrar la app. */
+const lotes = new Map<string, string>();
+
+async function pedirCarpeta(titulo: string): Promise<string | null> {
+  if (ventana === null) return null;
+  const elegido = await dialog.showOpenDialog(ventana, { title: titulo, properties: ['openDirectory', 'createDirectory'] });
+  return elegido.canceled ? null : (elegido.filePaths[0] ?? null);
+}
+
+const SIN_NOMBRE_LIBRE = {
+  ok: false,
+  error: {
+    codigo: 'SIN_NOMBRE_LIBRE',
+    mensaje: 'Ya hay demasiadas copias con ese nombre en la carpeta. Elige otra carpeta o cambia el nombre de las copias.',
+  },
+} as const;
 
 function aplicarTema(tema: Tema): void {
   switch (tema) {
@@ -229,7 +299,7 @@ async function abrirRutas(rutas: string[]): Promise<ArchivoCargado[]> {
       salida.push({
         ok: false,
         nombre: basename(ruta),
-        error: { codigo: 'ES_VIDEO', mensaje: 'Esto es un video. Ábrelo con el botón "Abrir video".' },
+        error: { codigo: 'ES_VIDEO', mensaje: 'Esto es un video. Arrástralo solo o ábrelo desde el menú, en Video.' },
       });
       continue;
     }
@@ -257,6 +327,29 @@ function validar<T>(esquema: z.ZodType<T>, valor: unknown): T | null {
 
 const invalido = { ok: false, error: ERROR_VALIDACION } as const;
 const FALLO = { ok: false, error: ERROR_INTERNO } as const;
+
+/** Escribe la copia en la carpeta con un nombre libre: en una carpeta nunca se sobrescribe sin preguntar. */
+async function exportarEnCarpeta(archivoId: string, ocultamientos: unknown[], carpeta: string): Promise<Resultado<Exportado>> {
+  const original = archivos.ruta(archivoId);
+  const formato = archivos.formato(archivoId);
+  if (original === undefined || formato === undefined) return invalido;
+  const { copia } = leerAjustes();
+  const deseado = nombreCopia(parse(original).name, copia.sufijo, extensionCopia(copia.formato, formato));
+  const nombre = nombreLibre(deseado, (n) => existsSync(join(carpeta, n)));
+  if (nombre === null) return SIN_NOMBRE_LIBRE;
+  const sidecarId = await archivos.sidecarId(archivoId);
+  if (!sidecarId.ok) return sidecarId;
+  const { resultado } = await sidecar.pedir({
+    tipo: 'exportar',
+    imagen_id: sidecarId.datos,
+    ocultamientos,
+    ruta_destino: join(carpeta, nombre),
+    sobrescribir: false,
+  });
+  if (!resultado.ok) return resultado;
+  const exportado = esquemaExportado.parse(resultado.datos);
+  return { ok: true, datos: { nombre, zonasOcultas: exportado.zonas_ocultas, carpeta: nombreCarpeta(carpeta) } };
+}
 
 /**
  * Toda excepción termina aquí. Si llegara al renderer, Electron le mostraría su texto,
@@ -321,12 +414,18 @@ function registrarCanales(): void {
     const lista = validar(esquemaListaOcultamientos, ocultamientos);
     if (archivoId === null || lista === null || ventana === null) return invalido;
     const original = archivos.ruta(archivoId);
-    if (original === undefined) return invalido;
-    const { name } = parse(original);
+    const formato = archivos.formato(archivoId);
+    if (original === undefined || formato === undefined) return invalido;
+    const ajustes = leerAjustes();
+    const carpeta = carpetaVigente(ajustes);
+    // Con una carpeta en tus ajustes, la copia va directo ahí. Si la carpeta ya no está, se pregunta.
+    if (ajustes.copia.destino === 'carpeta' && carpeta !== null) return exportarEnCarpeta(archivoId, lista, carpeta);
+    const extension = extensionCopia(ajustes.copia.formato, formato);
+    const filtros = [{ name: 'JPG', extensions: ['jpg'] }, { name: 'PNG', extensions: ['png'] }];
     const elegido = await dialog.showSaveDialog(ventana, {
       title: 'Guardar copia sin metadatos',
-      defaultPath: join(dirname(original), `${name}-copia.jpg`),
-      filters: [{ name: 'JPG', extensions: ['jpg'] }, { name: 'PNG', extensions: ['png'] }],
+      defaultPath: join(carpeta ?? dirname(original), nombreCopia(parse(original).name, ajustes.copia.sufijo, extension)),
+      filters: extension === 'png' ? filtros.reverse() : filtros,
     });
     if (elegido.canceled || elegido.filePath === '') return { ok: true, datos: null };
     const sidecarId = await archivos.sidecarId(archivoId);
@@ -341,7 +440,43 @@ function registrarCanales(): void {
     });
     if (!resultado.ok) return resultado;
     const exportado = esquemaExportado.parse(resultado.datos);
-    return { ok: true, datos: { nombre: basename(elegido.filePath), zonasOcultas: exportado.zonas_ocultas } };
+    return { ok: true, datos: { nombre: basename(elegido.filePath), zonasOcultas: exportado.zonas_ocultas, carpeta: null } };
+  });
+
+  manejar(CANALES.prepararLote, FALLO, async (): Promise<Resultado<unknown>> => {
+    const ajustes = leerAjustes();
+    const guardada = ajustes.copia.destino === 'carpeta' ? carpetaVigente(ajustes) : null;
+    const carpeta = guardada ?? (await pedirCarpeta('Elige la carpeta para tus copias'));
+    if (carpeta === null) return { ok: true, datos: null };
+    const loteId = randomUUID();
+    lotes.set(loteId, carpeta);
+    return { ok: true, datos: { loteId, carpeta: nombreCarpeta(carpeta) } };
+  });
+
+  manejar(CANALES.exportarEnLote, FALLO, async (lote: unknown, id: unknown, ocultamientos: unknown): Promise<Resultado<unknown>> => {
+    const loteId = validar(z.uuid(), lote);
+    const archivoId = validar(esquemaArchivoId, id);
+    const lista = validar(esquemaListaOcultamientos, ocultamientos);
+    if (loteId === null || archivoId === null || lista === null) return invalido;
+    const carpeta = lotes.get(loteId);
+    if (carpeta === undefined) return invalido;
+    return exportarEnCarpeta(archivoId, lista, carpeta);
+  });
+
+  manejar(CANALES.miniatura, FALLO, async (id: unknown): Promise<Resultado<unknown>> => {
+    const archivoId = validar(esquemaArchivoId, id);
+    if (archivoId === null) return invalido;
+    const sidecarId = await archivos.sidecarId(archivoId);
+    if (!sidecarId.ok) return sidecarId;
+    const { resultado, binario } = await sidecar.pedir({
+      tipo: 'previsualizar',
+      imagen_id: sidecarId.datos,
+      ocultamientos: [],
+      lado_max: LIMITES.ladoMiniatura,
+    });
+    if (!resultado.ok) return resultado;
+    if (binario === null) return invalido;
+    return { ok: true, datos: { mime: resultado.datos.mime, datos: new Uint8Array(binario) } };
   });
 
   manejar(CANALES.segmentar, FALLO, async (id: unknown, x: unknown, y: unknown): Promise<Resultado<unknown>> => {
@@ -387,7 +522,20 @@ function registrarCanales(): void {
     const valido = validar(esquemaTema, tema);
     if (valido === null) return;
     aplicarTema(valido);
-    writeFileSync(rutaAjustes(), JSON.stringify({ tema: valido }));
+    guardarAjustes({ tema: valido });
+  });
+
+  manejar(CANALES.obtenerAjustes, ajustesVisibles(AJUSTES_INICIALES), (): Ajustes => ajustesVisibles(leerAjustes()));
+
+  manejar(CANALES.definirCopia, ajustesVisibles(AJUSTES_INICIALES), (preferencias: unknown): Ajustes => {
+    const validas = validar(esquemaPreferenciasCopia, preferencias);
+    // Si no son válidas, se conservan las anteriores: nada cambia en silencio a algo distinto.
+    return ajustesVisibles(validas === null ? leerAjustes() : guardarAjustes({ copia: validas }));
+  });
+
+  manejar(CANALES.elegirCarpeta, ajustesVisibles(AJUSTES_INICIALES), async (): Promise<Ajustes> => {
+    const carpeta = await pedirCarpeta('Elige dónde guardar tus copias');
+    return ajustesVisibles(carpeta === null ? leerAjustes() : guardarAjustes({ carpeta }));
   });
 
   manejar(CANALES.guardarEdiciones, undefined, (ediciones: unknown): Promise<void> => {
@@ -432,6 +580,14 @@ function registrarCanalesVideo(): void {
     const ruta = elegido.filePaths[0];
     if (elegido.canceled || ruta === undefined) return { ok: true, datos: null };
     return videos.abrir(ruta);
+  });
+
+  manejar(CANALES.soltarVideo, FALLO, async (ruta: unknown): Promise<Resultado<unknown>> => {
+    const valida = validar(z.string().min(1).max(32767), ruta);
+    if (valida === null || !esVideo(valida)) {
+      return { ok: false, error: { codigo: 'NO_ES_VIDEO', mensaje: 'Ese archivo no es un video que podamos abrir. Usa MP4, MOV, M4V, WebM o MKV.' } };
+    }
+    return videos.abrir(valida);
   });
 
   manejar(CANALES.vistaVideo, FALLO, async (id: unknown, posicion: unknown, pistas: unknown): Promise<Resultado<unknown>> => {
@@ -563,9 +719,10 @@ function crearMenu(): void {
       {
         label: 'Ver',
         submenu: [
-          { role: 'zoomIn', label: 'Acercar la interfaz', accelerator: 'CommandOrControl+=' },
-          { role: 'zoomOut', label: 'Alejar la interfaz' },
-          { role: 'resetZoom', label: 'Tamaño normal' },
+          // Ctrl + y Ctrl − sin Mayús acercan la foto: la interfaz usa Ctrl Mayús.
+          { role: 'zoomIn', label: 'Agrandar la interfaz', accelerator: 'CommandOrControl+Shift+=' },
+          { role: 'zoomOut', label: 'Achicar la interfaz', accelerator: 'CommandOrControl+Shift+-' },
+          { role: 'resetZoom', label: 'Tamaño normal', accelerator: 'CommandOrControl+Shift+0' },
           { role: 'togglefullscreen', label: 'Pantalla completa' },
         ],
       },

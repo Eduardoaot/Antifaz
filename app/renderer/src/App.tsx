@@ -1,30 +1,25 @@
-import {
-  BookOpen,
-  Car,
-  CheckCircle2,
-  CreditCard,
-  Film,
-  FolderOpen,
-  IdCard,
-  Image as IconoFoto,
-  Lock,
-  MapPin,
-  Menu,
-  QrCode,
-  Redo2,
-  Save,
-  Shield,
-  ShieldCheck,
-  Sparkles,
-  Undo2,
-  Users,
-  X,
-} from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
+import { FolderOpen, Keyboard, Menu, ShieldCheck, X } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import logoClaro from '../../../brand/logo/horizontal-claro.svg';
 import logoOscuro from '../../../brand/logo/horizontal-oscuro.svg';
-import { AVISO_LEGAL, MARCA } from '../../shared/catalogo';
-import { esquemaAvisoCierre, esquemaTema, ERROR_INTERNO, LIMITES, textoCierre, TITULO_CIERRE, type AvisoCierre, type Analisis, type ArchivoAbierto, type ArchivoCargado, type ErrorApp, type Origen, type Punto, type Recuperable, type Tema } from '../../shared/contrato';
+import { AVISO_LEGAL, MARCA, type Regla } from '../../shared/catalogo';
+import {
+  esquemaAvisoCierre,
+  ERROR_INTERNO,
+  LIMITES,
+  PREFERENCIAS_COPIA_INICIALES,
+  textoCierre,
+  TITULO_CIERRE,
+  type Ajustes,
+  type Analisis,
+  type ArchivoAbierto,
+  type ArchivoCargado,
+  type AvisoCierre,
+  type ErrorApp,
+  type Origen,
+  type Punto,
+  type Recuperable,
+} from '../../shared/contrato';
 import {
   aEdicion,
   agregarManual,
@@ -32,11 +27,9 @@ import {
   aplicarCambio,
   aplicarDecisionesIniciales,
   construirOcultamientos,
-  contarAdvertencias,
   cubreTodo,
   desdeEdicion,
   deshacer,
-  efectoDeManual,
   hayCambios,
   nuevoHistorial,
   ocultarRiesgoAlto,
@@ -54,13 +47,18 @@ import {
   type Resaltado,
   type Revision,
 } from '../../shared/logica';
-import { Advertencias, Cobertura } from './Advertencias';
+import { Advertencias, EstiloGlobal, Resumen } from './Advertencias';
 import { AnimacionInicio } from './AnimacionInicio';
-import { Confirmacion } from './Dialogos';
+import { DialogoAtajos } from './Atajos';
+import { herramientaDeTecla } from './BarraHerramientas';
+import { Cajon, type Vista } from './Cajon';
+import { Configuracion } from './Configuracion';
+import { Confirmacion, DialogoPorQue } from './Dialogos';
 import { Guia } from './Guia';
+import { ListaFotos } from './ListaFotos';
 import { Manual } from './Manual';
 import { ModoVideo } from './ModoVideo';
-import { irAFila } from './resaltar';
+import { esNombreDeVideo, SoltarAqui } from './SoltarAqui';
 import { Visor } from './Visor';
 
 export type EstadoAnalisis =
@@ -91,26 +89,61 @@ interface ZonaNueva {
   anuncio: string;
 }
 
+/** Lo que dice el aviso antes de exportar varias fotos. */
+interface ResumenLote {
+  listas: number;
+  conPendientes: number;
+  parciales: number;
+  sinRevisar: number;
+}
+
 const api = (): typeof window.revisor => window.revisor;
+
+const AJUSTES_INICIALES: Ajustes = { tema: 'sistema', copia: PREFERENCIAS_COPIA_INICIALES, carpeta: null };
+
+const plural = (n: number, uno: string, varios: string): string => `${n} ${n === 1 ? uno : varios}`;
+
+/** Los ocultamientos de una foto revisada, con sus hallazgos en el mismo orden que ve la persona. */
+function ocultamientosDe(a: Archivo): ReturnType<typeof construirOcultamientos> | null {
+  if (a.estado.tipo !== 'listo') return null;
+  return construirOcultamientos(a.historial.actual, ordenarHallazgos(a.estado.analisis.hallazgos));
+}
+
+function textoLote(r: ResumenLote): string {
+  const partes = [`Vamos a guardar ${plural(r.listas, 'copia', 'copias')}.`];
+  if (r.sinRevisar > 0) partes.push(`${plural(r.sinRevisar, 'foto no está revisada', 'fotos no están revisadas')}, así que no se exporta${r.sinRevisar === 1 ? '' : 'n'}.`);
+  if (r.parciales > 0) partes.push(`${plural(r.parciales, 'foto no se revisó', 'fotos no se revisaron')} por completo y podría${r.parciales === 1 ? '' : 'n'} tener algo que no vimos.`);
+  if (r.conPendientes > 0) partes.push(`${plural(r.conPendientes, 'foto tiene', 'fotos tienen')} advertencias sin decidir: lo que no marques para ocultar saldrá visible.`);
+  partes.push('Tú decides.');
+  return partes.join(' ');
+}
 
 export function App(): React.JSX.Element {
   const [archivos, setArchivos] = useState<Archivo[]>([]);
   const [elegido, setSeleccion] = useState<string | null>(null);
   const [fallos, setFallos] = useState<Fallo[]>([]);
   const [anuncio, setAnuncio] = useState('');
-  const [tema, setTema] = useState<Tema>('sistema');
+  const [ajustes, setAjustes] = useState<Ajustes>(AJUSTES_INICIALES);
+  const [configurando, setConfigurando] = useState(false);
+  const [viendoAtajos, setViendoAtajos] = useState(false);
+  const [menuAbierto, setMenuAbierto] = useState(false);
   const [exportando, setExportando] = useState(false);
+  const [progresoLote, setProgresoLote] = useState<{ hechas: number; total: number; carpeta: string } | null>(null);
   const [confirmarExport, setConfirmarExport] = useState<{ faltan: number; parcial: boolean } | null>(null);
+  const [confirmarLote, setConfirmarLote] = useState<ResumenLote | null>(null);
   const [recuperables, setRecuperables] = useState<Recuperable[]>([]);
   // Hasta resolverlo no se guarda nada, para no borrar la recuperación que se está ofreciendo.
   const [recuperacionResuelta, setRecuperacionResuelta] = useState(false);
   const exportandoAhora = useRef(false);
-  const [vista, setVista] = useState<'revision' | 'guia' | 'video'>('revision');
+  const [vista, setVista] = useState<Vista>('revision');
   const [herramienta, setHerramienta] = useState<Herramienta>('ninguna');
   const [buscando, setBuscando] = useState(false);
   const [tamanoPincel, setTamanoPincel] = useState<number>(LIMITES.pincel.porDefecto);
   const [zonaTotal, setZonaTotal] = useState<ZonaNueva | null>(null);
   const [avisoCierre, setAvisoCierre] = useState<AvisoCierre | null>(null);
+  const [porQue, setPorQue] = useState<Regla | null>(null);
+  // Un video que se soltó sobre la ventana, o el pedido de abrir uno desde el menú: el modo de video lo atiende.
+  const [pedidoVideo, setPedidoVideo] = useState<{ archivo: File | null; vez: number } | null>(null);
   // Zona resaltada a la vez en la imagen y en el panel. Solo es visual: no cambia ninguna decisión.
   // Se guarda con su foto, porque los ids de zona ("cara-0") se repiten entre fotos.
   const [resaltadoDe, setResaltadoDe] = useState<{ archivoId: string | null; resaltado: Resaltado | null }>({ archivoId: null, resaltado: null });
@@ -131,9 +164,14 @@ export function App(): React.JSX.Element {
     () => (revision === null ? [] : construirOcultamientos(revision, hallazgos)),
     [revision, hallazgos],
   );
+  const listasParaExportar = archivos.filter((a) => a.estado.tipo === 'listo').length;
 
   const actualizar = useCallback((id: string, cambio: (a: Archivo) => Archivo) => {
     setArchivos((lista) => lista.map((a) => (a.info.id === id ? cambio(a) : a)));
+  }, []);
+
+  const fallar = useCallback((nombre: string, mensaje: string) => {
+    setFallos((f) => [...f, { clave: crypto.randomUUID(), nombre, mensaje }]);
   }, []);
 
   /** Analiza de uno en uno: el sidecar atiende en serie y así no se congela la interfaz. */
@@ -198,6 +236,7 @@ export function App(): React.JSX.Element {
   );
 
   const abrir = useCallback(async () => {
+    setVista('revision');
     incorporar(await api().seleccionarArchivos());
   }, [incorporar]);
 
@@ -233,21 +272,22 @@ export function App(): React.JSX.Element {
     try {
       const resultado = await api().exportar(actual.info.id, ocultamientos);
       if (!resultado.ok) {
-        setFallos((f) => [...f, { clave: crypto.randomUUID(), nombre: actual.info.nombre, mensaje: resultado.error.mensaje }]);
+        fallar(actual.info.nombre, resultado.error.mensaje);
         setAnuncio(`No se guardó. ${resultado.error.mensaje}`);
       } else if (resultado.datos !== null) {
-        const { nombre, zonasOcultas } = resultado.datos;
+        const { nombre, zonasOcultas, carpeta } = resultado.datos;
         actualizar(actual.info.id, (a) => ({ ...a, exportado: true }));
-        setAnuncio(`Guardamos ${nombre} sin metadatos, con ${zonasOcultas} ${zonasOcultas === 1 ? 'zona oculta' : 'zonas ocultas'}.`);
+        const donde = carpeta === null ? '' : ` en la carpeta ${carpeta}`;
+        setAnuncio(`Guardamos ${nombre}${donde} sin metadatos, con ${zonasOcultas} ${zonasOcultas === 1 ? 'zona oculta' : 'zonas ocultas'}.`);
       }
     } catch {
-      setFallos((f) => [...f, { clave: crypto.randomUUID(), nombre: actual.info.nombre, mensaje: ERROR_INTERNO.mensaje }]);
+      fallar(actual.info.nombre, ERROR_INTERNO.mensaje);
       setAnuncio(`No se guardó. ${ERROR_INTERNO.mensaje}`);
     } finally {
       exportandoAhora.current = false;
       setExportando(false);
     }
-  }, [actual, actualizar, ocultamientos]);
+  }, [actual, actualizar, fallar, ocultamientos]);
 
   const pedirExportar = useCallback(() => {
     if (actual === null || revision === null || analisis === null || exportando) return;
@@ -256,6 +296,68 @@ export function App(): React.JSX.Element {
     if (faltan > 0 || parcial) setConfirmarExport({ faltan, parcial });
     else void exportarAhora();
   }, [actual, analisis, exportando, exportarAhora, hallazgos, revision]);
+
+  /** Exporta todas las fotos revisadas a una sola carpeta, de una en una, diciendo cuántas van. */
+  const exportarLoteAhora = useCallback(async () => {
+    setConfirmarLote(null);
+    if (exportandoAhora.current) return;
+    // Lo que se exporta es lo decidido en este momento: mientras tanto no se puede cambiar nada.
+    const fotos = archivos.filter((a) => a.estado.tipo === 'listo');
+    if (fotos.length === 0) return;
+    exportandoAhora.current = true;
+    setExportando(true);
+    try {
+      const lote = await api().prepararLote();
+      if (!lote.ok) {
+        fallar('Exportar todas', lote.error.mensaje);
+        return;
+      }
+      if (lote.datos === null) return;
+      const { loteId, carpeta } = lote.datos;
+      let guardadas = 0;
+      let hechas = 0;
+      setProgresoLote({ hechas, total: fotos.length, carpeta });
+      for (const foto of fotos) {
+        const lista = ocultamientosDe(foto);
+        if (lista !== null) {
+          const resultado = await api().exportarEnLote(loteId, foto.info.id, lista).catch(() => ({ ok: false, error: ERROR_INTERNO }) as const);
+          if (resultado.ok) {
+            guardadas += 1;
+            actualizar(foto.info.id, (a) => ({ ...a, exportado: true }));
+          } else {
+            fallar(foto.info.nombre, resultado.error.mensaje);
+          }
+        }
+        hechas += 1;
+        setProgresoLote({ hechas, total: fotos.length, carpeta });
+      }
+      const fallidas = fotos.length - guardadas;
+      setAnuncio(
+        `Guardamos ${plural(guardadas, 'copia', 'copias')} sin metadatos en la carpeta ${carpeta}.${fallidas > 0 ? ` ${plural(fallidas, 'no se guardó', 'no se guardaron')}: revisa los avisos.` : ''}`,
+      );
+    } finally {
+      exportandoAhora.current = false;
+      setExportando(false);
+      setProgresoLote(null);
+    }
+  }, [actualizar, archivos, fallar]);
+
+  const pedirExportarTodas = useCallback(() => {
+    if (exportando) return;
+    const listas = archivos.filter((a) => a.estado.tipo === 'listo');
+    if (listas.length === 0) {
+      setAnuncio('Todavía no hay fotos revisadas para exportar.');
+      return;
+    }
+    const resumen: ResumenLote = {
+      listas: listas.length,
+      sinRevisar: archivos.length - listas.length,
+      parciales: listas.filter((a) => a.estado.tipo === 'listo' && !a.estado.analisis.cobertura.completa).length,
+      conPendientes: listas.filter((a) => a.estado.tipo === 'listo' && pendientes(a.historial.actual, a.estado.analisis.hallazgos).length > 0).length,
+    };
+    // Siempre se confirma: son varias fotos y se dice cuántas y a dónde van.
+    setConfirmarLote(resumen);
+  }, [archivos, exportando]);
 
   const agregarZona = useCallback(
     (z: ZonaNueva) => {
@@ -325,10 +427,10 @@ export function App(): React.JSX.Element {
         if (resultado.ok) {
           const { caja, mascara_id: mascaraId } = resultado.datos;
           // Nada se recorta en silencio: si el trazo llegó al límite, se dice.
-          const anuncio = trazoLleno(puntos)
+          const texto = trazoLleno(puntos)
             ? 'Tu trazo era muy largo, así que solo tomamos la primera parte. Pinta otro trazo para tapar el resto.'
             : 'Agregamos tu trazo para ocultarlo. Revisa la vista previa.';
-          pedirZona({ archivoId: id, caja, mascaraId, origen: 'pincel', anuncio });
+          pedirZona({ archivoId: id, caja, mascaraId, origen: 'pincel', anuncio: texto });
         } else {
           setAnuncio(resultado.error.mensaje);
         }
@@ -377,7 +479,7 @@ export function App(): React.JSX.Element {
   );
 
   useEffect(() => {
-    void api().obtenerTema().then(setTema);
+    void api().obtenerAjustes().then(setAjustes);
     void api().recuperar().then(({ recuperables: lista, descartadas }) => {
       setRecuperables(lista);
       if (lista.length === 0) setRecuperacionResuelta(true);
@@ -394,21 +496,56 @@ export function App(): React.JSX.Element {
     });
   }, []);
 
+  const abrirVideo = useCallback(() => {
+    setVista('video');
+    setPedidoVideo({ archivo: null, vez: Date.now() });
+  }, []);
+
   useEffect(() => {
     const alTeclear = (e: KeyboardEvent): void => {
+      const objetivo = e.target;
+      const hayDialogo = document.querySelector('dialog[open]') !== null;
+      if (e.key === 'F1' || (e.ctrlKey && e.key === '/')) {
+        e.preventDefault();
+        if (!hayDialogo) setViendoAtajos(true);
+        return;
+      }
+      const enCampo = objetivo instanceof HTMLInputElement || objetivo instanceof HTMLSelectElement || objetivo instanceof HTMLTextAreaElement;
+      // Las herramientas con una letra, como en un editor de fotos. Nunca mientras se escribe.
+      if (!e.ctrlKey && !e.altKey && !e.metaKey && !enCampo && vista === 'revision' && analisis !== null && !exportando) {
+        const h = herramientaDeTecla(e.key);
+        if (h !== null && document.querySelector('dialog[open]') === null) {
+          e.preventDefault();
+          setHerramienta(h);
+          return;
+        }
+      }
       if (!e.ctrlKey || e.altKey) return;
       const tecla = e.key.toLowerCase();
-      const enCampo = e.target instanceof HTMLInputElement && e.target.type === 'text';
+      const enTexto = objetivo instanceof HTMLInputElement && (objetivo.type === 'text' || objetivo.type === 'search');
+      // Con un diálogo abierto, los atajos no deben abrir otro encima.
+      if (hayDialogo && tecla !== 'z' && tecla !== 'y') return;
       if (tecla === 'o') {
         e.preventDefault();
-        void abrir();
-      } else if (tecla === 'e') {
+        if (e.shiftKey) abrirVideo();
+        else void abrir();
+      } else if (tecla === '1' || tecla === '2' || tecla === '3') {
         e.preventDefault();
-        pedirExportar();
-      } else if (!enCampo && tecla === 'z' && !e.shiftKey) {
+        setVista(tecla === '1' ? 'revision' : tecla === '2' ? 'video' : 'guia');
+      } else if (tecla === ',') {
+        e.preventDefault();
+        setConfigurando(true);
+      } else if (tecla === 'e' && vista === 'revision') {
+        // En video, Ctrl E lo atiende el modo de video.
+        e.preventDefault();
+        if (e.shiftKey) pedirExportarTodas();
+        else pedirExportar();
+      } else if (vista !== 'revision') {
+        return;
+      } else if (!enTexto && tecla === 'z' && !e.shiftKey) {
         e.preventDefault();
         moverHistorial(deshacer, 'Se deshizo el último cambio.');
-      } else if (!enCampo && (tecla === 'y' || (tecla === 'z' && e.shiftKey))) {
+      } else if (!enTexto && (tecla === 'y' || (tecla === 'z' && e.shiftKey))) {
         e.preventDefault();
         moverHistorial(rehacer, 'Se rehizo el cambio.');
       }
@@ -417,12 +554,24 @@ export function App(): React.JSX.Element {
     return () => {
       window.removeEventListener('keydown', alTeclear);
     };
-  }, [abrir, moverHistorial, pedirExportar]);
+  }, [abrir, abrirVideo, analisis, exportando, moverHistorial, pedirExportar, pedirExportarTodas, vista]);
 
-  const alSoltar = (e: DragEvent): void => {
-    e.preventDefault();
-    const soltados = [...e.dataTransfer.files];
-    if (soltados.length > 0) void api().soltarArchivos(soltados).then(incorporar);
+  /** Se puede soltar en cualquier parte: las fotos van a revisión y un video, al modo de video. */
+  const alSoltarArchivos = (soltados: File[]): void => {
+    const videos = soltados.filter((f) => esNombreDeVideo(f.name));
+    const fotos = soltados.filter((f) => !esNombreDeVideo(f.name));
+    const [video] = videos;
+    if (video !== undefined) {
+      setPedidoVideo({ archivo: video, vez: Date.now() });
+      if (videos.length > 1) setAnuncio('Abrimos solo el primer video: en esta versión se revisa uno a la vez.');
+    }
+    if (fotos.length > 0) {
+      setVista('revision');
+      void api().soltarArchivos(fotos).then(incorporar);
+      if (video !== undefined) setAnuncio('Abrimos tus fotos. El video está en Video, en el menú.');
+    } else if (video !== undefined) {
+      setVista('video');
+    }
   };
 
   const aplicarRecuperacion = (): void => {
@@ -464,107 +613,47 @@ export function App(): React.JSX.Element {
   };
 
   const analizando = archivos.some((a) => a.estado.tipo === 'analizando' || a.estado.tipo === 'en_cola');
-  const fallar = useCallback((nombre: string, mensaje: string) => {
-    setFallos((f) => [...f, { clave: crypto.randomUUID(), nombre, mensaje }]);
-  }, []);
-  const enFotos = vista === 'revision';
-
-  const [menuAbierto, setMenuAbierto] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-  const botonMenuRef = useRef<HTMLButtonElement>(null);
-  useEffect(() => {
-    if (!menuAbierto) return;
-    const alPresionar = (e: PointerEvent): void => {
-      if (e.target instanceof Node && !menuRef.current?.contains(e.target)) setMenuAbierto(false);
-    };
-    const alTecla = (e: KeyboardEvent): void => {
-      if (e.key !== 'Escape') return;
-      setMenuAbierto(false);
-      botonMenuRef.current?.focus();
-    };
-    document.addEventListener('pointerdown', alPresionar);
-    document.addEventListener('keydown', alTecla);
-    return () => {
-      document.removeEventListener('pointerdown', alPresionar);
-      document.removeEventListener('keydown', alTecla);
-    };
-  }, [menuAbierto]);
+  const conFotos = archivos.length > 0;
+  const titulos: Record<Vista, string> = { revision: 'Fotos', video: 'Video', guia: 'Guía de privacidad' };
 
   return (
-    <div className="app" onDragOver={(e) => { e.preventDefault(); }} onDrop={alSoltar}>
+    <div className="app">
       <AnimacionInicio />
+      <SoltarAqui alSoltar={alSoltarArchivos} />
       <a className="saltar" href="#principal">Saltar al contenido</a>
       <header className="cabecera">
         <div className="identidad">
-          <div className="menu-navegacion" ref={menuRef}>
-            <button
-              ref={botonMenuRef}
-              type="button"
-              className="boton fantasma boton-menu"
-              aria-label="Menú"
-              aria-expanded={menuAbierto}
-              aria-controls="menu-desplegable"
-              onClick={() => { setMenuAbierto((a) => !a); }}
-            >
-              <Menu aria-hidden="true" />
-            </button>
-            {menuAbierto && (
-              <div id="menu-desplegable" className="menu-desplegable">
-                {enFotos ? (
-                  <button type="button" className="boton fantasma" onClick={() => { setMenuAbierto(false); void abrir(); }}>
-                    <FolderOpen aria-hidden="true" /> Abrir fotos
-                  </button>
-                ) : (
-                  <button type="button" className="boton fantasma" onClick={() => { setMenuAbierto(false); setVista('revision'); }}>
-                    <IconoFoto aria-hidden="true" /> Fotos
-                  </button>
-                )}
-                <button type="button" className="boton fantasma" aria-pressed={vista === 'video'} onClick={() => { setMenuAbierto(false); setVista((v) => (v === 'video' ? 'revision' : 'video')); }}>
-                  <Film aria-hidden="true" /> Video
-                </button>
-                <button type="button" className="boton fantasma" aria-pressed={vista === 'guia'} onClick={() => { setMenuAbierto(false); setVista((v) => (v === 'guia' ? 'revision' : 'guia')); }}>
-                  <BookOpen aria-hidden="true" /> Guía de privacidad
-                </button>
-              </div>
-            )}
-          </div>
+          <button
+            type="button"
+            className="boton fantasma boton-menu"
+            aria-label="Menú"
+            aria-expanded={menuAbierto}
+            aria-haspopup="dialog"
+            onClick={() => { setMenuAbierto(true); }}
+          >
+            <Menu aria-hidden="true" />
+          </button>
           <picture>
             <source srcSet={logoOscuro} media="(prefers-color-scheme: dark)" />
             <img className="logo" src={logoClaro} alt={MARCA.nombre} />
           </picture>
           <p className="eslogan">{MARCA.eslogan}</p>
         </div>
-        {/* Las acciones de edición solo aparecen con una foto abierta; abrir y cambiar de vista van en el menú. */}
-        <div className="acciones">
-          {enFotos && actual !== null && (<>
-          <button type="button" className="boton fantasma" disabled={exportando || actual.historial.pasado.length === 0} onClick={() => { moverHistorial(deshacer, 'Se deshizo el último cambio.'); }}>
-            <Undo2 aria-hidden="true" /> Deshacer
-          </button>
-          <button type="button" className="boton fantasma" disabled={exportando || actual.historial.futuro.length === 0} onClick={() => { moverHistorial(rehacer, 'Se rehizo el cambio.'); }}>
-            <Redo2 aria-hidden="true" /> Rehacer
-          </button>
-          <button type="button" className="boton primario" disabled={analisis === null || exportando} onClick={pedirExportar}>
-            <Save aria-hidden="true" /> {exportando ? 'Guardando…' : 'Exportar copia'}
-          </button>
-          <span className="separador" aria-hidden="true" />
-          </>)}
-          <label className="campo-tema">
-            Tema
-            <select
-              value={tema}
-              onChange={(e) => {
-                const valor = esquemaTema.parse(e.target.value);
-                setTema(valor);
-                void api().definirTema(valor);
-              }}
-            >
-              <option value="sistema">Como el sistema</option>
-              <option value="claro">Claro</option>
-              <option value="oscuro">Oscuro</option>
-            </select>
-          </label>
-        </div>
+        <p className="seccion-actual" aria-hidden="true">{titulos[vista]}</p>
       </header>
+
+      <Cajon
+        abierto={menuAbierto}
+        vista={vista}
+        listasParaExportar={listasParaExportar}
+        alCerrar={() => { setMenuAbierto(false); }}
+        alElegirVista={setVista}
+        alAbrirFotos={() => { void abrir(); }}
+        alAbrirVideo={abrirVideo}
+        alExportarTodas={pedirExportarTodas}
+        alConfigurar={() => { setConfigurando(true); }}
+        alVerAtajos={() => { setViendoAtajos(true); }}
+      />
 
       <div role="status" aria-live="polite" className="anuncio" data-testid="anuncio">{anuncio}</div>
 
@@ -573,7 +662,7 @@ export function App(): React.JSX.Element {
           {fallos.map((f) => (
             <li key={f.clave}>
               <span role="alert"><strong>{f.nombre}:</strong> {f.mensaje}</span>
-              <button type="button" className="boton chico" aria-label={`Cerrar el aviso de ${f.nombre}`} onClick={() => { setFallos((l) => l.filter((x) => x.clave !== f.clave)); }}>
+              <button type="button" className="boton fantasma chico" aria-label={`Cerrar el aviso de ${f.nombre}`} onClick={() => { setFallos((l) => l.filter((x) => x.clave !== f.clave)); }}>
                 <X aria-hidden="true" />
               </button>
             </li>
@@ -581,200 +670,199 @@ export function App(): React.JSX.Element {
         </ul>
       )}
 
+      {progresoLote !== null && (
+        <div className="progreso-lote" role="status">
+          <p>Guardando en <strong>{progresoLote.carpeta}</strong>: {progresoLote.hechas} de {progresoLote.total}</p>
+          <div className="barra-avance" aria-hidden="true"><span style={{ width: `${(progresoLote.hechas / progresoLote.total) * 100}%` }} /></div>
+        </div>
+      )}
+
       {/* El modo de video queda montado mientras se usan fotos: así no se pierde lo que se siguió. */}
-      <div hidden={vista !== 'video'}>
-        <ModoVideo activo={vista === 'video'} alAnunciar={setAnuncio} alFallar={fallar} />
+      <div hidden={vista !== 'video'} className="contenedor-video">
+        <ModoVideo activo={vista === 'video'} alAnunciar={setAnuncio} alFallar={fallar} pedido={pedidoVideo} />
       </div>
-      {vista === 'video' ? null : vista === 'guia' ? <Guia /> : (
-      <div className="cuerpo">
-        <nav className="lista-archivos" aria-label="Fotos abiertas">
-          <div className="cabecera-seccion">
-            <h2>Fotos</h2>
-            {archivos.length > 0 && <span className="chip-conteo">{archivos.length}</span>}
-          </div>
-          {archivos.length === 0 ? (
-            <div className="tarjeta-vacia-lateral">
-              <IconoFoto className="icono-lateral-vacio" aria-hidden="true" />
-              <p className="suave">Abre una foto o arrástrala aquí.</p>
-            </div>
-          ) : (
-            <ul>
-              {archivos.map((a) => (
-                <li key={a.info.id} className={a.info.id === seleccion ? 'activo' : ''}>
-                  <button type="button" className="archivo" aria-current={a.info.id === seleccion ? 'true' : undefined} onClick={() => { setSeleccion(a.info.id); }}>
-                    <span className="nombre">{a.info.nombre}</span>
-                    <span className="suave estado">{textoEstado(a)}</span>
-                  </button>
-                  <button type="button" className="boton chico" aria-label={`Cerrar ${a.info.nombre}`} onClick={() => { cerrarArchivo(a.info.id); }}>
-                    <X aria-hidden="true" />
-                  </button>
+      {vista === 'video' ? null : vista === 'guia' ? <Guia /> : !conFotos ? (
+        <main id="principal" tabIndex={-1} className="principal inicio">
+          <div className="vacio">
+            <div className="vacio-tarjeta">
+              <div className="vacio-icono-aura" aria-hidden="true">
+                <div className="aura-brillo" />
+                <div className="icono-escudo-wrapper">
+                  <ShieldCheck className="icono-escudo-svg" />
+                </div>
+              </div>
+              <h1 className="vacio-titulo">Revisa tus fotos antes de publicarlas</h1>
+              <p className="vacio-subtitulo">Todo se analiza en tu computadora. Ninguna foto sale de aquí.</p>
+
+              <div className="vacio-acciones">
+                <button type="button" className="boton primario boton-destacado" onClick={() => { void abrir(); }}>
+                  <FolderOpen aria-hidden="true" /> Abrir fotos
+                </button>
+                <span className="suave vacio-arrastrar">o arrastra fotos o un video a cualquier parte de la ventana</span>
+              </div>
+
+              <ol className="pasos-inicio" aria-label="Así funciona">
+                <li>
+                  <span className="paso-numero" aria-hidden="true">1</span>
+                  <div>
+                    <strong>Abre o arrastra</strong>
+                    <p className="suave">Varias fotos a la vez, o un video de hasta 15 segundos.</p>
+                  </div>
                 </li>
-              ))}
-            </ul>
-          )}
-          {analizando && <button type="button" className="boton" onClick={cancelar}>Cancelar revisión</button>}
-        </nav>
-
-        <main id="principal" tabIndex={-1} className="principal">
-          {actual === null ? (
-            <div className="vacio">
-              <div className="vacio-tarjeta">
-                <div className="vacio-icono-aura" aria-hidden="true">
-                  <div className="aura-brillo" />
-                  <div className="icono-escudo-wrapper">
-                    <ShieldCheck className="icono-escudo-svg" />
+                <li>
+                  <span className="paso-numero" aria-hidden="true">2</span>
+                  <div>
+                    <strong>Revisa lo que encontramos</strong>
+                    <p className="suave">Caras, datos de contacto, placas, documentos y más. Haz clic en una zona para saber por qué importa.</p>
                   </div>
-                </div>
-                <h1 className="vacio-titulo">Revisa tus fotos antes de publicarlas</h1>
-                <p className="vacio-subtitulo">Todo se analiza en tu computadora. Ninguna foto sale de aquí.</p>
-
-                <div className="vacio-acciones">
-                  <button type="button" className="boton primario boton-destacado" onClick={() => { void abrir(); }}>
-                    <FolderOpen aria-hidden="true" /> Abrir fotos
-                  </button>
-                  <span className="suave vacio-arrastrar">o arrastra tus fotos a esta ventana</span>
-                </div>
-
-                <div className="caracteristicas-grid" aria-label="Garantías de privacidad">
-                  <div className="caracteristica-tarjeta">
-                    <div className="caracteristica-icono-caja">
-                      <Lock aria-hidden="true" />
-                    </div>
-                    <div>
-                      <strong>100% Local</strong>
-                      <p className="suave">Sin nubes ni rastreo externo</p>
-                    </div>
+                </li>
+                <li>
+                  <span className="paso-numero" aria-hidden="true">3</span>
+                  <div>
+                    <strong>Exporta una copia limpia</strong>
+                    <p className="suave">Con lo que elegiste tapado y sin ubicación ni datos ocultos del archivo.</p>
                   </div>
-                  <div className="caracteristica-tarjeta">
-                    <div className="caracteristica-icono-caja">
-                      <Sparkles aria-hidden="true" />
-                    </div>
-                    <div>
-                      <strong>Detección local</strong>
-                      <p className="suave">Caras, identificaciones y texto</p>
-                    </div>
-                  </div>
-                  <div className="caracteristica-tarjeta">
-                    <div className="caracteristica-icono-caja">
-                      <CheckCircle2 aria-hidden="true" />
-                    </div>
-                    <div>
-                      <strong>Copia limpia</strong>
-                      <p className="suave">Sin metadatos EXIF ni GPS</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
+                </li>
+              </ol>
+              <p className="pista-atajos suave">
+                <Keyboard aria-hidden="true" /> Pulsa <kbd>F1</kbd> para ver los atajos de teclado.
+              </p>
             </div>
-          ) : (
-            <>
-              <h1 className="titulo-foto">{actual.info.nombre}</h1>
-              <Visor
-                key={actual.info.id}
-                archivo={actual}
-                hallazgos={hallazgos}
-                ocultamientos={ocultamientos}
-                revision={revision}
-                herramienta={analisis === null || exportando ? 'ninguna' : herramienta}
-                tamanoPincel={tamanoPincel}
-                alClic={(x, y) => { void buscarEnPunto(x, y); }}
-                alDibujar={pedirCaja}
-                alPintar={(puntos) => { void pintar(puntos); }}
-                alFuera={() => { setAnuncio('Ese punto queda fuera de la imagen.'); }}
-                resaltado={resaltado}
-                alResaltar={setResaltado}
-                alElegirZona={irAFila}
-                seleccionSticker={sticker}
-                alSeleccionarSticker={setSticker}
-                alAjustarSticker={(h, cambio) => { cambiarRevision(actual.info.id, (r) => ajustarSticker(r, h, cambio)); }}
-              />
-            </>
-          )}
+          </div>
         </main>
+      ) : (
+        <div className="cuerpo">
+          <ListaFotos
+            archivos={archivos}
+            seleccion={seleccion}
+            analizando={analizando}
+            listasParaExportar={listasParaExportar}
+            exportando={exportando}
+            alElegir={setSeleccion}
+            alCerrar={cerrarArchivo}
+            alAbrir={() => { void abrir(); }}
+            alCancelar={cancelar}
+            alExportarTodas={pedirExportarTodas}
+          />
 
-        <aside className="panel" aria-label="Advertencias">
-          {actual === null && (
-            <div className="panel-vacio-card">
-              <div className="cabecera-seccion">
-                <h2>Advertencias</h2>
+          <main id="principal" tabIndex={-1} className="principal">
+            {actual === null ? (
+              <p className="suave">Elige una foto de la lista.</p>
+            ) : (
+              <>
+                <h1 className="titulo-foto">{actual.info.nombre}</h1>
+                <Visor
+                  key={actual.info.id}
+                  archivo={actual}
+                  hallazgos={hallazgos}
+                  ocultamientos={ocultamientos}
+                  revision={revision}
+                  herramienta={analisis === null || exportando ? 'ninguna' : herramienta}
+                  tamanoPincel={tamanoPincel}
+                  alClic={(x, y) => { void buscarEnPunto(x, y); }}
+                  alDibujar={pedirCaja}
+                  alPintar={(puntos) => { void pintar(puntos); }}
+                  alFuera={() => { setAnuncio('Ese punto queda fuera de la imagen.'); }}
+                  resaltado={resaltado}
+                  alResaltar={setResaltado}
+                  alCambiar={(cambio) => { cambiarRevision(actual.info.id, cambio); }}
+                  alQuitarManual={(id) => { cambiarRevision(actual.info.id, (r) => quitarManual(r, id)); setAnuncio('Quitamos tu zona.'); }}
+                  alPorQue={setPorQue}
+                  barra={{
+                    puedeDeshacer: actual.historial.pasado.length > 0,
+                    puedeRehacer: actual.historial.futuro.length > 0,
+                    alDeshacer: () => { moverHistorial(deshacer, 'Se deshizo el último cambio.'); },
+                    alRehacer: () => { moverHistorial(rehacer, 'Se rehizo el cambio.'); },
+                    herramienta,
+                    herramientasActivas: analisis !== null && !exportando,
+                    alElegirHerramienta: setHerramienta,
+                    tamanoPincel,
+                    alCambiarTamano: setTamanoPincel,
+                    exportando,
+                    puedeExportar: analisis !== null,
+                    alExportar: pedirExportar,
+                  }}
+                  seleccionSticker={sticker}
+                  alSeleccionarSticker={setSticker}
+                  alAjustarSticker={(h, cambio) => { cambiarRevision(actual.info.id, (r) => ajustarSticker(r, h, cambio)); }}
+                />
+              </>
+            )}
+          </main>
+
+          <aside className="panel" aria-label="Advertencias">
+            {actual?.estado.tipo === 'en_cola' && <p className="estado-panel">Esta foto está en espera de revisión.</p>}
+            {actual?.estado.tipo === 'analizando' && <p className="estado-panel"><span className="girador" aria-hidden="true" /> Revisando esta foto…</p>}
+            {actual?.estado.tipo === 'error' && (
+              <div className="caja-parcial">
+                <h2>Esta foto no está revisada</h2>
+                <p>{actual.estado.error.mensaje}</p>
+                <p className="suave">Para exportar una copia, primero hay que revisar la foto.</p>
+                <button type="button" className="boton" onClick={() => { reintentar(actual.info.id); }}>Revisar de nuevo</button>
               </div>
-              <div className="panel-vacio-contenido">
-                <div className="panel-vacio-icono-caja" aria-hidden="true">
-                  <Shield />
-                </div>
-                <p className="suave">
-                  Abre o selecciona una foto para ver las advertencias detectadas y decidir qué zonas ocultar antes de publicar.
-                </p>
-                <div className="pilas-categorias-info" aria-hidden="true">
-                  <span className="pildora-cat"><Users /> Caras y menores</span>
-                  <span className="pildora-cat"><MapPin /> Ubicación GPS</span>
-                  <span className="pildora-cat"><IdCard /> Documentos</span>
-                  <span className="pildora-cat"><CreditCard /> Tarjetas</span>
-                  <span className="pildora-cat"><Car /> Matrículas</span>
-                  <span className="pildora-cat"><QrCode /> Códigos QR</span>
-                </div>
-              </div>
-            </div>
-          )}
-          {actual?.estado.tipo === 'en_cola' && <p>Esta foto está en espera de revisión.</p>}
-          {actual?.estado.tipo === 'analizando' && <p>Revisando esta foto…</p>}
-          {actual?.estado.tipo === 'error' && (
-            <div className="caja-parcial">
-              <h2>Esta foto no está revisada</h2>
-              <p>{actual.estado.error.mensaje}</p>
-              <p className="suave">Para exportar una copia, primero hay que revisar la foto.</p>
-              <button type="button" className="boton" onClick={() => { reintentar(actual.info.id); }}>Revisar de nuevo</button>
-            </div>
-          )}
-          {actual !== null && analisis !== null && revision !== null && (
-            <>
-              <Cobertura analisis={analisis} />
-              <fieldset className="sin-marco" disabled={exportando} aria-label="Decisiones sobre esta foto">
-              <Advertencias
-                key={actual.info.id}
-                hallazgos={hallazgos}
-                revision={revision}
-                alCambiar={(cambio) => { cambiarRevision(actual.info.id, cambio); }}
-                alOcultarTodo={() => { cambiarRevision(actual.info.id, (r) => ocultarTodo(r, hallazgos)); setAnuncio('Marcamos para ocultar todo lo detectado.'); }}
-                alOcultarAlto={() => { cambiarRevision(actual.info.id, (r) => ocultarRiesgoAlto(r, hallazgos)); setAnuncio('Marcamos para ocultar lo de riesgo alto.'); }}
-                resaltado={resaltado}
-                alResaltar={setResaltado}
-                seleccionSticker={sticker}
-                alSeleccionarSticker={setSticker}
-              />
-              <Manual
-                key={`manual-${actual.info.id}`}
-                ancho={actual.info.ancho}
-                alto={actual.info.alto}
-                herramienta={herramienta}
-                tamanoPincel={tamanoPincel}
-                revision={revision}
-                ocupado={buscando}
-                alElegirHerramienta={setHerramienta}
-                alCambiarTamano={setTamanoPincel}
-                alAgregarCaja={pedirCaja}
-                alBuscarEnPunto={(x, y) => { void buscarEnPunto(x, y); }}
-                alQuitar={(id) => { cambiarRevision(actual.info.id, (r) => quitarManual(r, id)); setAnuncio('Quitamos tu zona.'); }}
-                alCambiarEfecto={(id, efecto) => { cambiarRevision(actual.info.id, (r) => efectoDeManual(r, id, efecto)); }}
-                resaltado={resaltado}
-                alResaltar={setResaltado}
-                seleccionSticker={sticker}
-                alSeleccionarSticker={setSticker}
-                alCambiarRevision={(cambio) => { cambiarRevision(actual.info.id, cambio); }}
-              />
-              </fieldset>
-              <section aria-labelledby="titulo-resumen" className="resumen">
-                <h2 id="titulo-resumen">Resumen en texto</h2>
-                <p data-testid="resumen">{resumenTexto(actual.info.nombre, analisis, revision)}</p>
-              </section>
-            </>
-          )}
-        </aside>
-      </div>
+            )}
+            {actual !== null && analisis !== null && revision !== null && (
+              <>
+                <Resumen analisis={analisis} revision={revision} texto={resumenTexto(actual.info.nombre, analisis, revision)} />
+                <fieldset className="sin-marco" disabled={exportando} aria-label="Decisiones sobre esta foto">
+                  <EstiloGlobal
+                    hallazgos={hallazgos}
+                    revision={revision}
+                    alCambiar={(cambio) => { cambiarRevision(actual.info.id, cambio); }}
+                    alOcultarTodo={() => { cambiarRevision(actual.info.id, (r) => ocultarTodo(r, hallazgos)); setAnuncio('Marcamos para ocultar todo lo detectado.'); }}
+                    alOcultarAlto={() => { cambiarRevision(actual.info.id, (r) => ocultarRiesgoAlto(r, hallazgos)); setAnuncio('Marcamos para ocultar lo de riesgo alto.'); }}
+                  />
+                  <Advertencias
+                    key={actual.info.id}
+                    hallazgos={hallazgos}
+                    revision={revision}
+                    alCambiar={(cambio) => { cambiarRevision(actual.info.id, cambio); }}
+                    resaltado={resaltado}
+                    alResaltar={setResaltado}
+                    seleccionSticker={sticker}
+                    alSeleccionarSticker={setSticker}
+                  />
+                  <Manual
+                    key={`manual-${actual.info.id}`}
+                    ancho={actual.info.ancho}
+                    alto={actual.info.alto}
+                    revision={revision}
+                    ocupado={buscando}
+                    alAgregarCaja={pedirCaja}
+                    alBuscarEnPunto={(x, y) => { void buscarEnPunto(x, y); }}
+                    alQuitar={(id) => { cambiarRevision(actual.info.id, (r) => quitarManual(r, id)); setAnuncio('Quitamos tu zona.'); }}
+                    resaltado={resaltado}
+                    alResaltar={setResaltado}
+                    seleccionSticker={sticker}
+                    alSeleccionarSticker={setSticker}
+                    alCambiarRevision={(cambio) => { cambiarRevision(actual.info.id, cambio); }}
+                  />
+                </fieldset>
+              </>
+            )}
+          </aside>
+        </div>
       )}
 
       <footer className="pie"><p>{AVISO_LEGAL}</p></footer>
 
+      {configurando && (
+        <Configuracion
+          ajustes={ajustes}
+          alCambiarTema={(tema) => {
+            setAjustes((a) => ({ ...a, tema }));
+            void api().definirTema(tema);
+          }}
+          alCambiarCopia={(copia) => {
+            setAjustes((a) => ({ ...a, copia }));
+            void api().definirCopia(copia).then(setAjustes);
+          }}
+          alElegirCarpeta={() => { void api().elegirCarpeta().then(setAjustes); }}
+          alCerrar={() => { setConfigurando(false); }}
+        />
+      )}
+      {porQue !== null && <DialogoPorQue regla={porQue} alCerrar={() => { setPorQue(null); }} />}
+      {viendoAtajos && <DialogoAtajos alCerrar={() => { setViendoAtajos(false); }} />}
       {confirmarExport !== null && (
         <Confirmacion
           titulo="Antes de exportar"
@@ -783,6 +871,16 @@ export function App(): React.JSX.Element {
           cancelar="Volver a revisar"
           alAceptar={() => { void exportarAhora(); }}
           alCancelar={() => { setConfirmarExport(null); }}
+        />
+      )}
+      {confirmarLote !== null && (
+        <Confirmacion
+          titulo="Exportar todas"
+          texto={`${textoLote(confirmarLote)} ${ajustes.copia.destino === 'carpeta' && ajustes.carpeta !== null ? `Van a tu carpeta ${ajustes.carpeta}.` : 'Después eliges la carpeta.'}`}
+          aceptar={`Exportar ${plural(confirmarLote.listas, 'copia', 'copias')}`}
+          cancelar="Volver a revisar"
+          alAceptar={() => { void exportarLoteAhora(); }}
+          alCancelar={() => { setConfirmarLote(null); }}
         />
       )}
       {zonaTotal !== null && (
@@ -817,27 +915,4 @@ export function App(): React.JSX.Element {
       )}
     </div>
   );
-}
-
-function textoEstado(a: Archivo): string {
-  switch (a.estado.tipo) {
-    case 'en_cola':
-      return 'En espera';
-    case 'analizando':
-      return 'Revisando…';
-    case 'error':
-      return 'No revisada';
-    case 'listo': {
-      if (!a.estado.analisis.cobertura.completa) return a.exportado ? 'Exportada, con revisión parcial' : 'Revisión parcial';
-      if (a.exportado) return 'Exportada';
-      const n = contarAdvertencias(a.estado.analisis.hallazgos);
-      const preguntas = a.estado.analisis.hallazgos.length - n;
-      if (n === 0) return preguntas === 0 ? 'Sin hallazgos' : 'Una pregunta para ti';
-      return `${n} ${n === 1 ? 'advertencia' : 'advertencias'}`;
-    }
-    default: {
-      const inalcanzable: never = a.estado;
-      throw new Error(`Estado desconocido: ${String(inalcanzable)}`);
-    }
-  }
 }

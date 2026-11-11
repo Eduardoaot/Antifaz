@@ -46,7 +46,9 @@ Cada parámetro de este archivo tiene pruebas parametrizadas de mínimo-1, míni
 | Parámetro | Tipo | Mín | Máx | Default | Ante un valor inválido |
 |---|---|---|---|---|---|
 | `efecto.tipo` | enum: `solido`, `difuminado`, `pixelado`, `emoji_sonrisa`, `emoji_lentes`, `emoji_gato`, `emoji_estrella`, `emoji_mono` | n/a | n/a | `solido` para texto, códigos, documentos y matrículas; `difuminado` para caras | Estándar. Un tipo desconocido nunca cae en "sin efecto" |
-| `efecto.intensidad` | entero, % | 1 | 100 | 80 | Estándar. En difuminado y pixelado, menos intensidad es más fácil de reconocer |
+| `efecto.intensidad` | entero, % | 1 | 100 | 80 | Estándar. En difuminado y pixelado, menos intensidad es más fácil de reconocer. Es la de toda la foto: al cambiarla se borran las de cada zona |
+| `efecto.intensidad_zona` | entero, %, por zona (detectada o tuya) | 1 | 100 | La de toda la foto | Estándar. La UI es un slider; `limitarIntensidad` lleva cualquier número al rango y lo redondea, y NaN o infinito vuelven a 80. La recuperación rechaza la edición con una fuera de rango. Ver también `efecto.intensidad` |
+| `video.intensidad_objeto` | entero, %, por objeto seguido | 1 | 100 | 80 | Estándar. Zod en la UI y Pydantic en el sidecar (`PistaElegida`). Sin el campo, el sidecar usa 80 |
 | `efecto.aviso_intensidad_baja` | entero, % | 1 | 100 | 30 (propuesta) | Estándar. Por debajo de este valor se avisa: "Con poca intensidad es más fácil reconocer lo que hay debajo" |
 | `efecto.sigma_px` | decimal, px | 25 | 1000 | max(25, 25% del lado corto de la región) | Estándar |
 | `efecto.pixel_px` | entero, px | 8 (propuesta) | 256 (propuesta) | max(16, 10% del lado corto de la región) (propuesta) | Estándar. Cada bloque toma el color promedio de lo que cubre |
@@ -163,6 +165,12 @@ FFmpeg 9.0.2 y exiftool 13.61, con hash fijado en `sidecar/revisor/herramientas.
 | `export.video_mbps` | decimal, Mbps | 1 (propuesta) | 25 (referencia: API de Instagram) | 16 (propuesta) | Estándar |
 | `export.video_fps` | decimal, fps | 23 | 60 | Igual al original, si cabe en el rango | Estándar. Referencia: API de Instagram |
 | `export.ruta` | texto | 1 carácter | Sin límite propio; lo define Windows | Carpeta elegida | Sin permisos o sin espacio: la exportación se detiene, no queda archivo final y se explica qué hacer |
+| `export.destino` | enum: `preguntar`, `carpeta` | n/a | n/a | `preguntar` | Ajuste guardado. Inválido: vuelve a `preguntar` sin borrar los demás ajustes. Con `carpeta` y una carpeta que ya no existe, se pregunta |
+| `export.carpeta` | ruta de carpeta | 1 carácter | 32767 caracteres | Ninguna | Solo vive en main (`ajustes.json`); el renderer recibe el nombre, nunca la ruta. Si ya no existe o no es carpeta, se ignora y se pregunta |
+| `export.formato` | enum: `automatico`, `jpg`, `png` | n/a | n/a | `automatico` (PNG si la foto era PNG; si no, JPG) | Ajuste guardado. Inválido: vuelve a `automatico` |
+| `export.sufijo` | texto | 0 caracteres | 40 (`LIMITES.sufijoExportacion`) | `-copia` | Sin `< > : " / \ \| ? *` ni caracteres de control, y sin punto ni espacio al final. La UI conserva el último válido y lo dice; main lo valida otra vez |
+| `export.variantes_nombre` | entero | 2 | 999 (`VARIANTES_MAX`) | n/a | En una carpeta nunca se reemplaza: si el nombre existe se prueba "(2)", "(3)"… Si todos existen, no se exporta y se pide otra carpeta o nombre |
+| `export.lote` | fotos por lote | 1 | 500 (`loteArchivos`) | Todas las revisadas | Solo entran fotos revisadas. Antes se confirma cuántas van, cuáles quedan fuera por no estar revisadas y cuáles tienen decisiones pendientes o revisión parcial |
 | `export.quitar_metadatos` | booleano | n/a | n/a | `true` | Estándar. No se ofrece en la UI; solo admite `true`. Decisión confirmada por el responsable del proyecto: siempre se borran |
 
 Los límites de Instagram cambian, y sus propias fuentes se contradicen (4:5 o 3:4). Por eso son configurables y no se tratan como cifras estables.
@@ -173,11 +181,15 @@ Los límites de Instagram cambian, y sus propias fuentes se contradicen (4:5 o 3
 |---|---|---|---|---|---|
 | `vista.zoom` | decimal, veces el tamaño ajustado a la ventana; niveles 1, 1.5, 2, 3, 4, 6 y 8 | 1 (100 %) | 8 (800 %) | 1: ajustar a la ventana | Se ajusta al límite más cercano; NaN o infinito vuelven a 1. Solo cambia la vista, nunca la exportación. Menos de 100 % no aporta, porque la imagen ya cabe completa; más de 800 % solo agranda la vista previa, que mide como máximo 1600 px (`ladoVista`) |
 | `vista.comparacion` | entero, % del ancho que muestra la original | 0 | 100 | 50 | Se ajusta al límite más cercano y se redondea; NaN o infinito vuelven a 50. En la UI es un slider y arrastrar la línea sobre la imagen. Solo cambia la vista: mientras se compara, las herramientas no actúan y las marcas se ocultan |
-| `vista.margen_etiqueta` | % del alto de la foto | n/a | n/a | 8 | Constante (`LIMITES.margenEtiqueta`). El número de una zona va encima de ella; si la zona empieza a menos de este margen del borde superior, va debajo, y si tampoco cabe, dentro. Así no tapa lo que marca. Alto no positivo o NaN: dentro |
+| `vista.margen_etiqueta` | % del alto de la foto | n/a | n/a | 8 | Constante (`LIMITES.margenEtiqueta`). Sin uso en la interfaz desde el rediseño: las zonas ya no llevan número encima. Se conserva por `ladoEtiqueta` y sus pruebas |
 | `vista.rotulo_comparacion` | % del ancho que queda del lado de cada rótulo | n/a | n/a | 10 (oculto) y 26 (opaco) | Constante (`LIMITES.rotuloComparacion`). "Original" y "Tu copia" se desvanecen de forma lineal entre los dos valores en vez de desaparecer de golpe. Un valor no finito o negativo: oculto |
 | `vista.ajuste_max_escala` | decimal, veces el tamaño real de la foto | n/a | n/a | 2 (200 %) | Constante (`LIMITES.ajusteMaxEscala`). Al ajustar a la ventana, una foto chica no se estira más de esto, porque se vería suave y con artefactos; para verla más grande está el zoom. Un valor no finito o no positivo no limita |
 | `historial.pasos` | entero | 1 | 500 (propuesta) | 100 (propuesta) | Estándar. Deshacer sin historial queda desactivado y no hace nada |
-| `tema` | enum: `sistema`, `claro`, `oscuro` | n/a | n/a | `sistema` | Se usa `sistema` y se registra el error |
+| `tema` | enum: `sistema`, `claro`, `oscuro` | n/a | n/a | `sistema` | Se usa `sistema` y se registra el error. Está en Configuración, dentro del menú |
+| `vista.tolerancia_clic` | px de pantalla | n/a | n/a | 10 | Constante (`TOLERANCIA_CLIC` en `Visor.tsx`). Un clic a esta distancia de una zona la elige, para alcanzar las diminutas. Margen inválido (NaN o negativo): sin tolerancia |
+| `vista.zona_diminuta` | px de pantalla del lado mayor | n/a | n/a | 22 | Constante (`ZONA_DIMINUTA` en `Visor.tsx`). Por debajo, la zona se señala con un anillo alrededor que no la tapa |
+| `vista.miniatura` | px del lado mayor | 64 | 4096 | 160 (`LIMITES.ladoMiniatura`) | Constante. Miniatura de la original en la lista de fotos, solo en memoria. Si falla, se muestra un ícono |
+| `vista.reproduccion_fps` | fps | n/a | n/a | 12 | Constante (`FPS_REPRODUCCION` en `ModoVideo.tsx`). Al reproducir el video se avanza un frame cuando el anterior ya se dibujó, sin pasar de este ritmo |
 | `proyecto.nombre` | texto | 1 carácter | 120 caracteres | Nombre sin extensión del primer archivo | Estándar |
 | `proyecto.guardar_embeddings` | booleano | n/a | n/a | `false` | Estándar. Ante cualquier duda, no se guardan |
 | `ventana.ancho_px`, `ventana.alto_px` | entero, px lógicos | 800 × 600 (propuesta) | Sin límite propio | 1280 × 800 (propuesta) | Windows no permite reducirla más; una posición fuera de pantalla se reubica |

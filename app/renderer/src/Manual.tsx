@@ -1,54 +1,47 @@
+import { Trash2 } from 'lucide-react';
 import { useState, type SyntheticEvent } from 'react';
-import { esEmoji, esquemaEfecto, LIMITES } from '../../shared/contrato';
-import { AjusteSticker } from './Advertencias';
-import { OpcionesEmoji } from './OpcionesEmoji';
-import { eventosResaltar } from './resaltar';
+import { esEmoji } from '../../shared/contrato';
 import {
   ajustarSticker,
   efectoManual,
+  elegirEfectoVarias,
+  elegirIntensidadVarias,
   hallazgoDeManual,
+  intensidadDe,
   leerCaja,
   leerPunto,
   restablecerSticker,
   textoOrigen,
-  type Herramienta,
+  usaIntensidad,
   type Caja,
   type Resaltado,
   type Revision,
-  type ZonaManual,
 } from '../../shared/logica';
+import { AjusteSticker, ControlIntensidad, SelectorEfecto } from './Advertencias';
+import { eventosResaltar } from './resaltar';
 
 interface Props {
   ancho: number;
   alto: number;
-  herramienta: Herramienta;
-  tamanoPincel: number;
   revision: Revision;
   ocupado: boolean;
-  alElegirHerramienta: (h: Herramienta) => void;
-  alCambiarTamano: (tamano: number) => void;
   alAgregarCaja: (caja: Caja) => void;
   alBuscarEnPunto: (x: number, y: number) => void;
   alQuitar: (id: string) => void;
-  alCambiarEfecto: (id: string, efecto: ZonaManual['efecto']) => void;
   /** Zona resaltada a la vez aquí y en la imagen. */
   resaltado?: Resaltado | null;
   alResaltar?: (r: Resaltado | null) => void;
   /** Sticker elegido en la foto o en un panel: sus ajustes quedan abiertos. */
   seleccionSticker?: string | null;
   alSeleccionarSticker?: (id: string | null) => void;
-  /** Tamaño y posición del sticker de tu zona. */
-  alCambiarRevision?: (cambio: (r: Revision) => Revision) => void;
+  alCambiarRevision: (cambio: (r: Revision) => Revision) => void;
 }
 
-const HERRAMIENTAS: readonly { valor: Herramienta; texto: string }[] = [
-  { valor: 'ninguna', texto: 'Solo ver' },
-  { valor: 'clic', texto: 'Clic en un objeto' },
-  { valor: 'rectangulo', texto: 'Dibujar rectángulo' },
-  { valor: 'pincel', texto: 'Pintar con pincel' },
-];
-
-export function Manual({ ancho, alto, herramienta, tamanoPincel, revision, ocupado, alElegirHerramienta, alCambiarTamano, alAgregarCaja, alBuscarEnPunto, alQuitar, alCambiarEfecto, resaltado = null, alResaltar, seleccionSticker = null, alSeleccionarSticker, alCambiarRevision }: Props): React.JSX.Element {
+/**
+ * Las zonas que agregaste tú. Las herramientas están en la barra de la imagen; aquí quedan tus zonas y
+ * la ruta sin mouse: escribir las coordenadas.
+ */
+export function Manual({ ancho, alto, revision, ocupado, alAgregarCaja, alBuscarEnPunto, alQuitar, resaltado = null, alResaltar, seleccionSticker = null, alSeleccionarSticker, alCambiarRevision }: Props): React.JSX.Element {
   const [valores, setValores] = useState({ x: '', y: '', ancho: '', alto: '' });
   const [error, setError] = useState<string | null>(null);
 
@@ -78,29 +71,55 @@ export function Manual({ ancho, alto, herramienta, tamanoPincel, revision, ocupa
   };
 
   return (
-    <section aria-labelledby="titulo-manual" className="caja-veredicto manual">
-      <h2 id="titulo-manual">Tapar algo más</h2>
-      <p className="suave">Elige una herramienta y usa la imagen, o escribe las coordenadas abajo.</p>
-      <div className="grupo-acciones" role="group" aria-label="Herramienta sobre la imagen">
-        {HERRAMIENTAS.map((h) => (
-          <button key={h.valor} type="button" className="boton" aria-pressed={herramienta === h.valor} onClick={() => { alElegirHerramienta(h.valor); }}>
-            {h.texto}
-          </button>
-        ))}
+    <section aria-labelledby="titulo-manual" className="manual">
+      <div className="cabecera-seccion">
+        <h2 id="titulo-manual">Tus zonas</h2>
+        {revision.manuales.length > 0 && <span className="chip-conteo">{revision.manuales.length}</span>}
       </div>
-      {herramienta === 'pincel' && (
-        <div className="campo-pincel">
-          <label htmlFor="tamano-pincel">Tamaño del pincel: {tamanoPincel} px de la foto</label>
-          <input
-            id="tamano-pincel"
-            type="range"
-            min={LIMITES.pincel.min}
-            max={LIMITES.pincel.max}
-            value={tamanoPincel}
-            onChange={(e) => { alCambiarTamano(Number(e.target.value)); }}
-          />
-          <p className="suave">Pinta sobre lo que quieras tapar, como una parte que la selección dejó fuera. Cada trazo es una zona nueva.</p>
-        </div>
+      {revision.manuales.length === 0 && (
+        <p className="suave">¿Algo más que tapar? Usa las herramientas de la barra sobre la imagen.</p>
+      )}
+      {revision.manuales.length > 0 && (
+        <ul className="zonas">
+          {revision.manuales.map((z, i) => {
+            const nombre = `tu zona ${i + 1}`;
+            const efecto = efectoManual(z);
+            return (
+              <li
+                key={z.id}
+                className={`fila-zona${resaltado?.id === z.id ? ' resaltada' : ''}`}
+                data-manual={z.id}
+                data-zona={z.id}
+                {...eventosResaltar(z.id, resaltado, alResaltar)}
+              >
+                <div className="fila-zona-cabecera">
+                  <p className="fila-zona-titulo">
+                    <strong>Tu zona {i + 1}</strong>
+                    <span className="suave">{` (${textoOrigen(z.origen)})`}</span>
+                  </p>
+                  <button type="button" className="boton fantasma chico" aria-label={`Quitar ${nombre}`} title="Quitar esta zona" onClick={() => { alQuitar(z.id); }}>
+                    <Trash2 aria-hidden="true" />
+                  </button>
+                </div>
+                <SelectorEfecto valor={efecto} etiqueta="Efecto" alCambiar={(e) => { alCambiarRevision((r) => elegirEfectoVarias(r, [z.id], e)); }} />
+                {usaIntensidad(efecto) && (
+                  <ControlIntensidad valor={intensidadDe(revision, z.id)} etiqueta="Intensidad" alCambiar={(v) => { alCambiarRevision((r) => elegirIntensidadVarias(r, [z.id], v)); }} />
+                )}
+                {esEmoji(z.efecto) && (
+                  <AjusteSticker
+                    hallazgo={hallazgoDeManual(z)}
+                    nombre={nombre}
+                    revision={revision}
+                    abierto={seleccionSticker === z.id}
+                    alAbrir={(abrir) => { alSeleccionarSticker?.(abrir ? z.id : null); }}
+                    alAjustar={(hz, cambio) => { alCambiarRevision((r) => ajustarSticker(r, hz, cambio)); }}
+                    alRestablecer={(sid) => { alCambiarRevision((r) => restablecerSticker(r, sid)); }}
+                  />
+                )}
+              </li>
+            );
+          })}
+        </ul>
       )}
       <details>
         <summary>Escribir coordenadas (sin mouse)</summary>
@@ -115,47 +134,6 @@ export function Manual({ ancho, alto, herramienta, tamanoPincel, revision, ocupa
           {error !== null && <p role="alert" className="error-campo">{error}</p>}
         </form>
       </details>
-      {revision.manuales.length > 0 && (
-        <ul className="advertencias">
-          {revision.manuales.map((z, i) => (
-            <li
-              key={z.id}
-              className={`advertencia bajo${resaltado?.id === z.id ? ' resaltada' : ''}`}
-              data-manual={z.id}
-              data-zona={z.id}
-              {...eventosResaltar(z.id, resaltado, alResaltar)}
-            >
-              <p>
-                <strong>Tu zona {i + 1}</strong>
-                {` (${textoOrigen(z.origen)})`}
-              </p>
-              <div className="controles">
-                <label>
-                  Efecto<span className="solo-lector"> de tu zona {i + 1}</span>
-                  <select value={efectoManual(z)} onChange={(e) => { alCambiarEfecto(z.id, esquemaEfecto.parse(e.target.value)); }}>
-                    <option value="solido">Bloque sólido</option>
-                    <option value="difuminado">Difuminado</option>
-                    <option value="pixelado">Pixelado</option>
-                    <OpcionesEmoji />
-                  </select>
-                </label>
-                <button type="button" className="boton" onClick={() => { alQuitar(z.id); }}>Quitar<span className="solo-lector"> tu zona {i + 1}</span></button>
-                {esEmoji(z.efecto) && alCambiarRevision !== undefined && (
-                  <AjusteSticker
-                    hallazgo={hallazgoDeManual(z)}
-                    numero={i + 1}
-                    revision={revision}
-                    abierto={seleccionSticker === z.id}
-                    alAbrir={(abrir) => { alSeleccionarSticker?.(abrir ? z.id : null); }}
-                    alAjustar={(hz, cambio) => { alCambiarRevision((r) => ajustarSticker(r, hz, cambio)); }}
-                    alRestablecer={(sid) => { alCambiarRevision((r) => restablecerSticker(r, sid)); }}
-                  />
-                )}
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
     </section>
   );
 }

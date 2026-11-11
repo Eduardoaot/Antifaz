@@ -152,6 +152,11 @@ export class Archivos {
     return this.registros.get(id)?.ruta;
   }
 
+  /** Formato con el que el sidecar abrió la foto, como "JPEG" o "PNG". */
+  formato(id: string): string | undefined {
+    return this.registros.get(id)?.archivo.formato;
+  }
+
   async cerrar(id: string): Promise<void> {
     const registro = this.registros.get(id);
     this.registros.delete(id);

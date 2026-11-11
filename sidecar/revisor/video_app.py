@@ -30,7 +30,7 @@ import numpy as np
 
 from . import efectos, metadatos_video, pistas, video
 from .errores import Codigo, ErrorRevisor
-from .esquemas import Ocultamiento, TipoEfecto
+from .esquemas import INTENSIDAD_POR_DEFECTO, Ocultamiento, TipoEfecto
 from .exportar import error_de_sistema, limpiar_parciales
 from .herramientas import FRAMES_MAX, Frame, Herramienta, Herramientas, entrada
 from .pistas import Mascara
@@ -188,13 +188,25 @@ def quitar(abierto: VideoAbierto, pista_id: str) -> None:
     del abierto.pistas[pista_id]
 
 
+# Pista elegida: id, efecto y, si se dio, su intensidad. Sin intensidad, la de siempre.
+Elegida = tuple[str, TipoEfecto] | tuple[str, TipoEfecto, int]
+# Zona de un frame: id de la pista, silueta, efecto e intensidad.
+ZonaElegida = tuple[str, Mascara, TipoEfecto, int]
+
+
+def _desarmar(elegida: Elegida) -> tuple[str, TipoEfecto, int]:
+    if len(elegida) == 3:
+        return elegida
+    return elegida[0], elegida[1], INTENSIDAD_POR_DEFECTO
+
+
 def _ocultamientos(
-    zonas_frame: Sequence[tuple[str, Mascara, TipoEfecto]], alto: int, ancho: int
+    zonas_frame: Sequence[ZonaElegida], alto: int, ancho: int
 ) -> tuple[list[Ocultamiento], dict[str, Mascara]]:
     """Cada zona, ya a la resolución del frame, como un ocultamiento con su silueta."""
     lista: list[Ocultamiento] = []
     siluetas: dict[str, Mascara] = {}
-    for clave, mascara, efecto in zonas_frame:
+    for clave, mascara, efecto, intensidad in zonas_frame:
         completa = pistas.a_resolucion(mascara, alto, ancho)
         ys, xs = np.nonzero(completa)
         if xs.size == 0:
@@ -203,7 +215,7 @@ def _ocultamientos(
         siluetas[clave] = completa[y0:y1, x0:x1]
         lista.append(
             Ocultamiento(
-                x=x0, y=y0, ancho=x1 - x0, alto=y1 - y0, efecto=efecto,
+                x=x0, y=y0, ancho=x1 - x0, alto=y1 - y0, efecto=efecto, intensidad=intensidad,
                 # La zona ya trae su margen; los 8 px mínimos de fotos se suman y no destapan nada.
                 dilatacion_px=8, dilatacion_pct=0.0, mascara_id=clave,
             )
@@ -211,7 +223,7 @@ def _ocultamientos(
     return lista, siluetas
 
 
-def _aplicar(frame: Frame, zonas_frame: Sequence[tuple[str, Mascara, TipoEfecto]]) -> Frame:
+def _aplicar(frame: Frame, zonas_frame: Sequence[ZonaElegida]) -> Frame:
     alto, ancho = int(frame.shape[0]), int(frame.shape[1])
     ocultamientos, siluetas = _ocultamientos(zonas_frame, alto, ancho)
     if not ocultamientos:
@@ -221,16 +233,16 @@ def _aplicar(frame: Frame, zonas_frame: Sequence[tuple[str, Mascara, TipoEfecto]
 
 
 def vista(
-    abierto: VideoAbierto, posicion: int, elegidas: Sequence[tuple[str, TipoEfecto]]
+    abierto: VideoAbierto, posicion: int, elegidas: Sequence[Elegida]
 ) -> tuple[bytes, bool]:
     """JPEG del frame en el proxy con las zonas ocultas, y si ese frame se debe revisar."""
     indice = _posicion(abierto, posicion)
-    zonas_frame: list[tuple[str, Mascara, TipoEfecto]] = []
+    zonas_frame: list[ZonaElegida] = []
     revisar = False
-    for pista_id, efecto in elegidas:
+    for pista_id, efecto, intensidad in map(_desarmar, elegidas):
         pista = _pista(abierto, pista_id)
         zona = pistas.zona_en(pista.rastreadas, abierto.total, indice)
-        zonas_frame.append((pista_id, zona.mascara, efecto))
+        zonas_frame.append((pista_id, zona.mascara, efecto, intensidad))
         revisar |= zona.revisar
     frame = _aplicar(abierto.proxy[posicion], zonas_frame)
     bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
@@ -304,7 +316,7 @@ def argumentos_codificar(
 def _frames_ocultos(
     herramientas: Herramientas,
     abierto: VideoAbierto,
-    elegidas: Sequence[tuple[str, TipoEfecto]],
+    elegidas: Sequence[Elegida],
     ancho: int,
     alto: int,
 ) -> Iterator[Frame]:
@@ -313,9 +325,9 @@ def _frames_ocultos(
         "-i", entrada(abierto.ruta), "-map", "0:v:0", "-an", "-sn", "-dn", "-fps_mode", "passthrough",
         "-vf", f"crop={ancho}:{alto}:0:0", "-pix_fmt", "rgb24", "-f", "rawvideo", "pipe:1",
     ]
-    generadores: list[tuple[str, Iterator[pistas.ZonaFrame], TipoEfecto]] = [
-        (pista_id, pistas.zonas(_pista(abierto, pista_id).rastreadas, abierto.total), efecto)
-        for pista_id, efecto in elegidas
+    generadores: list[tuple[str, Iterator[pistas.ZonaFrame], TipoEfecto, int]] = [
+        (pista_id, pistas.zonas(_pista(abierto, pista_id).rastreadas, abierto.total), efecto, intensidad)
+        for pista_id, efecto, intensidad in map(_desarmar, elegidas)
     ]
     lector = herramientas.leer_frames(argumentos, ancho, alto, FRAMES_MAX, TIEMPO_EXPORTAR_S)
     vistos = 0
@@ -323,8 +335,9 @@ def _frames_ocultos(
         for frame in lector:
             if vistos >= abierto.total:
                 raise ErrorRevisor(Codigo.EXPORTACION_NO_VERIFICADA, "más frames que al abrir")
-            zonas_frame: list[tuple[str, Mascara, TipoEfecto]] = [
-                (pista_id, next(zonas).mascara, efecto) for pista_id, zonas, efecto in generadores
+            zonas_frame: list[ZonaElegida] = [
+                (pista_id, next(zonas).mascara, efecto, intensidad)
+                for pista_id, zonas, efecto, intensidad in generadores
             ]
             vistos += 1
             yield _aplicar(frame, zonas_frame)
@@ -349,7 +362,7 @@ def _verificar_salida(herramientas: Herramientas, temporal: str, ancho: int, alt
 def exportar(
     herramientas: Herramientas,
     abierto: VideoAbierto,
-    elegidas: Sequence[tuple[str, TipoEfecto]],
+    elegidas: Sequence[Elegida],
     ruta_destino: str,
     sobrescribir: bool,
 ) -> dict[str, object]:
@@ -363,8 +376,8 @@ def exportar(
     carpeta = os.path.dirname(destino)
     if not os.path.isdir(carpeta):
         raise ErrorRevisor(Codigo.RUTA_INVALIDA, "la carpeta no existe")
-    for pista_id, _ in elegidas:
-        _pista(abierto, pista_id)
+    for elegida in elegidas:
+        _pista(abierto, elegida[0])
     # Las decisiones solo valen para los mismos bytes.
     if huella_de(abierto.ruta) != abierto.huella:
         raise ErrorRevisor(Codigo.ARCHIVO_CAMBIO)
@@ -391,7 +404,7 @@ def exportar(
                 os.remove(temporal)
         except OSError as e:
             registro.warning("No se pudo borrar un temporal de video: errno %s", e.errno)
-    revisar = set[int]().union(*(_pista(abierto, p).revisar for p, _ in elegidas)) if elegidas else set[int]()
+    revisar = set[int]().union(*(_pista(abierto, e[0]).revisar for e in elegidas)) if elegidas else set[int]()
     return {
         "bytes": os.path.getsize(destino),
         "pistas_ocultas": len(elegidas),

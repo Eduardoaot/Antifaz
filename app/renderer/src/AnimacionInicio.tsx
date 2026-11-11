@@ -5,61 +5,90 @@ interface Props {
   alTerminar?: () => void;
 }
 
+/** Duración total del sonido, en segundos: el contexto de audio se cierra al terminar. */
+const DURACION_SONIDO = 2.6;
+
 /**
- * Genera un sonido ambiental cinematográfico usando la Web Audio API nativa.
- * No requiere descargar archivos de audio externos y es completamente local y seguro.
+ * Un "ding" suave y cálido: tres campanas de vidrio que suben (Sol, Do, Mi) sobre un fondo grave que
+ * apenas se nota, con un eco corto. Se genera con la Web Audio API: sin archivos ni internet.
  */
 function reproducirIntroSonido(): void {
+  let ctx: AudioContext;
   try {
-    const ctx = new window.AudioContext();
-    if (ctx.state === 'suspended') {
-      void ctx.resume();
-    }
-
-    const t = ctx.currentTime;
-
-    // Acorde cálido espacial estilo consola (D3, A3, D4, F#4, A4)
-    const frecuencias = [146.83, 220.0, 293.66, 369.99, 440.0, 587.33];
-
-    frecuencias.forEach((freq, i) => {
-      const osc = ctx.createOscillator();
-      const ganancia = ctx.createGain();
-
-      osc.type = i === 0 ? 'sine' : i % 2 === 0 ? 'triangle' : 'sine';
-      osc.frequency.setValueAtTime(freq, t);
-
-      const retardo = i * 0.04;
-      const duracion = 1.6 + i * 0.12;
-
-      ganancia.gain.setValueAtTime(0.0001, t + retardo);
-      ganancia.gain.exponentialRampToValueAtTime(0.07 / (i + 1), t + retardo + 0.15);
-      ganancia.gain.exponentialRampToValueAtTime(0.0001, t + retardo + duracion);
-
-      osc.connect(ganancia);
-      ganancia.connect(ctx.destination);
-
-      osc.start(t + retardo);
-      osc.stop(t + retardo + duracion + 0.1);
-    });
-
-    // Campana armónica brillante que resuelve el acorde (toque de privacidad activa)
-    const campana = ctx.createOscillator();
-    const gananciaCampana = ctx.createGain();
-    campana.type = 'sine';
-    campana.frequency.setValueAtTime(880, t + 0.35);
-    campana.frequency.exponentialRampToValueAtTime(1174.66, t + 0.6);
-
-    gananciaCampana.gain.setValueAtTime(0.0001, t + 0.35);
-    gananciaCampana.gain.exponentialRampToValueAtTime(0.035, t + 0.45);
-    gananciaCampana.gain.exponentialRampToValueAtTime(0.0001, t + 1.5);
-
-    campana.connect(gananciaCampana);
-    gananciaCampana.connect(ctx.destination);
-    campana.start(t + 0.35);
-    campana.stop(t + 1.6);
+    ctx = new window.AudioContext();
   } catch {
-    // Si la reproducción de audio no está permitida o falla, se continúa en silencio.
+    // Sin audio en este equipo: la animación sigue en silencio.
+    return;
   }
+  if (ctx.state === 'suspended') void ctx.resume();
+  const t = ctx.currentTime + 0.05;
+
+  // Salida: compresor suave para que nada sature, y un volumen bajo y amable.
+  const salida = ctx.createGain();
+  salida.gain.value = 0.22;
+  const compresor = ctx.createDynamicsCompressor();
+  compresor.threshold.value = -18;
+  compresor.ratio.value = 3;
+  salida.connect(compresor);
+  compresor.connect(ctx.destination);
+
+  // Eco corto y apagado: da espacio sin sonar a "cueva".
+  const eco = ctx.createDelay(1);
+  eco.delayTime.value = 0.19;
+  const retorno = ctx.createGain();
+  retorno.gain.value = 0.28;
+  const filtroEco = ctx.createBiquadFilter();
+  filtroEco.type = 'lowpass';
+  filtroEco.frequency.value = 2600;
+  eco.connect(filtroEco);
+  filtroEco.connect(retorno);
+  retorno.connect(eco);
+  retorno.connect(salida);
+
+  /** Una campana: la nota y dos armónicos que se apagan antes, como un vidrio al tocarlo. */
+  const campana = (frecuencia: number, inicio: number, volumen: number): void => {
+    const parciales: readonly [number, number, number][] = [[1, 1, 1.5], [2.01, 0.28, 0.6], [3.98, 0.1, 0.3]];
+    for (const [multiplo, nivel, caida] of parciales) {
+      const osc = ctx.createOscillator();
+      const g = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(frecuencia * multiplo, t + inicio);
+      g.gain.setValueAtTime(0.0001, t + inicio);
+      g.gain.exponentialRampToValueAtTime(volumen * nivel, t + inicio + 0.012);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + inicio + caida);
+      osc.connect(g);
+      g.connect(salida);
+      g.connect(eco);
+      osc.start(t + inicio);
+      osc.stop(t + inicio + caida + 0.05);
+    }
+  };
+
+  // Fondo grave (Do y Sol): entra despacio y se va con la última campana.
+  for (const [frecuencia, volumen] of [[130.81, 0.18], [196.0, 0.1]] as const) {
+    const osc = ctx.createOscillator();
+    const g = ctx.createGain();
+    const filtro = ctx.createBiquadFilter();
+    osc.type = 'triangle';
+    osc.frequency.value = frecuencia;
+    filtro.type = 'lowpass';
+    filtro.frequency.value = 700;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(volumen, t + 0.35);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 2.2);
+    osc.connect(filtro);
+    filtro.connect(g);
+    g.connect(salida);
+    osc.start(t);
+    osc.stop(t + 2.3);
+  }
+
+  campana(783.99, 0.0, 0.55); // Sol
+  campana(1046.5, 0.13, 0.5); // Do
+  campana(1318.51, 0.26, 0.45); // Mi
+  campana(2093.0, 0.42, 0.14); // Brillo final, Do agudo
+
+  setTimeout(() => { void ctx.close(); }, DURACION_SONIDO * 1000);
 }
 
 export function AnimacionInicio({ alTerminar }: Props): React.JSX.Element | null {

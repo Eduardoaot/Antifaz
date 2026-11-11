@@ -80,7 +80,7 @@ describe('Videos: las rutas no salen de main', () => {
 });
 
 describe('Contrato de video', () => {
-  const pista = (id: string) => ({ pista_id: id, efecto: 'solido' });
+  const pista = (id: string) => ({ pista_id: id, efecto: 'solido', intensidad: 80 });
 
   it('pistas: límites, repetidas y efecto desconocido', () => {
     expect(esquemaListaPistas.safeParse([]).success).toBe(true);

@@ -241,6 +241,38 @@ def test_vista_oculta_la_zona(original: Path) -> None:
     assert imagen[300:350, 400:470].mean() > 30  # lo demás se ve
 
 
+def test_vista_con_intensidad_por_objeto(original: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """La intensidad de cada objeto llega a su ocultamiento; sin ella, se usa la de siempre (80)."""
+    from revisor import efectos
+
+    vistas: list[list[int]] = []
+    aplicar = efectos.aplicar
+
+    def espiar(frame: Any, ocultamientos: Any, siluetas: Any) -> Any:
+        vistas.append([o.intensidad for o in ocultamientos])
+        return aplicar(frame, ocultamientos, siluetas)
+
+    monkeypatch.setattr(video_app.efectos, "aplicar", espiar)
+    abierto, _ = abrir(original)
+    pista = str(video_app.seguir(abierto, SeguidorFalso(), 0, 130, 140)["pista_id"])
+    video_app.vista(abierto, 0, [(pista, "difuminado", 7)])
+    video_app.vista(abierto, 0, [(pista, "difuminado")])
+    assert vistas == [[7], [80]]
+
+
+def test_pista_elegida_valida_la_intensidad() -> None:
+    from pydantic import ValidationError
+
+    from revisor.esquemas import INTENSIDAD_POR_DEFECTO, PistaElegida
+
+    assert PistaElegida(pista_id="p", efecto="difuminado").intensidad == INTENSIDAD_POR_DEFECTO
+    for valida in (1, 100):
+        assert PistaElegida(pista_id="p", efecto="difuminado", intensidad=valida).intensidad == valida
+    for invalida in (0, 101, 50.5, "50"):
+        with pytest.raises(ValidationError):
+            PistaElegida.model_validate({"pista_id": "p", "efecto": "difuminado", "intensidad": invalida})
+
+
 def test_vista_sin_pistas_y_con_pista_desconocida(original: Path) -> None:
     abierto, _ = abrir(original)
     datos, revisar = video_app.vista(abierto, 2, [])

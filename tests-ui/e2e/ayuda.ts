@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { _electron, type ElectronApplication, type Page } from '@playwright/test';
+import { _electron, type ElectronApplication, type Locator, type Page } from '@playwright/test';
 
 export const RAIZ = resolve(__dirname, '..', '..');
 export const PYTHON = process.platform === 'win32'
@@ -146,7 +146,22 @@ export async function abrir(sesion: Sesion, rutas: string[]): Promise<void> {
 /** Las vistas (fotos, video y guía) se eligen desde el menú de hamburguesa. */
 export async function irA(pagina: Page, opcion: string): Promise<void> {
   await pagina.getByRole('button', { name: 'Menú' }).click();
-  await pagina.getByRole('button', { name: opcion }).click();
+  await pagina.getByRole('dialog', { name: 'Menú' }).getByRole('button', { name: opcion, exact: true }).click();
+}
+
+/** El tema está en Configuración, dentro del menú. */
+export async function elegirTema(pagina: Page, tema: 'sistema' | 'claro' | 'oscuro'): Promise<void> {
+  await irA(pagina, 'Configuración');
+  const dialogo = pagina.getByRole('dialog', { name: 'Configuración' });
+  await dialogo.getByLabel('Tema').selectOption(tema);
+  await dialogo.getByRole('button', { name: 'Listo' }).click();
+  await dialogo.waitFor({ state: 'hidden' });
+}
+
+/** Abre el detalle de un grupo de advertencias (efecto, intensidad, zonas y sticker). */
+export async function personalizar(grupo: Locator): Promise<void> {
+  const boton = grupo.getByRole('button', { name: /^Personalizar/ });
+  if ((await boton.getAttribute('aria-expanded')) !== 'true') await boton.click();
 }
 
 export function guardarTexto(ruta: string, texto: string): void {

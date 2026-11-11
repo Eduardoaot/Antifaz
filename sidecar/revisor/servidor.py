@@ -39,7 +39,6 @@ from .esquemas import (
     Segmentar,
     SeguirVideo,
     Solicitud,
-    TipoEfecto,
     VistaVideo,
 )
 from .herramientas import Herramientas
@@ -253,8 +252,8 @@ class Sesion:
                 assert_never(desconocido)
 
 
-def _elegidas(lista: list[PistaElegida]) -> list[tuple[str, TipoEfecto]]:
-    return [(p.pista_id, p.efecto) for p in lista]
+def _elegidas(lista: list[PistaElegida]) -> list[video_app.Elegida]:
+    return [(p.pista_id, p.efecto, p.intensidad) for p in lista]
 
 
 def _error(id_solicitud: int | None, codigo: Codigo, mensaje: str | None = None) -> dict[str, object]:

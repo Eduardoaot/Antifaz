@@ -156,9 +156,16 @@ PISTAS_MAX = 50
 Id = Annotated[str, Field(min_length=1, max_length=64)]
 
 
+INTENSIDAD_MIN = 1
+INTENSIDAD_MAX = 100
+INTENSIDAD_POR_DEFECTO = 80
+
+
 class PistaElegida(Estricto):
     pista_id: Id
     efecto: TipoEfecto
+    # Solo cambia algo en difuminado y pixelado. Sin ella, la misma que en fotos.
+    intensidad: Annotated[int, Field(ge=INTENSIDAD_MIN, le=INTENSIDAD_MAX)] = INTENSIDAD_POR_DEFECTO
 
 
 def _sin_repetidas(pistas: list[PistaElegida]) -> list[PistaElegida]:

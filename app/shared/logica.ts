@@ -46,6 +46,8 @@ export interface Revision {
   escalas: Readonly<Record<string, number>>;
   /** Posición del sticker de cada cara, en fracciones de los semiejes de su zona. Sin entrada, centrado. */
   posiciones: Readonly<Record<string, Posicion>>;
+  /** Intensidad propia de una zona. Sin entrada, la de toda la foto (`intensidad`). */
+  intensidades: Readonly<Record<string, number>>;
 }
 
 export interface Posicion {
@@ -61,6 +63,7 @@ export const REVISION_INICIAL: Revision = {
   manuales: [],
   escalas: {},
   posiciones: {},
+  intensidades: {},
 };
 
 export interface Historial {
@@ -97,6 +100,55 @@ export function decidir(r: Revision, hallazgoId: string, decision: Decision): Re
 export function elegirEfecto(r: Revision, hallazgoId: string, efecto: Efecto): Revision {
   return { ...r, efectos: { ...r.efectos, [hallazgoId]: efecto } };
 }
+
+/** Decide lo mismo para varias zonas a la vez, por ejemplo todas las de un tipo de riesgo. */
+export function decidirVarias(r: Revision, ids: readonly string[], decision: Decision): Revision {
+  if (ids.length === 0) return r;
+  const decisiones: Record<string, Decision> = { ...r.decisiones };
+  for (const id of ids) decisiones[id] = decision;
+  return { ...r, decisiones };
+}
+
+/** Mismo efecto para varias zonas. Las tuyas guardan su efecto en ellas mismas. */
+export function elegirEfectoVarias(r: Revision, ids: readonly string[], efecto: Efecto): Revision {
+  if (ids.length === 0) return r;
+  const propios = new Set(r.manuales.map((z) => z.id));
+  const efectos: Record<string, Efecto> = { ...r.efectos };
+  for (const id of ids) if (!propios.has(id)) efectos[id] = efecto;
+  const elegidas = new Set(ids);
+  return { ...r, efectos, manuales: r.manuales.map((z) => (elegidas.has(z.id) ? { ...z, efecto } : z)) };
+}
+
+/** Lleva cualquier número al rango de la intensidad. Lo que no es un número vuelve al valor por defecto. */
+export function limitarIntensidad(valor: number): number {
+  if (!Number.isFinite(valor)) return LIMITES.intensidad.porDefecto;
+  return Math.min(LIMITES.intensidad.max, Math.max(LIMITES.intensidad.min, Math.round(valor)));
+}
+
+export const intensidadDe = (r: Revision, id: string): number => r.intensidades[id] ?? r.intensidad;
+
+/** Intensidad propia para varias zonas: las demás siguen con la de toda la foto. */
+export function elegirIntensidadVarias(r: Revision, ids: readonly string[], valor: number): Revision {
+  if (ids.length === 0) return r;
+  const intensidades: Record<string, number> = { ...r.intensidades };
+  for (const id of ids) intensidades[id] = limitarIntensidad(valor);
+  return { ...r, intensidades };
+}
+
+/** La intensidad de toda la foto. Es global de verdad: borra las que cada zona tenía. */
+export function elegirIntensidadGlobal(r: Revision, valor: number): Revision {
+  return { ...r, intensidad: limitarIntensidad(valor), intensidades: {} };
+}
+
+/** El valor si todos coinciden; null si son distintos o no hay ninguno. */
+export function valorComun<T>(valores: readonly T[]): T | null {
+  const [primero, ...resto] = valores;
+  if (primero === undefined) return null;
+  return resto.every((v) => v === primero) ? primero : null;
+}
+
+/** La intensidad solo cambia algo en el difuminado y el pixelado. */
+export const usaIntensidad = (efecto: Efecto): boolean => efecto === 'difuminado' || efecto === 'pixelado';
 
 function ocultarVarios(r: Revision, hallazgos: readonly Hallazgo[]): Revision {
   const decisiones: Record<string, Decision> = { ...r.decisiones };
@@ -296,7 +348,7 @@ export function construirOcultamientos(r: Revision, hallazgos: readonly Hallazgo
     salida.push({
       ...h.caja,
       efecto: efectoDe(r, h),
-      intensidad: r.intensidad,
+      intensidad: intensidadDe(r, h.id),
       dilatacion_px: LIMITES.dilatacionPx.porDefecto,
       dilatacion_pct: LIMITES.dilatacionPct.porDefecto,
       mascara_id: null,
@@ -316,7 +368,7 @@ export function construirOcultamientos(r: Revision, hallazgos: readonly Hallazgo
       ancho: z.ancho,
       alto: z.alto,
       efecto: z.efecto,
-      intensidad: r.intensidad,
+      intensidad: intensidadDe(r, z.id),
       dilatacion_px: LIMITES.dilatacionPx.porDefecto,
       // Un rectángulo o un trazo ya son lo que se pidió: solo llevan el margen mínimo.
       // La silueta del modelo puede quedarse corta, así que lleva el margen completo.
@@ -580,7 +632,13 @@ export const trazoLleno = (trazo: readonly Punto[]): boolean => trazo.length >= 
 
 export function quitarManual(r: Revision, id: string): Revision {
   // Su sticker se va con ella: un id nuevo con el mismo nombre no debe heredar tamaño ni posición.
-  return { ...r, manuales: r.manuales.filter((z) => z.id !== id), escalas: sinClave(r.escalas, id), posiciones: sinClave(r.posiciones, id) };
+  return {
+    ...r,
+    manuales: r.manuales.filter((z) => z.id !== id),
+    escalas: sinClave(r.escalas, id),
+    posiciones: sinClave(r.posiciones, id),
+    intensidades: sinClave(r.intensidades, id),
+  };
 }
 
 export function efectoDeManual(r: Revision, id: string, efecto: Efecto): Revision {
@@ -682,6 +740,7 @@ export function aEdicion(archivoId: string, r: Revision): Edicion {
     manuales: r.manuales.map((z) => ({ ...z })),
     escalas: { ...r.escalas },
     posiciones: Object.fromEntries(Object.entries(r.posiciones).map(([id, p]) => [id, { ...p }])),
+    intensidades: { ...r.intensidades },
   };
 }
 
@@ -694,6 +753,7 @@ export function desdeEdicion(e: Edicion): Revision {
     manuales: e.manuales.map((z) => ({ ...z, origen: z.origen ?? origenPorMascara(z.mascara_id) })),
     escalas: e.escalas,
     posiciones: e.posiciones,
+    intensidades: e.intensidades,
   };
 }
 
@@ -705,6 +765,7 @@ export function hayCambios(r: Revision): boolean {
     r.manuales.length > 0 ||
     Object.keys(r.escalas).length > 0 ||
     Object.keys(r.posiciones).length > 0 ||
+    Object.keys(r.intensidades).length > 0 ||
     r.intensidad !== LIMITES.intensidad.porDefecto
   );
 }
@@ -794,13 +855,136 @@ export function desplazamientoAnclado(fraccion: number, enVentana: number, taman
   return Number.isFinite(ideal) ? Math.min(maximo, Math.max(0, ideal)) : 0;
 }
 
-/** La zona bajo un punto de la imagen. Si hay varias, la más chica: es la que se quiso señalar. */
-export function zonaEnPunto(x: number, y: number, zonas: readonly { id: string; caja: Caja }[]): string | null {
+/**
+ * La zona bajo un punto de la imagen. Si hay varias, la más chica: es la que se quiso señalar.
+ * `margen` (en píxeles de la imagen) agranda cada zona para el clic: así una zona diminuta se puede elegir.
+ */
+export function zonaEnPunto(x: number, y: number, zonas: readonly { id: string; caja: Caja }[], margen = 0): string | null {
+  const m = Number.isFinite(margen) && margen > 0 ? margen : 0;
   let elegida: { id: string; area: number } | null = null;
   for (const { id, caja } of zonas) {
-    const dentro = x >= caja.x && y >= caja.y && x < caja.x + caja.ancho && y < caja.y + caja.alto;
+    const dentro = x >= caja.x - m && y >= caja.y - m && x < caja.x + caja.ancho + m && y < caja.y + caja.alto + m;
     const area = caja.ancho * caja.alto;
     if (dentro && (elegida === null || area < elegida.area)) elegida = { id, area };
   }
   return elegida?.id ?? null;
 }
+
+// --- Panel: grupos por tipo de riesgo y resumen ---------------------------------------------------
+
+const TITULO_GRUPO: Readonly<Record<string, string>> = {
+  'CAR-01': 'Caras',
+  'MEN-01': 'Menores',
+  'DOC-01': 'Documentos de identidad',
+  'FIN-01': 'Información financiera',
+  'VIA-01': 'Boletos y viajes',
+  'VIA-02': 'Etiquetas de maleta',
+  'UBI-01': 'Ubicación guardada en el archivo',
+  'UBI-02': 'Fachadas y domicilios',
+  'UBI-03': 'Uniformes y logos de escuela',
+  'UBI-04': 'Letreros',
+  'UBI-05': 'Gafetes',
+  'UBI-06': 'Ventanas',
+  'MAT-01': 'Placas',
+  'VAL-01': 'Llaves',
+  'VAL-02': 'Joyas y objetos de valor',
+  'PAN-01': 'Pantallas',
+  'CON-01': 'Datos de contacto',
+  'MED-01': 'Información médica',
+  'COD-01': 'Códigos QR y de barras',
+  'DES-01': 'Desnudez',
+  'SUG-01': 'Contenido sugerente',
+  'INT-01': 'Baño',
+  'ARM-01': 'Armas',
+  'EXT-01': 'Símbolos extremistas',
+};
+
+export const tituloGrupo = (reglaId: string): string => TITULO_GRUPO[reglaId] ?? reglaDe(reglaId).que_detecta;
+
+const PESO_MOSTRADO: Readonly<Record<NivelMostrado, number>> = { alto: 0, medio: 1, bajo: 2, pregunta: 3 };
+
+export interface Grupo {
+  reglaId: string;
+  titulo: string;
+  /** El nivel más grave de sus zonas. */
+  nivel: NivelMostrado;
+  hallazgos: Hallazgo[];
+}
+
+/** Junta los hallazgos por tipo de riesgo, en el orden en que llegan (lo más grave primero). */
+export function agruparHallazgos(hallazgos: readonly Hallazgo[], r: Revision): Grupo[] {
+  const grupos = new Map<string, Grupo>();
+  for (const h of hallazgos) {
+    const nivel = nivelMostrado(h, r);
+    const grupo = grupos.get(h.regla_id);
+    if (grupo === undefined) {
+      grupos.set(h.regla_id, { reglaId: h.regla_id, titulo: tituloGrupo(h.regla_id), nivel, hallazgos: [h] });
+    } else {
+      grupo.hallazgos.push(h);
+      if (PESO_MOSTRADO[nivel] < PESO_MOSTRADO[grupo.nivel]) grupo.nivel = nivel;
+    }
+  }
+  return [...grupos.values()].sort((a, b) => PESO_MOSTRADO[a.nivel] - PESO_MOSTRADO[b.nivel]);
+}
+
+export type EstadoGrupo = 'ocultar' | 'ignorar' | 'mixto' | 'pendiente';
+
+/** Qué pasa con las zonas de un grupo: todas igual, mezcladas, o sin decidir. */
+export function estadoDeZonas(r: Revision, ids: readonly string[]): EstadoGrupo {
+  const decisiones = ids.map((id) => r.decisiones[id]);
+  if (decisiones.length === 0 || decisiones.every((d) => d === undefined)) return 'pendiente';
+  const comun = valorComun(decisiones);
+  return comun === undefined || comun === null ? 'mixto' : comun;
+}
+
+const mayuscula = (texto: string): string => (texto === '' ? texto : `${texto.charAt(0).toUpperCase()}${texto.slice(1)}`);
+
+/** Cómo se nombra una zona dentro de su grupo: por dónde está, sin repetir el tipo de riesgo. */
+export function describirZona(h: Hallazgo): string {
+  const lugar = mayuscula(h.posicion ?? 'en la imagen');
+  return h.requiere_revision ? `${lugar} (no estamos seguros)` : lugar;
+}
+
+export interface Conteo {
+  alto: number;
+  medio: number;
+  bajo: number;
+  preguntas: number;
+  /** Zonas que se pueden tapar, contando las tuyas. */
+  zonas: number;
+  ocultas: number;
+  visibles: number;
+  sinDecidir: number;
+}
+
+/** Números para el resumen del panel. Una pregunta sin responder cuenta como algo por decidir. */
+export function contarRevision(analisis: Analisis, r: Revision): Conteo {
+  const conteo: Conteo = { alto: 0, medio: 0, bajo: 0, preguntas: 0, zonas: 0, ocultas: 0, visibles: 0, sinDecidir: 0 };
+  for (const h of analisis.hallazgos) {
+    const nivel = nivelMostrado(h, r);
+    if (nivel === 'pregunta') conteo.preguntas += 1;
+    else conteo[nivel] += 1;
+    // La pregunta de menores sin responder también pide una decisión.
+    if (reglaDe(h.regla_id).requiere_confirmacion === true && r.hayMenores === null) conteo.sinDecidir += 1;
+    if (!esVisual(h)) continue;
+    conteo.zonas += 1;
+    const decision = r.decisiones[h.id];
+    if (decision === 'ocultar') conteo.ocultas += 1;
+    else if (decision === 'ignorar') conteo.visibles += 1;
+    else conteo.sinDecidir += 1;
+  }
+  conteo.zonas += r.manuales.length;
+  conteo.ocultas += r.manuales.length;
+  return conteo;
+}
+
+/** Para la Guía: lo que la app revisa sola en cada foto y lo que todavía no. */
+export function alcanceRevision(): { revisa: string[]; noRevisa: Regla[] } {
+  return {
+    revisa: Object.values(NOMBRE_REVISADO),
+    noRevisa: catalogo.reglas.filter((regla) => !(regla.id in NOMBRE_REVISADO)),
+  };
+}
+
+/** Si la app busca esta regla sola en cada foto. Las demás quedan para que la persona las revise. */
+export const revisaSola = (reglaId: string): boolean => reglaId in NOMBRE_REVISADO;

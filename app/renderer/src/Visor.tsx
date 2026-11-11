@@ -1,5 +1,6 @@
-import { Maximize, SquareSplitHorizontal, ZoomIn, ZoomOut } from 'lucide-react';
+import { Maximize, ZoomIn, ZoomOut } from 'lucide-react';
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
+import type { Regla } from '../../shared/catalogo';
 import { esEmoji, LIMITES, type Hallazgo, type Ocultamiento, type Punto } from '../../shared/contrato';
 import {
   agregarPuntoTrazo,
@@ -9,7 +10,6 @@ import {
   desplazamientoAnclado,
   efectoDe,
   escalaDe,
-  ladoEtiqueta,
   limitarCorte,
   limitarZoom,
   opacidadRotulo,
@@ -25,7 +25,12 @@ import {
   type Revision,
 } from '../../shared/logica';
 import type { Archivo } from './App';
+import { BarraHerramientas } from './BarraHerramientas';
 import { MarcoSticker } from './Sticker';
+import { TarjetaZona, type ZonaElegida } from './TarjetaZona';
+
+/** Lo que la cinta de herramientas necesita de afuera. Comparar vive aquí, en el visor. */
+export type PropsBarra = Omit<React.ComponentProps<typeof BarraHerramientas>, 'comparando' | 'alComparar' | 'atenuada'>;
 
 interface Props {
   archivo: Archivo;
@@ -41,8 +46,11 @@ interface Props {
   /** Zona resaltada a la vez aquí y en el panel. */
   resaltado?: Resaltado | null;
   alResaltar?: (r: Resaltado | null) => void;
-  /** Con "Solo ver", un clic en una marca lleva a su fila del panel. */
-  alElegirZona?: (id: string) => void;
+  /** Con "Solo ver", un clic en una zona abre su explicación junto a ella. */
+  alCambiar?: (cambio: (r: Revision) => Revision) => void;
+  alQuitarManual?: (id: string) => void;
+  alPorQue?: (regla: Regla) => void;
+  barra: PropsBarra;
   /** Sticker de una cara elegido para moverlo o cambiar su tamaño. El panel abre sus controles. */
   seleccionSticker?: string | null;
   alSeleccionarSticker?: (id: string | null) => void;
@@ -58,6 +66,10 @@ const porcentajes = (c: Caja, ancho: number, alto: number): React.CSSProperties 
 
 /** Más de esto, en píxeles de pantalla, ya es arrastrar y no un clic. */
 const UMBRAL_ARRASTRE = 4;
+/** Un clic a esta distancia de una zona, en píxeles de pantalla, también la elige: las chicas se alcanzan. */
+const TOLERANCIA_CLIC = 10;
+/** Por debajo de esto, en píxeles de pantalla, la zona se señala con un anillo alrededor. */
+const ZONA_DIMINUTA = 22;
 /** En ventanas angostas la imagen usa todo el ancho; al acercarla, la ventana de la imagen se limita. */
 const CONSULTA_ANGOSTA = '(max-width: 1000px)';
 
@@ -80,7 +92,7 @@ interface Arrastre {
 }
 
 /** La imagen la dibuja el sidecar con los mismos efectos que la exportación: lo que ves es lo que sale. */
-export function Visor({ archivo, hallazgos, ocultamientos, revision, herramienta, tamanoPincel, alClic, alDibujar, alPintar, alFuera, resaltado = null, alResaltar, alElegirZona, seleccionSticker = null, alSeleccionarSticker, alAjustarSticker }: Props): React.JSX.Element {
+export function Visor({ archivo, hallazgos, ocultamientos, revision, herramienta, tamanoPincel, alClic, alDibujar, alPintar, alFuera, resaltado = null, alResaltar, alCambiar, alQuitarManual, alPorQue, barra, seleccionSticker = null, alSeleccionarSticker, alAjustarSticker }: Props): React.JSX.Element {
   const { id, ancho, alto, nombre } = archivo.info;
   const clave = JSON.stringify(ocultamientos);
   const [url, setUrl] = useState<string | null>(null);
@@ -97,6 +109,10 @@ export function Visor({ archivo, hallazgos, ocultamientos, revision, herramienta
   const [errorOriginal, setErrorOriginal] = useState<string | null>(null);
   const [corte, setCorte] = useState<number>(LIMITES.comparacion.porDefecto);
   const moviendoCorte = useRef(false);
+  // Zona cuya explicación está abierta, y una clave que cambia al moverse la imagen para recolocarla.
+  const [abierta, setAbierta] = useState<string | null>(null);
+  const [desplazamiento, setDesplazamiento] = useState(0);
+  const marco = useRef<HTMLDivElement | null>(null);
   const lienzo = useRef<HTMLDivElement | null>(null);
   const ventana = useRef<HTMLDivElement | null>(null);
   const ancla = useRef<{ fx: number; fy: number; vx: number; vy: number } | null>(null);
@@ -216,6 +232,25 @@ export function Visor({ archivo, hallazgos, ocultamientos, revision, herramienta
     setZoom(z);
   };
 
+  // Ctrl + y Ctrl − acercan y alejan la foto desde cualquier parte; Ctrl 0 la ajusta. Con un diálogo
+  // abierto no hacen nada. El tamaño de la interfaz queda en Ctrl Mayús + y −, en el menú Ver.
+  const alTeclaZoom = useRef<(e: globalThis.KeyboardEvent) => void>(() => undefined);
+  useEffect(() => {
+    alTeclaZoom.current = (e: globalThis.KeyboardEvent): void => {
+      if (!e.ctrlKey || e.shiftKey || e.altKey || document.querySelector('dialog[open]') !== null) return;
+      if (e.key === '+' || e.key === '=') cambiarZoom(pasoZoom(zoom, 1));
+      else if (e.key === '-') cambiarZoom(pasoZoom(zoom, -1));
+      else if (e.key === '0') cambiarZoom(LIMITES.zoom.min);
+      else return;
+      e.preventDefault();
+    };
+  });
+  useEffect(() => {
+    const oyente = (e: globalThis.KeyboardEvent): void => { alTeclaZoom.current(e); };
+    window.addEventListener('keydown', oyente);
+    return () => { window.removeEventListener('keydown', oyente); };
+  }, []);
+
   // Ctrl + rueda acerca o aleja. Necesita un oyente no pasivo para que la página no haga su propio zoom.
   const alRuedaActual = useRef<(e: WheelEvent) => void>(() => undefined);
   useEffect(() => {
@@ -252,6 +287,21 @@ export function Visor({ archivo, hallazgos, ocultamientos, revision, herramienta
     marca?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
   }, [resaltado, ampliada]);
 
+  /** Cuántos píxeles de la imagen mide la tolerancia del clic a este zoom. */
+  const margenClic = (): number => {
+    const ancho_pantalla = lienzo.current?.getBoundingClientRect().width ?? 0;
+    return ancho_pantalla > 0 ? (TOLERANCIA_CLIC * ancho) / ancho_pantalla : 0;
+  };
+
+  const elegida: ZonaElegida | null = (() => {
+    if (abierta === null || revision === null) return null;
+    const h = conCaja.find((x) => x.id === abierta);
+    if (h !== undefined) return { tipo: 'hallazgo', hallazgo: h };
+    const i = revision.manuales.findIndex((z) => z.id === abierta);
+    const zona = revision.manuales[i];
+    return zona === undefined ? null : { tipo: 'manual', zona, numero: i + 1 };
+  })();
+
   const punto = (e: PointerEvent): { x: number; y: number } | null => {
     const rect = lienzo.current?.getBoundingClientRect();
     return rect === undefined ? null : aPuntoDeImagen(e.clientX, e.clientY, rect, ancho, alto);
@@ -260,7 +310,7 @@ export function Visor({ archivo, hallazgos, ocultamientos, revision, herramienta
   const resaltarEn = (e: PointerEvent): void => {
     if (alResaltar === undefined) return;
     const p = punto(e);
-    const zona = p === null ? null : zonaEnPunto(p.x, p.y, zonas);
+    const zona = p === null ? null : zonaEnPunto(p.x, p.y, zonas, margenClic());
     if (zona === null) {
       if (resaltado?.origen === 'imagen') alResaltar(null);
     } else if (resaltado?.id !== zona) {
@@ -340,10 +390,12 @@ export function Visor({ archivo, hallazgos, ocultamientos, revision, herramienta
     if (a !== null) {
       arrastre.current = null;
       setArrastrando(false);
-      if (!a.movido && a.boton === 0 && herramienta === 'ninguna' && alElegirZona !== undefined) {
+      // Un clic sin arrastrar en "Solo ver": abre la explicación de la zona, o la cierra si fue fuera.
+      if (!a.movido && a.boton === 0 && herramienta === 'ninguna') {
         const p = punto(e);
-        const zona = p === null ? null : zonaEnPunto(p.x, p.y, zonas);
-        if (zona !== null) alElegirZona(zona);
+        const zona = p === null ? null : zonaEnPunto(p.x, p.y, zonas, margenClic());
+        setAbierta(zona);
+        if (zona !== null) alResaltar?.({ id: zona, origen: 'imagen' });
       }
       return;
     }
@@ -404,29 +456,33 @@ export function Visor({ archivo, hallazgos, ocultamientos, revision, herramienta
   };
 
   const dibujo = inicio !== null && actual !== null ? cajaEntre(inicio, actual) : null;
-  const claseMarca = (zona: string): string => (resaltado?.id === zona ? ' resaltada' : '');
+  // Píxeles de pantalla por píxel de la imagen, del ancho que el visor le da al lienzo.
+  const escala = ajuste === null || ancho <= 0 ? 0 : (ajuste * zoom) / ancho;
+  const claseMarca = (zona: string, caja: Caja): string =>
+    `${resaltado?.id === zona || abierta === zona ? ' resaltada' : ''}${Math.max(caja.ancho, caja.alto) * escala < ZONA_DIMINUTA ? ' diminuta' : ''}`;
   const sobreZona = !comparando && herramienta === 'ninguna' && resaltado?.origen === 'imagen';
-  // Mientras se dibuja o pinta, los números se apartan para no estorbar.
+  // Mientras se dibuja o pinta, la cinta se aparta para no estorbar.
   const dibujando = inicio !== null || trazo !== null;
-  const etiqueta = (caja: Caja): string => `etiqueta-${ladoEtiqueta(caja, alto)}`;
   const original = comparando ? urlOriginal : null;
+  const verTarjeta = elegida !== null && !comparando && herramienta === 'ninguna' && revision !== null && alCambiar !== undefined;
 
   if (error !== null) return <p role="alert">No pudimos mostrar la vista previa. {error}</p>;
-  if (url === null) return <p className="suave">Preparando la vista previa…</p>;
+  if (url === null) return <p className="suave preparando">Preparando la vista previa…</p>;
   return (
     <figure className="visor">
-      {/* El marco ancla la barra flotante al área visible: con zoom, la imagen se desplaza y la barra no. */}
-      <div className="marco-visor">
+      {/* El marco ancla las barras flotantes al área visible: con zoom, la imagen se desplaza y ellas no. */}
+      <div className="marco-visor" ref={marco}>
+        <BarraHerramientas {...barra} comparando={comparando} alComparar={alternarComparar} atenuada={dibujando} />
         <span className="solo-lector" id="pista-zoom">
           {comparando
             ? 'Arrastra la línea o usa el control de abajo. Las herramientas están en pausa.'
             : elegido !== undefined
               ? 'Arrastra el sticker o usa las flechas. Las esquinas o [ y ] cambian su tamaño. Esc para terminar.'
               : stickers.length > 0
-                ? 'Arrastra un sticker para moverlo. Ctrl + rueda o + y − para acercar.'
+                ? 'Arrastra un sticker para moverlo. Haz clic en una zona para ver por qué es un riesgo. Ctrl + rueda o + y − para acercar.'
                 : ampliada
-              ? herramienta === 'ninguna' ? 'Arrastra la imagen para moverte.' : 'Muévete con la rueda, las barras o el botón central del mouse.'
-              : 'Ctrl + rueda o las teclas + y − para acercar.'}
+              ? herramienta === 'ninguna' ? 'Arrastra la imagen para moverte. Haz clic en una zona para ver por qué es un riesgo.' : 'Muévete con la rueda, las barras o el botón central del mouse.'
+              : herramienta === 'ninguna' ? 'Haz clic en una zona para ver por qué es un riesgo. Ctrl + rueda o las teclas + y − para acercar.' : 'Ctrl + rueda o las teclas + y − para acercar.'}
         </span>
         <div
           ref={ventana}
@@ -436,6 +492,7 @@ export function Visor({ archivo, hallazgos, ocultamientos, revision, herramienta
           aria-label="Imagen"
           aria-describedby="pista-zoom"
           onKeyDown={alTecla}
+          onScroll={() => { if (abierta !== null) setDesplazamiento((n) => n + 1); }}
         >
           <div
             ref={lienzo}
@@ -459,19 +516,16 @@ export function Visor({ archivo, hallazgos, ocultamientos, revision, herramienta
                 <span className="rotulo despues" aria-hidden="true" style={{ opacity: opacidadRotulo(100 - corte) }}>Tu copia</span>
               </>
             )}
-            {!comparando && conCaja.map((h, i) => {
+            {/* Sin números encima: el contorno va por fuera y una zona diminuta lleva un anillo. */}
+            {!comparando && conCaja.map((h) => {
               const caja = h.caja;
               if (caja === null) return null;
               return (
-                <div key={h.id} aria-hidden="true" data-marca={h.id} className={`marca ${revision?.decisiones[h.id] ?? 'sin-decidir'}${claseMarca(h.id)}`} style={porcentajes(caja, ancho, alto)}>
-                  <span className={etiqueta(caja)}>{i + 1}</span>
-                </div>
+                <div key={h.id} aria-hidden="true" data-marca={h.id} className={`marca ${revision?.decisiones[h.id] ?? 'sin-decidir'}${claseMarca(h.id, caja)}`} style={porcentajes(caja, ancho, alto)} />
               );
             })}
-            {!comparando && revision?.manuales.map((z, i) => (
-              <div key={z.id} aria-hidden="true" data-marca={z.id} className={`marca ocultar manual${claseMarca(z.id)}`} style={porcentajes(z, ancho, alto)}>
-                <span className={etiqueta(z)}>T{i + 1}</span>
-              </div>
+            {!comparando && revision?.manuales.map((z) => (
+              <div key={z.id} aria-hidden="true" data-marca={z.id} className={`marca ocultar manual${claseMarca(z.id, z)}`} style={porcentajes(z, ancho, alto)} />
             ))}
             {revision !== null && stickers.map((h) => {
               const efecto = efectoDe(revision, h);
@@ -505,6 +559,22 @@ export function Visor({ archivo, hallazgos, ocultamientos, revision, herramienta
             )}
           </div>
         </div>
+        {verTarjeta && (
+          <TarjetaZona
+            elegida={elegida}
+            revision={revision}
+            lienzo={lienzo}
+            marco={marco}
+            posicionClave={`${zoom}-${desplazamiento}-${ajuste ?? 0}`}
+            alCambiar={alCambiar}
+            alQuitarManual={(zid) => { setAbierta(null); alQuitarManual?.(zid); }}
+            alPorQue={(regla) => { alPorQue?.(regla); }}
+            alCerrar={() => {
+              setAbierta(null);
+              ventana.current?.focus({ preventScroll: true });
+            }}
+          />
+        )}
         {/* Herramientas de vista: compactas, sobre la esquina, para no competir con la foto. */}
         <div className={`barra-visor${dibujando ? ' atenuada' : ''}${ampliada ? ' con-barras' : ''}`} role="group" aria-label="Vista de la imagen">
           <button type="button" className="boton chico" aria-label="Alejar" title="Alejar (−)" disabled={zoom <= LIMITES.zoom.min} onClick={() => { cambiarZoom(pasoZoom(zoom, -1)); }}>
@@ -516,10 +586,6 @@ export function Visor({ archivo, hallazgos, ocultamientos, revision, herramienta
           </button>
           <button type="button" className="boton chico" aria-label="Ajustar" title="Ajustar a la ventana (0)" disabled={!ampliada} onClick={() => { cambiarZoom(LIMITES.zoom.min); }}>
             <Maximize aria-hidden="true" />
-          </button>
-          <span className="separador" aria-hidden="true" />
-          <button type="button" className="boton chico" aria-label="Comparar antes y después" title="Comparar antes y después" aria-pressed={comparando} onClick={alternarComparar}>
-            <SquareSplitHorizontal aria-hidden="true" />
           </button>
         </div>
       </div>

@@ -42,6 +42,10 @@ export const LIMITES = {
   videoPistas: 50,
   videoPosicionMax: 999,
   videoProxyLadoMax: 4096,
+  /** Texto que se agrega al nombre de cada copia, como "-copia". Puede quedar vacío. */
+  sufijoExportacion: 40,
+  /** Lado de las miniaturas de la lista de fotos, en píxeles. Solo es vista. */
+  ladoMiniatura: 160,
 } as const;
 
 /**
@@ -225,7 +229,11 @@ export const esquemaSeguido = z.strictObject({
   frames_rastreados: z.number().int().positive(),
 });
 
-export const esquemaPistaElegida = z.strictObject({ pista_id: z.string().min(1).max(64), efecto: esquemaEfecto });
+export const esquemaPistaElegida = z.strictObject({
+  pista_id: z.string().min(1).max(64),
+  efecto: esquemaEfecto,
+  intensidad: enteroEnRango(LIMITES.intensidad.min, LIMITES.intensidad.max),
+});
 export type PistaElegida = z.infer<typeof esquemaPistaElegida>;
 export const esquemaListaPistas = z
   .array(esquemaPistaElegida)
@@ -308,6 +316,46 @@ export interface Vista {
 export interface Exportado {
   nombre: string;
   zonasOcultas: number;
+  /** Nombre de la carpeta donde se guardó, si fue la carpeta de tus ajustes o la de un lote. */
+  carpeta: string | null;
+}
+
+// --- Ajustes ------------------------------------------------------------------------------------
+
+/** "automatico": PNG si la foto era PNG; si no, JPG. */
+export const esquemaFormatoCopia = z.enum(['jpg', 'png', 'automatico']);
+export type FormatoCopia = z.infer<typeof esquemaFormatoCopia>;
+
+/** Caracteres que Windows no acepta en un nombre de archivo. */
+const CARACTERES_PROHIBIDOS = /[<>:"/\\|?*\u0000-\u001f]/;
+
+export const esquemaSufijo = z
+  .string()
+  .max(LIMITES.sufijoExportacion)
+  .refine((s) => !CARACTERES_PROHIBIDOS.test(s), 'Sin < > : " / \\ | ? *')
+  .refine((s) => !/[. ]$/.test(s), 'Sin punto ni espacio al final');
+
+export const esquemaPreferenciasCopia = z.strictObject({
+  /** "carpeta": se guarda directo en la carpeta elegida, sin preguntar. */
+  destino: z.enum(['preguntar', 'carpeta']),
+  formato: esquemaFormatoCopia,
+  sufijo: esquemaSufijo,
+});
+export type PreferenciasCopia = z.infer<typeof esquemaPreferenciasCopia>;
+
+export const PREFERENCIAS_COPIA_INICIALES: PreferenciasCopia = { destino: 'preguntar', formato: 'automatico', sufijo: '-copia' };
+
+export interface Ajustes {
+  tema: Tema;
+  copia: PreferenciasCopia;
+  /** Solo el nombre de la carpeta elegida, nunca la ruta. Null si no hay o ya no existe. */
+  carpeta: string | null;
+}
+
+/** Un lote de copias va a una sola carpeta. El renderer solo recibe un id opaco y el nombre. */
+export interface Lote {
+  loteId: string;
+  carpeta: string;
 }
 
 export const esquemaDecision = z.enum(['ocultar', 'ignorar']);
@@ -339,6 +387,8 @@ export const esquemaEdicion = z.strictObject({
   escalas: z.record(z.string(), z.number().min(LIMITES.escalaSticker.min).max(LIMITES.escalaSticker.max)).default({}),
   // Opcional por la misma razón: las anteriores a poder mover el sticker no lo traen.
   posiciones: z.record(z.string(), z.strictObject({ x: coordenadaSticker, y: coordenadaSticker })).default({}),
+  // Intensidad propia de una zona. Opcional: las recuperaciones anteriores no la traen.
+  intensidades: z.record(z.string(), enteroEnRango(LIMITES.intensidad.min, LIMITES.intensidad.max)).default({}),
 });
 export type Edicion = z.infer<typeof esquemaEdicion>;
 
@@ -362,6 +412,11 @@ export interface ApiRevisor {
   analizar(id: string): Promise<Resultado<Analisis>>;
   vista(id: string, ocultamientos: Ocultamiento[]): Promise<Resultado<Vista>>;
   exportar(id: string, ocultamientos: Ocultamiento[]): Promise<Resultado<Exportado | null>>;
+  /** Prepara una carpeta para varias copias: la de tus ajustes o una que eliges. Null si cancelas. */
+  prepararLote(): Promise<Resultado<Lote | null>>;
+  exportarEnLote(loteId: string, id: string, ocultamientos: Ocultamiento[]): Promise<Resultado<Exportado>>;
+  /** Miniatura de la foto original para la lista. Solo es vista: nunca se guarda. */
+  miniatura(id: string): Promise<Resultado<Vista>>;
   segmentar(id: string, x: number, y: number): Promise<Resultado<Segmentado>>;
   pintar(id: string, puntos: Punto[], tamano: number): Promise<Resultado<Segmentado>>;
   cerrar(id: string): Promise<void>;
@@ -369,10 +424,15 @@ export interface ApiRevisor {
   abrirFuente(url: string): Promise<void>;
   obtenerTema(): Promise<Tema>;
   definirTema(tema: Tema): Promise<void>;
+  obtenerAjustes(): Promise<Ajustes>;
+  definirCopia(preferencias: PreferenciasCopia): Promise<Ajustes>;
+  /** Abre el selector de carpetas. Devuelve los ajustes con la carpeta nueva, o igual si cancelas. */
+  elegirCarpeta(): Promise<Ajustes>;
   guardarEdiciones(ediciones: Edicion[]): Promise<void>;
   recuperar(): Promise<Recuperacion>;
   descartarRecuperacion(): Promise<void>;
   abrirVideo(): Promise<Resultado<VideoInfo | null>>;
+  soltarVideo(archivo: File): Promise<Resultado<VideoInfo>>;
   vistaVideo(id: string, posicion: number, pistas: PistaElegida[]): Promise<Resultado<VistaVideo>>;
   seguirVideo(id: string, posicion: number, x: number, y: number): Promise<Resultado<Seguido>>;
   quitarPista(id: string, pistaId: string): Promise<void>;
