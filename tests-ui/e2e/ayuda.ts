@@ -137,7 +137,10 @@ export async function simularGuardar(app: ElectronApplication, ruta: string | nu
 
 export async function abrir(sesion: Sesion, rutas: string[]): Promise<void> {
   await simularAbrir(sesion.app, rutas);
-  await sesion.pagina.getByRole('button', { name: 'Abrir fotos' }).first().click();
+  // Sin fotos, el botón está en la pantalla inicial; con fotos abiertas, solo en el menú.
+  const directo = sesion.pagina.getByRole('main').getByRole('button', { name: 'Abrir fotos' });
+  if ((await directo.count()) > 0) await directo.first().click();
+  else await irA(sesion.pagina, 'Abrir fotos');
 }
 
 /** Las vistas (fotos, video y guía) se eligen desde el menú de hamburguesa. */
