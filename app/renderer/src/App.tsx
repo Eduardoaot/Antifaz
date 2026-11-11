@@ -1,4 +1,4 @@
-import { FolderOpen, Keyboard, Menu, ShieldCheck, X } from 'lucide-react';
+import { Download, FolderOpen, Keyboard, Menu, ScanEye, ShieldCheck, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import logoClaro from '../../../brand/logo/horizontal-claro.svg';
 import logoOscuro from '../../../brand/logo/horizontal-oscuro.svg';
@@ -703,25 +703,19 @@ export function App(): React.JSX.Element {
 
               <ol className="pasos-inicio" aria-label="Así funciona">
                 <li>
-                  <span className="paso-numero" aria-hidden="true">1</span>
-                  <div>
-                    <strong>Abre o arrastra</strong>
-                    <p className="suave">Varias fotos a la vez, o un video de hasta 15 segundos.</p>
-                  </div>
+                  <span className="paso-icono" aria-hidden="true"><FolderOpen /></span>
+                  <strong>Abre</strong>
+                  <span className="suave">fotos o un video</span>
                 </li>
                 <li>
-                  <span className="paso-numero" aria-hidden="true">2</span>
-                  <div>
-                    <strong>Revisa lo que encontramos</strong>
-                    <p className="suave">Caras, datos de contacto, placas, documentos y más. Haz clic en una zona para saber por qué importa.</p>
-                  </div>
+                  <span className="paso-icono" aria-hidden="true"><ScanEye /></span>
+                  <strong>Revisa</strong>
+                  <span className="suave">tú decides qué tapar</span>
                 </li>
                 <li>
-                  <span className="paso-numero" aria-hidden="true">3</span>
-                  <div>
-                    <strong>Exporta una copia limpia</strong>
-                    <p className="suave">Con lo que elegiste tapado y sin ubicación ni datos ocultos del archivo.</p>
-                  </div>
+                  <span className="paso-icono" aria-hidden="true"><Download /></span>
+                  <strong>Exporta</strong>
+                  <span className="suave">una copia limpia</span>
                 </li>
               </ol>
               <p className="pista-atajos suave">
