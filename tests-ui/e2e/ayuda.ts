@@ -140,6 +140,12 @@ export async function abrir(sesion: Sesion, rutas: string[]): Promise<void> {
   await sesion.pagina.getByRole('button', { name: 'Abrir fotos' }).first().click();
 }
 
+/** Las vistas (fotos, video y guía) se eligen desde el menú de hamburguesa. */
+export async function irA(pagina: Page, opcion: string): Promise<void> {
+  await pagina.getByRole('button', { name: 'Menú' }).click();
+  await pagina.getByRole('button', { name: opcion }).click();
+}
+
 export function guardarTexto(ruta: string, texto: string): void {
   writeFileSync(ruta, texto);
 }

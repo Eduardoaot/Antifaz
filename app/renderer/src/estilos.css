@@ -69,6 +69,17 @@ svg { width: 1.125rem; height: 1.125rem; flex: none; }
 .logo:hover { transform: scale(1.02); }
 .eslogan { color: var(--texto-suave); font-size: 0.875rem; min-width: 0; }
 .acciones { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 0.25rem 0.5rem; }
+.menu-navegacion { position: relative; flex: none; }
+.boton-menu { padding-inline: 0.625rem; }
+.boton-menu svg { width: 1.25rem; height: 1.25rem; }
+.boton-menu[aria-expanded='true'] { background: var(--superficie-2); }
+.menu-desplegable {
+  position: absolute; top: calc(100% + 0.5rem); left: 0; z-index: 20;
+  display: grid; gap: 0.25rem; min-width: 14rem; padding: 0.5rem;
+  background: var(--superficie); border: 1px solid var(--borde-sutil);
+  border-radius: var(--radio-md); box-shadow: var(--sombra-lg);
+}
+.menu-desplegable .boton { justify-content: flex-start; width: 100%; }
 /* Separa los grupos de acciones: navegación · historial y exportar · ajustes. */
 .separador { width: 1px; height: 1.5rem; margin-inline: 0.25rem; background: var(--borde-sutil); }
 .campo-tema { display: inline-flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; color: var(--texto-suave); }

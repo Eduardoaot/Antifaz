@@ -9,6 +9,7 @@ import {
   Image as IconoFoto,
   Lock,
   MapPin,
+  Menu,
   QrCode,
   Redo2,
   Save,
@@ -468,48 +469,85 @@ export function App(): React.JSX.Element {
   }, []);
   const enFotos = vista === 'revision';
 
+  const [menuAbierto, setMenuAbierto] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const botonMenuRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!menuAbierto) return;
+    const alPresionar = (e: PointerEvent): void => {
+      if (e.target instanceof Node && !menuRef.current?.contains(e.target)) setMenuAbierto(false);
+    };
+    const alTecla = (e: KeyboardEvent): void => {
+      if (e.key !== 'Escape') return;
+      setMenuAbierto(false);
+      botonMenuRef.current?.focus();
+    };
+    document.addEventListener('pointerdown', alPresionar);
+    document.addEventListener('keydown', alTecla);
+    return () => {
+      document.removeEventListener('pointerdown', alPresionar);
+      document.removeEventListener('keydown', alTecla);
+    };
+  }, [menuAbierto]);
+
   return (
     <div className="app" onDragOver={(e) => { e.preventDefault(); }} onDrop={alSoltar}>
       <AnimacionInicio />
       <a className="saltar" href="#principal">Saltar al contenido</a>
       <header className="cabecera">
         <div className="identidad">
+          <div className="menu-navegacion" ref={menuRef}>
+            <button
+              ref={botonMenuRef}
+              type="button"
+              className="boton fantasma boton-menu"
+              aria-label="Menú"
+              aria-expanded={menuAbierto}
+              aria-controls="menu-desplegable"
+              onClick={() => { setMenuAbierto((a) => !a); }}
+            >
+              <Menu aria-hidden="true" />
+            </button>
+            {menuAbierto && (
+              <div id="menu-desplegable" className="menu-desplegable">
+                {enFotos ? (
+                  <button type="button" className="boton fantasma" onClick={() => { setMenuAbierto(false); void abrir(); }}>
+                    <FolderOpen aria-hidden="true" /> Abrir fotos
+                  </button>
+                ) : (
+                  <button type="button" className="boton fantasma" onClick={() => { setMenuAbierto(false); setVista('revision'); }}>
+                    <IconoFoto aria-hidden="true" /> Fotos
+                  </button>
+                )}
+                <button type="button" className="boton fantasma" aria-pressed={vista === 'video'} onClick={() => { setMenuAbierto(false); setVista((v) => (v === 'video' ? 'revision' : 'video')); }}>
+                  <Film aria-hidden="true" /> Video
+                </button>
+                <button type="button" className="boton fantasma" aria-pressed={vista === 'guia'} onClick={() => { setMenuAbierto(false); setVista((v) => (v === 'guia' ? 'revision' : 'guia')); }}>
+                  <BookOpen aria-hidden="true" /> Guía de privacidad
+                </button>
+              </div>
+            )}
+          </div>
           <picture>
             <source srcSet={logoOscuro} media="(prefers-color-scheme: dark)" />
             <img className="logo" src={logoClaro} alt={MARCA.nombre} />
           </picture>
           <p className="eslogan">{MARCA.eslogan}</p>
         </div>
-        {/* Una sola acción principal a la vista: Exportar. Abrir es secundaria; la pantalla vacía tiene la suya. */}
+        {/* Las acciones de edición solo aparecen con una foto abierta; abrir y cambiar de vista van en el menú. */}
         <div className="acciones">
-          {enFotos ? (
-            <button type="button" className="boton" onClick={() => { void abrir(); }}>
-              <FolderOpen aria-hidden="true" /> Abrir fotos
-            </button>
-          ) : (
-            <button type="button" className="boton" onClick={() => { setVista('revision'); }}>
-              <IconoFoto aria-hidden="true" /> Fotos
-            </button>
-          )}
-          <button type="button" className="boton fantasma" aria-pressed={vista === 'video'} onClick={() => { setVista((v) => (v === 'video' ? 'revision' : 'video')); }}>
-            <Film aria-hidden="true" /> Video
-          </button>
-          <button type="button" className="boton fantasma" aria-pressed={vista === 'guia'} onClick={() => { setVista((v) => (v === 'guia' ? 'revision' : 'guia')); }}>
-            <BookOpen aria-hidden="true" /> Guía de privacidad
-          </button>
-          {enFotos && (<>
-          <span className="separador" aria-hidden="true" />
-          <button type="button" className="boton fantasma" disabled={!actual || exportando || actual.historial.pasado.length === 0} onClick={() => { moverHistorial(deshacer, 'Se deshizo el último cambio.'); }}>
+          {enFotos && actual !== null && (<>
+          <button type="button" className="boton fantasma" disabled={exportando || actual.historial.pasado.length === 0} onClick={() => { moverHistorial(deshacer, 'Se deshizo el último cambio.'); }}>
             <Undo2 aria-hidden="true" /> Deshacer
           </button>
-          <button type="button" className="boton fantasma" disabled={!actual || exportando || actual.historial.futuro.length === 0} onClick={() => { moverHistorial(rehacer, 'Se rehizo el cambio.'); }}>
+          <button type="button" className="boton fantasma" disabled={exportando || actual.historial.futuro.length === 0} onClick={() => { moverHistorial(rehacer, 'Se rehizo el cambio.'); }}>
             <Redo2 aria-hidden="true" /> Rehacer
           </button>
           <button type="button" className="boton primario" disabled={analisis === null || exportando} onClick={pedirExportar}>
             <Save aria-hidden="true" /> {exportando ? 'Guardando…' : 'Exportar copia'}
           </button>
-          </>)}
           <span className="separador" aria-hidden="true" />
+          </>)}
           <label className="campo-tema">
             Tema
             <select
