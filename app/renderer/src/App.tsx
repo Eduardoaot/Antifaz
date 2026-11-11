@@ -154,7 +154,7 @@ export function App(): React.JSX.Element {
   const [zonaTotal, setZonaTotal] = useState<ZonaNueva | null>(null);
   const [avisoCierre, setAvisoCierre] = useState<AvisoCierre | null>(null);
   const [porQue, setPorQue] = useState<Regla | null>(null);
-  // Un video que se soltó sobre la ventana, o el pedido de abrir uno desde el menú: el modo de video lo atiende.
+  // Un video soltado, o pedir el selector desde el menú (archivo null).
   const [pedidoVideo, setPedidoVideo] = useState<{ archivo: File | null; vez: number } | null>(null);
   // Zona resaltada a la vez en la imagen y en el panel. Solo es visual: no cambia ninguna decisión.
   // Se guarda con su foto, porque los ids de zona ("cara-0") se repiten entre fotos.

@@ -28,7 +28,20 @@ const api: ApiRevisor = {
   descartarRecuperacion: () => ipcRenderer.invoke(CANALES.descartarRecuperacion),
   abrirVideo: () => ipcRenderer.invoke(CANALES.abrirVideo),
   // Igual que con las fotos: la ruta va directo a main y el renderer no la ve.
-  soltarVideo: (archivo) => ipcRenderer.invoke(CANALES.soltarVideo, webUtils.getPathForFile(archivo)),
+  soltarVideo: (archivo) => {
+    const ruta = webUtils.getPathForFile(archivo);
+    // Sin ruta real no hay nada que abrir (p. ej. un File inventado en pruebas).
+    if (!ruta) {
+      return Promise.resolve({
+        ok: false,
+        error: {
+          codigo: 'NO_ES_VIDEO',
+          mensaje: 'No pude leer la ruta de ese archivo. Ábrelo con el botón o suéltalo desde el Explorador.',
+        },
+      });
+    }
+    return ipcRenderer.invoke(CANALES.soltarVideo, ruta);
+  },
   vistaVideo: (id, posicion, pistas) => ipcRenderer.invoke(CANALES.vistaVideo, id, posicion, pistas),
   seguirVideo: (id, posicion, x, y) => ipcRenderer.invoke(CANALES.seguirVideo, id, posicion, x, y),
   zonaVideo: (id, forma, puntos, tamano) => ipcRenderer.invoke(CANALES.zonaVideo, id, forma, puntos, tamano),

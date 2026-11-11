@@ -1,10 +1,17 @@
 import { Brush, ChevronDown, Crosshair, Film, FolderOpen, Hand, Pause, Play, Save, SkipBack, SkipForward, SquareDashed, SquareSplitHorizontal, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useId, useRef, useState, type PointerEvent, type SyntheticEvent } from 'react';
 import { ERROR_INTERNO, LIMITES, type Efecto, type PistaElegida, type Punto, type Seguido, type VideoInfo } from '../../shared/contrato';
-import { agregarPuntoTrazo, aPuntoDeImagen, cajaEntre, limitarIntensidad, usaIntensidad, valorComun } from '../../shared/logica';
+import { agregarPuntoTrazo, anchoAjustado, aPuntoDeImagen, cajaEntre, limitarIntensidad, usaIntensidad, valorComun } from '../../shared/logica';
 import { leerEnRango } from '../../shared/numeros';
 import { ControlDecision, ControlIntensidad, SelectorEfecto } from './Advertencias';
 import { Confirmacion } from './Dialogos';
+
+function rellenoDe(estilo: CSSStyleDeclaration): { x: number; y: number } {
+  return {
+    x: Number.parseFloat(estilo.paddingLeft) + Number.parseFloat(estilo.paddingRight),
+    y: Number.parseFloat(estilo.paddingTop) + Number.parseFloat(estilo.paddingBottom),
+  };
+}
 
 /** Seguido con un clic, o una zona tuya fija en todo el video. */
 type OrigenPista = 'seguimiento' | 'rectangulo' | 'pincel';
@@ -30,7 +37,7 @@ interface Props {
   activo: boolean;
   alAnunciar: (texto: string) => void;
   alFallar: (nombre: string, mensaje: string) => void;
-  /** Abrir un video: el que se soltó en la ventana o, sin archivo, con el selector. */
+  /** Abrir un video: el que se soltó, o null para el selector (carpeta vacía local). */
   pedido: { archivo: File | null; vez: number } | null;
 }
 
@@ -71,9 +78,26 @@ export function ModoVideo({ activo, alAnunciar, alFallar, pedido }: Props): Reac
   const [reproduciendo, setReproduciendo] = useState(false);
   const [abiertas, setAbiertas] = useState<ReadonlySet<string>>(new Set());
   const [estiloAbierto, setEstiloAbierto] = useState(false);
+  const [ajuste, setAjuste] = useState<number | null>(null);
+  const ventana = useRef<HTMLDivElement | null>(null);
   const lienzo = useRef<HTMLDivElement | null>(null);
   const elegidas: PistaElegida[] = pistas.filter((p) => p.oculta).map((p) => ({ pista_id: p.id, efecto: p.efecto, intensidad: p.intensidad }));
   const claveVista = JSON.stringify(elegidas);
+
+  // Lo más grande que cabe en el área del visor, sin forzar barras de desplazamiento.
+  useEffect(() => {
+    const v = ventana.current;
+    if (v === null || info === null) return undefined;
+    const medir = (): void => {
+      const relleno = rellenoDe(getComputedStyle(v));
+      const alto = v.clientHeight - relleno.y;
+      setAjuste(anchoAjustado(v.clientWidth - relleno.x, alto > 0 ? alto : null, info.proxyAncho, info.proxyAlto, Number.POSITIVE_INFINITY));
+    };
+    medir();
+    const observador = new ResizeObserver(medir);
+    observador.observe(v);
+    return () => { observador.disconnect(); };
+  }, [info]);
 
   const perderVideo = useCallback((mensaje: string) => {
     setInfo(null);
@@ -184,7 +208,6 @@ export function ModoVideo({ activo, alAnunciar, alFallar, pedido }: Props): Reac
   useEffect(() => {
     if (pedido === null || atendido.current === pedido.vez) return undefined;
     const { archivo, vez } = pedido;
-    // Fuera del efecto: abrir cambia el estado, y así no se encadenan renders.
     const espera = setTimeout(() => {
       atendido.current = vez;
       void (archivo === null ? abrir() : abrirCon(() => api().soltarVideo(archivo)));
@@ -421,7 +444,7 @@ export function ModoVideo({ activo, alAnunciar, alFallar, pedido }: Props): Reac
               <button type="button" className="boton primario boton-destacado" disabled={ocupado !== null} onClick={() => { void abrir(); }}>
                 <FolderOpen aria-hidden="true" /> {ocupado === 'abriendo' ? 'Abriendo…' : 'Abrir video'}
               </button>
-              <span className="suave vacio-arrastrar">o arrastra un video a cualquier parte de la ventana</span>
+              <span className="suave vacio-arrastrar">o arrastra un video a la ventana (si el selector se queda en «Trabajando en ello…», cancélalo y arrastra)</span>
             </div>
           </div>
         </div>
@@ -501,14 +524,17 @@ export function ModoVideo({ activo, alAnunciar, alFallar, pedido }: Props): Reac
                 <Save aria-hidden="true" /><span className="texto-cinta">{ocupado === 'exportando' ? 'Guardando…' : 'Exportar copia'}</span>
               </button>
             </div>
-            <div className="ventana-lienzo">
+            <div ref={ventana} className="ventana-lienzo">
               {url === null ? (
                 <p className="suave preparando">{ocupado === 'siguiendo' ? 'Siguiendo el objeto…' : 'Preparando la vista previa…'}</p>
               ) : (
                 <div
                   ref={lienzo}
                   className={`lienzo${comparando ? ' comparando-video' : ''}${libre && herramienta !== 'ver' && !comparando ? ' herramienta-clic' : ''}`}
-                  style={{ aspectRatio: `${info.proxyAncho} / ${info.proxyAlto}` }}
+                  style={{
+                    aspectRatio: `${info.proxyAncho} / ${info.proxyAlto}`,
+                    width: ajuste === null ? '100%' : `${Math.round(ajuste)}px`,
+                  }}
                   data-testid="lienzo-video"
                   onPointerDown={alBajar}
                   onPointerMove={alMover}
@@ -577,7 +603,8 @@ export function ModoVideo({ activo, alAnunciar, alFallar, pedido }: Props): Reac
           </button>
           <div className="campo-frame">
             <label htmlFor={`${id}-frame`}>
-              Frame {posicion + 1} de {info.posiciones} (segundo {segundos(info, posicion)})
+              {/* Ancho fijo en dígitos: al scrubear no cambia de renglón ni mueve la barra. */}
+              Frame <span className="num-fijo">{posicion + 1}</span> de {info.posiciones} (segundo {segundos(info, posicion)})
             </label>
             <div className="linea-tiempo">
               <input
