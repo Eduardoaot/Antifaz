@@ -7,7 +7,6 @@ import {
   limitarEscala,
   limitarPosicion,
   limitarRotacion,
-  moverCreciendo,
   posicionDe,
   rotacionDe,
   semiejesZona,
@@ -111,8 +110,7 @@ export function MarcoSticker({ hallazgo, emoji, revision, ancho, alto, lienzo, s
         x: a.posicion.x + (dx * (ancho / rect.width)) / semi.x,
         y: a.posicion.y + (dy * (alto / rect.height)) / semi.y,
       };
-      // Si no alcanza a llegar sin destapar algo, crece lo justo para poder.
-      setProvisional({ ...moverCreciendo(hallazgo, a.escala, pedida), rotacion: a.rotacion });
+      setProvisional({ escala: a.escala, posicion: limitarPosicion(hallazgo, a.escala, pedida), rotacion: a.rotacion });
     } else if (a.tipo === 'girar') {
       const angulo = (Math.atan2(e.clientY - centro.y, e.clientX - centro.x) * 180) / Math.PI;
       // Con Mayús, de 15 en 15 grados.

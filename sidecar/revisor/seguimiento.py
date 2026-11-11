@@ -245,7 +245,8 @@ def _csrt_disponible() -> bool:
 def _nuevo_csrt() -> Any:
     if not _csrt_disponible():
         raise ErrorRevisor(Codigo.SEGUIMIENTO_NO_DISPONIBLE, "csrt: opencv sin contrib")
-    return cv2.legacy.TrackerCSRT_create()
+    # Los tipos de opencv-contrib no declaran el módulo `legacy`, aunque existe: se pide por nombre.
+    return getattr(cv2.legacy, "TrackerCSRT_create")()  # noqa: B009
 
 
 def _bgr(frame: Frame) -> np.ndarray:

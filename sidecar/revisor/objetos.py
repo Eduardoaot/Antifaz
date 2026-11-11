@@ -25,6 +25,11 @@ SHA256_TOKENIZADOR_OWL = "50b24e94079fb11cb1503f65fef0ed08044186a1cd118c79683991
 LADO_OWL = 768
 LARGO_TEXTO = 16
 UMBRAL_NMS = 0.3
+# Una caja que queda casi toda dentro de otra mejor, del mismo tipo, es la misma cosa: se descarta.
+DENTRO_DE_OTRA = 0.7
+# En fotos con mucho fondo (una cafetería, una calle) estas clases dan decenas de cajas débiles. Solo
+# se conservan las más seguras. Placas, armas, pantallas y tarjetas nunca se recortan.
+TOPE_POR_REGLA = {"UBI-04": 4, "UBI-06": 3, "VAL-02": 4}
 
 
 @dataclass(frozen=True)
@@ -41,9 +46,10 @@ CLASES = (
     Clase("a television", "PAN-01", 0.2),
     Clase("a credit card", "FIN-01", 0.15),
     Clase("jewelry or a necklace", "VAL-02", 0.15),
-    Clase("a street sign", "UBI-04", 0.1),
-    # Propuesta sin medir (2026-11-06): lo que importa es la vista, no la ventana. Riesgo bajo.
-    Clase("a window with a view of the street or buildings", "UBI-06", 0.2),
+    # Subido de 0.1 (2026-11-11): en fotos con mucho fondo marcaba decenas de cajas. Propuesta sin medir.
+    Clase("a street sign", "UBI-04", 0.15),
+    # Propuesta sin medir: lo que importa es la vista, no la ventana. Riesgo bajo. Subido de 0.2 por ruido.
+    Clase("a window with a view of the street or buildings", "UBI-06", 0.3),
     Clase("a gun", "ARM-01", 0.3),
     Clase("a rifle", "ARM-01", 0.3),
     Clase("a flag", "EXT-01", 0.2),
@@ -80,10 +86,24 @@ def decodificar(logits: Any, cajas: Any, ancho: int, alto: int) -> list[Objeto]:
             grupo[1].append(float(puntaje))
     salida: list[Objeto] = []
     for regla, (lista, valores) in por_regla.items():
-        for i in np.array(cv2.dnn.NMSBoxes(lista, valores, 0.0, UMBRAL_NMS)).reshape(-1):
-            x, y, w, h = lista[int(i)]
-            salida.append(Objeto(regla, x, y, w, h, valores[int(i)]))
+        indices = [int(i) for i in np.array(cv2.dnn.NMSBoxes(lista, valores, 0.0, UMBRAL_NMS)).reshape(-1)]
+        indices.sort(key=lambda i: valores[i], reverse=True)
+        conservadas: list[int] = []
+        for i in indices:
+            if not any(_dentro(lista[i], lista[j]) for j in conservadas):
+                conservadas.append(i)
+        for i in conservadas[: TOPE_POR_REGLA.get(regla, len(conservadas))]:
+            x, y, w, h = lista[i]
+            salida.append(Objeto(regla, x, y, w, h, valores[i]))
     return salida
+
+
+def _dentro(caja: list[int], otra: list[int]) -> bool:
+    """Si la mayor parte de `caja` cae dentro de `otra`."""
+    x0, y0 = max(caja[0], otra[0]), max(caja[1], otra[1])
+    x1, y1 = min(caja[0] + caja[2], otra[0] + otra[2]), min(caja[1] + caja[3], otra[1] + otra[3])
+    comun = max(0, x1 - x0) * max(0, y1 - y0)
+    return comun >= DENTRO_DE_OTRA * caja[2] * caja[3]
 
 
 class DetectorObjetos:

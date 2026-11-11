@@ -175,3 +175,47 @@ def test_fail_closed_si_el_detector_explota(tmp_path: Path, monkeypatch: pytest.
     resultado = _analizar(tmp_path)
     assert "objetos_fallo" in resultado["cobertura"]["motivos"]
     assert "PAN-01" not in resultado["cobertura"]["reglas_revisadas"]
+
+
+def test_descarta_la_caja_metida_en_otra_del_mismo_tipo() -> None:
+    zonas = decodificar(
+        *_salida(("a street sign", 0.9, (0.5, 0.5, 0.4, 0.4)), ("a street sign", 0.5, (0.5, 0.5, 0.1, 0.1))), 100, 100
+    )
+    assert len(zonas) == 1
+
+
+def test_tope_de_cajas_en_clases_ruidosas_y_sin_tope_en_placas() -> None:
+    letreros = [("a street sign", 0.9 - i * 0.01, (0.05 + i * 0.12, 0.5, 0.08, 0.08)) for i in range(8)]
+    assert len(decodificar(*_salida(*letreros), 1000, 1000)) == 4
+    placas = [("a car license plate", 0.9 - i * 0.01, (0.05 + i * 0.12, 0.5, 0.08, 0.08)) for i in range(8)]
+    assert len(decodificar(*_salida(*placas), 1000, 1000)) == 8
+
+
+# --- Forma de cara (caras.py) ------------------------------------------------------------------------
+
+
+def _puntos(ojo_d: tuple[float, float], ojo_i: tuple[float, float], nariz: tuple[float, float], boca_d: tuple[float, float], boca_i: tuple[float, float]) -> list[float]:
+    return [0, 0, 100, 100, *ojo_d, *ojo_i, *nariz, *boca_d, *boca_i]
+
+
+def test_forma_de_cara_de_frente_de_lado_y_acostada() -> None:
+    from revisor.caras import forma_de_cara
+
+    assert forma_de_cara(_puntos((35, 40), (65, 40), (50, 55), (38, 72), (62, 72)))
+    # De perfil: los ojos juntos, la boca abajo.
+    assert forma_de_cara(_puntos((55, 40), (68, 41), (75, 56), (60, 72), (70, 72)))
+    # Acostada (girada 90°): la misma cara, de lado.
+    assert forma_de_cara(_puntos((40, 65), (40, 35), (55, 50), (72, 62), (72, 38)))
+
+
+def test_puntos_sin_forma_de_cara_se_descartan() -> None:
+    from revisor.caras import forma_de_cara
+
+    # Todos amontonados en un punto (textura).
+    assert not forma_de_cara(_puntos((50, 50), (51, 50), (50, 51), (51, 51), (50, 52)))
+    # La boca a la misma altura que los ojos y lejos de la nariz.
+    assert not forma_de_cara(_puntos((10, 50), (90, 50), (50, 95), (12, 52), (88, 52)))
+    # Puntos fuera de la caja.
+    assert not forma_de_cara(_puntos((35, 40), (65, 40), (50, 55), (38, 72), (200, 72)))
+    # Caja vacía.
+    assert not forma_de_cara([0, 0, 0, 0, *([1.0] * 10)])

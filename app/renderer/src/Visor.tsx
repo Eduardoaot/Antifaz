@@ -7,6 +7,7 @@ import {
   anchoAjustado,
   aPuntoDeImagen,
   cajaEntre,
+  descartarZona,
   desplazamientoAnclado,
   efectoDe,
   escalaDe,
@@ -14,7 +15,6 @@ import {
   limitarZoom,
   opacidadRotulo,
   pasoZoom,
-  moverCreciendo,
   posicionDe,
   rotacionDe,
   textoZoom,
@@ -321,6 +321,28 @@ export function Visor({ archivo, hallazgos, ocultamientos, revision, herramienta
     return ancho_pantalla > 0 ? (TOLERANCIA_CLIC * ancho) / ancho_pantalla : 0;
   };
 
+  // Ctrl X o Supr quitan la zona elegida: la tuya se borra; la detectada se quita de la foto.
+  const alTeclaQuitar = useRef<(e: globalThis.KeyboardEvent) => void>(() => undefined);
+  useEffect(() => {
+    alTeclaQuitar.current = (e: globalThis.KeyboardEvent): void => {
+      const quitar = (e.ctrlKey && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'x') || e.key === 'Delete';
+      const objetivo = e.target;
+      const enCampo = objetivo instanceof HTMLInputElement || objetivo instanceof HTMLSelectElement || objetivo instanceof HTMLTextAreaElement;
+      const id = abierta ?? seleccionSticker;
+      if (!quitar || enCampo || id === null || revision === null || document.querySelector('dialog[open]') !== null) return;
+      e.preventDefault();
+      setAbierta(null);
+      alSeleccionarSticker?.(null);
+      if (revision.manuales.some((z) => z.id === id)) alQuitarManual?.(id);
+      else alCambiar?.((r) => descartarZona(r, id));
+    };
+  });
+  useEffect(() => {
+    const oyente = (e: globalThis.KeyboardEvent): void => { alTeclaQuitar.current(e); };
+    window.addEventListener('keydown', oyente);
+    return () => { window.removeEventListener('keydown', oyente); };
+  }, []);
+
   useEffect(() => {
     if (abierta === null) return undefined;
     const alPresionar = (e: globalThis.PointerEvent): void => {
@@ -475,10 +497,10 @@ export function Visor({ archivo, hallazgos, ocultamientos, revision, herramienta
     const p = posicionDe(revision, elegido.id);
     const escala = escalaDe(revision, elegido.id);
     switch (e.key) {
-      case 'ArrowUp': alAjustarSticker(elegido, moverCreciendo(elegido, escala, { x: p.x, y: p.y - d })); return true;
-      case 'ArrowDown': alAjustarSticker(elegido, moverCreciendo(elegido, escala, { x: p.x, y: p.y + d })); return true;
-      case 'ArrowLeft': alAjustarSticker(elegido, moverCreciendo(elegido, escala, { x: p.x - d, y: p.y })); return true;
-      case 'ArrowRight': alAjustarSticker(elegido, moverCreciendo(elegido, escala, { x: p.x + d, y: p.y })); return true;
+      case 'ArrowUp': alAjustarSticker(elegido, { posicion: { x: p.x, y: p.y - d } }); return true;
+      case 'ArrowDown': alAjustarSticker(elegido, { posicion: { x: p.x, y: p.y + d } }); return true;
+      case 'ArrowLeft': alAjustarSticker(elegido, { posicion: { x: p.x - d, y: p.y } }); return true;
+      case 'ArrowRight': alAjustarSticker(elegido, { posicion: { x: p.x + d, y: p.y } }); return true;
       case ',': alAjustarSticker(elegido, { rotacion: rotacionDe(revision, elegido.id) - LIMITES.rotacionSticker.paso }); return true;
       case '.': alAjustarSticker(elegido, { rotacion: rotacionDe(revision, elegido.id) + LIMITES.rotacionSticker.paso }); return true;
       case '[': alAjustarSticker(elegido, { escala: escala - LIMITES.escalaSticker.paso }); return true;
@@ -580,7 +602,13 @@ export function Visor({ archivo, hallazgos, ocultamientos, revision, herramienta
               const caja = h.caja;
               if (caja === null) return null;
               return (
-                <div key={h.id} aria-hidden="true" data-marca={h.id} className={`marca ${revision?.decisiones[h.id] ?? 'sin-decidir'}${claseMarca(h.id, caja)}`} style={porcentajes(caja, ancho, alto)} />
+                <div
+                  key={h.id}
+                  aria-hidden="true"
+                  data-marca={h.id}
+                  className={`marca ${revision?.decisiones[h.id] ?? 'sin-decidir'}${claseMarca(h.id, caja)}`}
+                  style={porcentajes(caja, ancho, alto)}
+                />
               );
             })}
             {!comparando && revision?.manuales.map((z) => (

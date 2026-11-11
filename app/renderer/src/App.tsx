@@ -810,9 +810,12 @@ export function App(): React.JSX.Element {
             </button>
           ) : (
           <aside className="panel" aria-label="Advertencias">
-            <button type="button" className="boton fantasma chico plegar-panel" aria-label="Ocultar el panel de advertencias" title="Ocultar el panel" onClick={() => { plegar('panel', true); }}>
-              <PanelRightClose aria-hidden="true" />
-            </button>
+            <div className="panel-barra">
+              <span className="panel-titulo">Revisión</span>
+              <button type="button" className="boton fantasma chico" aria-label="Ocultar el panel de advertencias" title="Ocultar el panel" onClick={() => { plegar('panel', true); }}>
+                <PanelRightClose aria-hidden="true" />
+              </button>
+            </div>
             {actual?.estado.tipo === 'en_cola' && <p className="estado-panel">Esta foto está en espera de revisión.</p>}
             {actual?.estado.tipo === 'analizando' && <p className="estado-panel"><span className="girador" aria-hidden="true" /> Revisando esta foto…</p>}
             {actual?.estado.tipo === 'error' && (

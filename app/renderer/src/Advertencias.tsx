@@ -18,7 +18,6 @@ import {
   enElTope,
   escalaDe,
   limitarRotacion,
-  moverCreciendo,
   rotacionDe,
   escalaMinimaSticker,
   estadoDeZonas,
@@ -217,22 +216,17 @@ export function ControlIntensidad({ valor, etiqueta, alCambiar, conAviso = false
 
 // --- Sticker ------------------------------------------------------------------------------------
 
-function textoTamano(valor: number, minimo: number, cara: boolean): string {
-  if (!cara) {
-    return valor > LIMITES.escalaSticker.porDefecto
-      ? 'Más grande tapa más de lo necesario.'
-      : 'Es el tamaño que elegimos: tapa toda la zona.';
-  }
-  if (valor <= minimo) return 'Es lo más chico: tapa justo la cara.';
-  if (valor < LIMITES.escalaSticker.porDefecto) return 'Más chico tapa la cara, pero podría dejar ver cabello u orejas.';
-  if (valor > LIMITES.escalaSticker.porDefecto) return 'Más grande tapa más de lo necesario.';
-  return 'Es el tamaño que elegimos: tapa la cara con un margen.';
+function textoTamano(valor: number, _minimo: number, cara: boolean): string {
+  const debajo = cara
+    ? 'Debajo del emoji la cara queda tapada con un color sólido: aunque lo achiques, no se ve.'
+    : 'Debajo del emoji la zona queda tapada con un color sólido: aunque lo achiques, no se ve.';
+  if (valor === LIMITES.escalaSticker.porDefecto) return `Es el tamaño que elegimos. ${debajo}`;
+  return debajo;
 }
 
 function textoPosicion(h: Hallazgo, escala: number, p: Posicion): string | null {
-  if (p.x === 0 && p.y === 0) return 'Al moverlo, crece lo necesario para seguir tapando.';
-  if (!enElTope(h, escala, p)) return 'Lo moviste del centro.';
-  return tieneNucleo(h) ? 'Hasta aquí: más lejos dejaría ver la cara.' : 'Hasta aquí: más lejos dejaría ver la zona.';
+  if (p.x === 0 && p.y === 0) return null;
+  return enElTope(h, escala, p) ? 'Hasta aquí se puede mover.' : 'Lo moviste del centro. Lo que estaba debajo sigue tapado.';
 }
 
 interface PropsAjuste {
@@ -275,8 +269,7 @@ export function AjusteSticker({ hallazgo, nombre, revision, abierto, alAbrir, al
   };
   const { paso } = LIMITES.posicionSticker;
   const mover = (dx: number, dy: number): void => {
-    // Si no alcanza a llegar sin destapar algo, crece lo justo.
-    alAjustar(hallazgo, moverCreciendo(hallazgo, valor, { x: posicion.x + dx, y: posicion.y + dy }));
+    alAjustar(hallazgo, { posicion: { x: posicion.x + dx, y: posicion.y + dy } });
   };
   const enPosicion = textoPosicion(hallazgo, valor, posicion);
   return (

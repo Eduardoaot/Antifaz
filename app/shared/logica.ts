@@ -232,22 +232,12 @@ const margenZona = (c: Caja): number =>
   Math.max(LIMITES.dilatacionPx.porDefecto, Math.ceil((Math.min(c.ancho, c.alto) * LIMITES.dilatacionPct.porDefecto) / 100));
 
 /**
- * Hasta dónde puede encogerse el sticker: lo que mide la cara del detector frente a la zona con margen.
- * Es una aproximación para el control; el sidecar calcula el mínimo exacto y nunca baja de él.
+ * Hasta dónde puede encogerse el sticker. Es libre: debajo del emoji la zona (o la cara del detector)
+ * ya queda tapada con un relleno sólido, así que achicarlo nunca deja ver lo que había.
  */
-export function escalaMinimaSticker(h: Hallazgo): number {
-  const { min } = LIMITES.escalaSticker;
-  if (h.caja === null || h.nucleo === undefined || h.nucleo === null) return 1;
-  const margen = margenZona(h.caja);
-  const nucleo = LIMITES.dilatacionPx.porDefecto;
-  const proporcion = Math.max(
-    (h.nucleo.ancho + 2 * nucleo) / (h.caja.ancho + 2 * margen),
-    (h.nucleo.alto + 2 * nucleo) / (h.caja.alto + 2 * margen),
-  );
-  if (!Number.isFinite(proporcion)) return 1;
-  // Hacia arriba, al paso del control: así el control no ofrece tamaños que el sidecar no daría.
-  const paso = LIMITES.escalaSticker.paso;
-  return Math.min(1, Math.max(min, redondearPaso(Math.ceil(proporcion / paso - 1e-9) * paso)));
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- se conserva la firma: antes dependía de la zona.
+export function escalaMinimaSticker(_h: Hallazgo): number {
+  return LIMITES.escalaSticker.min;
 }
 
 /** Fuera de rango o no numérico, se limita; 1 se guarda como "sin cambio". */
@@ -267,12 +257,6 @@ export const posicionDe = (r: Revision, id: string): Posicion => r.posiciones[id
 /** Al centésimo, hacia el centro: redondear nunca debe sacar al sticker de donde tapa la cara. */
 const haciaElCentro = (v: number): number => Math.trunc(v * 100) / 100 || 0;
 
-/**
- * Cuánto puede alejarse el centro, en semiejes. Al centésimo y hacia abajo, con tolerancia para que
- * 0.85 − 0.75 dé 0.1 y no 0.09: redondear nunca debe alargarlo.
- */
-const radioSticker = (h: Hallazgo, escala: number): number =>
-  Math.max(0, Math.floor(((Number.isFinite(escala) ? escala : 0) - escalaMinimaSticker(h)) * 100 + 1e-6) / 100);
 
 /**
  * La posición más cercana a la pedida desde la que el sticker, con esa escala, sigue tapando la cara.
@@ -280,21 +264,17 @@ const radioSticker = (h: Hallazgo, escala: number): number =>
  * tapa uno de radio `escala`: el centro puede alejarse hasta la diferencia. Más lejos, se queda en el
  * borde (el imán). El sidecar lo comprueba en píxeles y, si no alcanza, agranda el emoji.
  */
-export function limitarPosicion(h: Hallazgo, escala: number, p: Posicion): Posicion {
+export function limitarPosicion(_h: Hallazgo, _escala: number, p: Posicion): Posicion {
+  // Libre dentro del rango: lo que oculta la zona es el relleno sólido de debajo, no el emoji.
   const { max } = LIMITES.posicionSticker;
   const recorte = (v: number): number => (Number.isFinite(v) ? Math.min(max, Math.max(-max, v)) : 0);
-  const x = recorte(p.x);
-  const y = recorte(p.y);
-  const radio = radioSticker(h, escala);
-  const distancia = Math.hypot(x, y);
-  const factor = distancia > radio ? (distancia === 0 ? 0 : radio / distancia) : 1;
-  return { x: haciaElCentro(x * factor), y: haciaElCentro(y * factor) };
+  return { x: haciaElCentro(recorte(p.x)), y: haciaElCentro(recorte(p.y)) };
 }
 
-/** Verdadero si el sticker ya no puede alejarse más del centro con su tamaño actual. */
-export function enElTope(h: Hallazgo, escala: number, p: Posicion): boolean {
-  const radio = radioSticker(h, escala);
-  return Math.hypot(p.x, p.y) >= radio - 0.011;
+/** Verdadero si el sticker llegó al borde del rango en el que se puede mover. */
+export function enElTope(_h: Hallazgo, _escala: number, p: Posicion): boolean {
+  const { max } = LIMITES.posicionSticker;
+  return Math.abs(p.x) >= max - 0.011 || Math.abs(p.y) >= max - 0.011;
 }
 
 export interface CambioSticker {
@@ -312,18 +292,6 @@ export function limitarRotacion(grados: number): number {
 
 export const rotacionDe = (r: Revision, id: string): number => r.rotaciones[id] ?? 0;
 
-/**
- * La posición pedida, agrandando el sticker lo justo para llegar ahí sin destapar nada. Así se puede
- * mover aunque esté al tamaño mínimo: crece hasta donde haga falta, sin pasar del máximo.
- */
-export function moverCreciendo(h: Hallazgo, escala: number, pedida: Posicion): { escala: number; posicion: Posicion } {
-  const { max, paso } = LIMITES.escalaSticker;
-  for (let e = escala; e <= max + 1e-9; e = redondearPaso(e + paso)) {
-    const p = limitarPosicion(h, e, pedida);
-    if (Math.abs(p.x - pedida.x) < 0.01 && Math.abs(p.y - pedida.y) < 0.01) return { escala: e, posicion: p };
-  }
-  return { escala: max, posicion: limitarPosicion(h, max, pedida) };
-}
 
 /**
  * Cambia el tamaño, la posición o ambos. El tamaño nunca baja del mínimo de la cara, y al encogerlo

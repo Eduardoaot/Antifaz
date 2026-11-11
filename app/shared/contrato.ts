@@ -13,7 +13,7 @@ export const LIMITES = {
    * Tamaño de un sticker sobre una cara, en veces el tamaño que la app elige sola. Por debajo de 1 se
    * ajusta a la cara que vio el detector; el sidecar nunca lo deja más chico que eso.
    */
-  escalaSticker: { min: 0.25, max: 2, porDefecto: 1, paso: 0.05 },
+  escalaSticker: { min: 0.1, max: 2, porDefecto: 1, paso: 0.05 },
   /**
    * Posición del sticker de una cara, en fracciones de los semiejes del óvalo de su zona (0 es centrado).
    * Solo se mueve mientras siga tapando la cara del detector; el sidecar lo agranda si hiciera falta.

@@ -18,7 +18,7 @@ PINCEL_MIN = 1
 PINCEL_MAX = 512
 PUNTOS_TRAZO_MAX = 5000
 # Tamaño del sticker sobre una cara, en veces el que se elige solo. Coincide con LIMITES.escalaSticker.
-ESCALA_STICKER_MIN = 0.25
+ESCALA_STICKER_MIN = 0.1
 ESCALA_STICKER_MAX = 2.0
 # Posición del sticker, en fracciones de los semiejes de su zona. Coincide con LIMITES.posicionSticker.
 POSICION_STICKER_MAX = 2.0
@@ -98,7 +98,7 @@ class AbrirImagen(Estricto):
 class Analizar(Estricto):
     tipo: Literal["analizar"]
     imagen_id: Annotated[str, Field(min_length=1, max_length=64)]
-    umbral_confianza: Annotated[float, Field(ge=0, le=1)] = 0.25
+    umbral_confianza: Annotated[float, Field(ge=0, le=1)] = 0.35
     umbral_revision: Annotated[float, Field(ge=0, le=1)] = 0.6
     multiplicador_cara: Annotated[float, Field(ge=1.0, le=3.0)] = 1.3
 

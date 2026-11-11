@@ -218,17 +218,13 @@ def _pegar_emoji(
     dx = xs.astype(np.float64) + (x0 - cx)
     dy = ys.astype(np.float64) + (y0 - cy)
     justo = lado_emoji(opaco, dx, dy)
+    # Libre: puede ser más chico que la zona e ir donde se pidió. Lo que oculta es el relleno sólido de
+    # debajo (la cara del detector, o la zona completa), que no depende del emoji. `minimo` se conserva
+    # en la firma solo como referencia de qué quedó tapado.
+    del minimo
     lado = max(1, round(justo * escala))
-    if minimo is None:
-        lado = max(lado, justo)
-    else:
-        if pegar_en is not None:
-            cx, cy = pegar_en
-        mys, mxs = _orilla(minimo)
-        if mxs.size > 0:
-            mdx = mxs.astype(np.float64) + (x0 - cx)
-            mdy = mys.astype(np.float64) + (y0 - cy)
-            lado = max(lado, lado_emoji(opaco, mdx, mdy))
+    if pegar_en is not None:
+        cx, cy = pegar_en
     ex0, ey0 = math.floor(cx - lado / 2 + 0.5), math.floor(cy - lado / 2 + 0.5)
     rx0, ry0 = max(0, ex0), max(0, ey0)
     rx1, ry1 = min(ancho_img, ex0 + lado), min(alto_img, ey0 + lado)

@@ -518,13 +518,16 @@ def test_sticker_chico_nunca_destapa_la_cara_del_detector(efecto: str, escala: f
     assert all(ovalo[fila, columna] for fila, columna in lados)
 
 
-def test_sticker_no_baja_del_minimo_que_tapa_la_cara() -> None:
-    """Pedir menos que el mínimo da el mínimo: escalas muy chicas acaban igual."""
+def test_sticker_se_hace_tan_chico_como_se_pida_y_la_cara_sigue_tapada() -> None:
+    """Sin mínimo: más chico es más chico. Lo que oculta la cara es el relleno de debajo, no el emoji."""
     a = _imagen()
-    muy_chico, _ = efectos.aplicar(a, [_cara(escala=0.25)])
-    tambien, _ = efectos.aplicar(a, [_cara(escala=0.3)])
-    assert np.array_equal(muy_chico, tambien)
-    assert _tocados(muy_chico, a) > NUCLEO["ancho"] * NUCLEO["alto"] * 0.7
+    muy_chico, _ = efectos.aplicar(a, [_cara(escala=0.1)])
+    menos, _ = efectos.aplicar(a, [_cara(escala=0.3)])
+    assert not np.array_equal(muy_chico, menos)
+    o = _cara(escala=0.1)
+    salida_b, _ = efectos.aplicar(255 - a, [o])
+    ovalo, (x0, y0, x1, y1) = _ovalo_nucleo(o)
+    assert np.array_equal(muy_chico[y0:y1, x0:x1][ovalo], salida_b[y0:y1, x0:x1][ovalo])
 
 
 @pytest.mark.parametrize(
@@ -536,14 +539,24 @@ def test_sticker_no_baja_del_minimo_que_tapa_la_cara() -> None:
     ],
     ids=["sin_nucleo", "en_la_orilla", "forma_caja"],
 )
-def test_sin_cara_del_detector_el_sticker_no_se_encoge(extra: dict[str, Any]) -> None:
+def test_sin_cara_del_detector_el_sticker_se_encoge_y_la_zona_sigue_tapada(extra: dict[str, Any]) -> None:
     a = _imagen()
     datos = {"forma": "elipse", "nucleo": NUCLEO} | extra
     x, y = int(datos.pop("x", CARA["x"])), int(datos.pop("y", CARA["y"]))
     base = datos
     normal, _ = efectos.aplicar(a, [oculto(x, y, CARA["ancho"], CARA["alto"], "emoji_sonrisa", **base)])
-    chico, _ = efectos.aplicar(a, [oculto(x, y, CARA["ancho"], CARA["alto"], "emoji_sonrisa", escala=0.5, **base)])
-    assert np.array_equal(normal, chico)
+    o = oculto(x, y, CARA["ancho"], CARA["alto"], "emoji_sonrisa", escala=0.5, **base)
+    chico, _ = efectos.aplicar(a, [o])
+    assert not np.array_equal(normal, chico)
+    otra, _ = efectos.aplicar(255 - a, [o])
+    x0, y0, x1, y1 = efectos.region_dilatada(o, a.shape[0], a.shape[1])
+    if base.get("forma") == "caja" or x == 0:
+        # Caja completa: nada de la foto queda en la zona.
+        assert np.array_equal(chico[y0:y1, x0:x1], otra[y0:y1, x0:x1])
+    else:
+        # Óvalo de la cara: su centro sigue sin depender de la foto.
+        cy, cx = (y0 + y1) // 2, (x0 + x1) // 2
+        assert np.array_equal(chico[cy - 5 : cy + 5, cx - 5 : cx + 5], otra[cy - 5 : cy + 5, cx - 5 : cx + 5])
 
 
 def test_la_escala_solo_cambia_al_emoji() -> None:
@@ -575,7 +588,7 @@ def test_propiedad_sticker_chico_tapa_la_cara_del_detector(
     assert np.array_equal(salida_a[y0:y1, x0:x1][ovalo], salida_b[y0:y1, x0:x1][ovalo])
 
 
-@pytest.mark.parametrize("escala", [0.2, 2.01, float("nan"), float("inf")])
+@pytest.mark.parametrize("escala", [0.05, 2.01, float("nan"), float("inf")])
 def test_escala_fuera_de_rango_se_rechaza(escala: float) -> None:
     from pydantic import ValidationError
 
@@ -664,13 +677,16 @@ def test_sticker_en_otra_zona_se_mueve_hacia_ese_lado() -> None:
     assert regiones_d[0][2] > regiones_c[0][2], "el emoji no llegó más a la derecha"
 
 
-def test_sticker_pedido_mas_chico_en_otra_zona_no_se_encoge() -> None:
-    """Sin cara del detector no hay un mínimo menor que la zona: el emoji no baja de su tamaño."""
+def test_sticker_pedido_mas_chico_en_otra_zona_se_encoge_y_la_zona_sigue_tapada() -> None:
     a = _imagen()
     normal, regiones_n = efectos.aplicar(a, [_zona()])
     chico, regiones_c = efectos.aplicar(a, [_zona(escala=0.25)])
-    assert regiones_c[0] == regiones_n[0]
-    assert np.array_equal(normal, chico)
+    assert not np.array_equal(normal, chico)
+    o = _zona(escala=0.25)
+    otra, _ = efectos.aplicar(255 - a, [o])
+    x0, y0, x1, y1 = efectos.region_dilatada(o, 200, 300)
+    assert np.array_equal(chico[y0:y1, x0:x1], otra[y0:y1, x0:x1])
+    assert regiones_c[0] == (x0, y0, x1, y1) or regiones_c[0] != regiones_n[0]
 
 
 def test_sticker_movido_con_silueta_tapa_la_silueta() -> None:

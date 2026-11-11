@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import math
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -27,6 +28,10 @@ MAX_LADO_MOSAICOS = 5120
 IOU_DUPLICADO = 0.3
 UMBRAL_NMS = 0.3
 MAX_CARAS = 5000
+# Por debajo de esta confianza, la detección solo cuenta si sus 5 puntos (ojos, nariz, comisuras) tienen
+# forma de cara. Encima, nunca se descarta. Propuesta del 2026-11-11: hombros, pecho y texturas daban
+# cajas con puntos sin forma.
+CONFIANZA_SIN_REVISAR_FORMA = 0.6
 
 
 class ModeloNoDisponible(Exception):
@@ -69,6 +74,37 @@ def _sin_duplicados(caras: list[Cara]) -> list[Cara]:
     return resultado
 
 
+def forma_de_cara(f: list[float]) -> bool:
+    """Si los 5 puntos de YuNet se acomodan como en una cara, sin importar el giro.
+
+    `f` es [x, y, ancho, alto, ojo derecho x, y, ojo izquierdo x, y, nariz x, y, boca derecha x, y,
+    boca izquierda x, y]. Solo usa distancias entre puntos, así una cara de lado o acostada pasa igual.
+    """
+    x, y, w, h = f[0], f[1], f[2], f[3]
+    if w <= 0 or h <= 0:
+        return False
+    ojo_d, ojo_i, nariz, boca_d, boca_i = (f[4], f[5]), (f[6], f[7]), (f[8], f[9]), (f[10], f[11]), (f[12], f[13])
+    margen_x, margen_y = 0.15 * w, 0.15 * h
+    for px, py in (ojo_d, ojo_i, nariz, boca_d, boca_i):
+        if not (x - margen_x <= px <= x + w + margen_x and y - margen_y <= py <= y + h + margen_y):
+            return False
+    centro_ojos = ((ojo_d[0] + ojo_i[0]) / 2, (ojo_d[1] + ojo_i[1]) / 2)
+    centro_boca = ((boca_d[0] + boca_i[0]) / 2, (boca_d[1] + boca_i[1]) / 2)
+    entre_ojos = math.dist(ojo_d, ojo_i)
+    ojos_a_boca = math.dist(centro_ojos, centro_boca)
+    ancho_boca = math.dist(boca_d, boca_i)
+    lado = max(w, h)
+    if not (0.12 * lado <= entre_ojos <= 0.8 * lado and 0.15 * lado <= ojos_a_boca <= 0.9 * lado):
+        return False
+    # De frente la boca está a ~1.1 veces la distancia entre ojos; de perfil, los ojos se juntan.
+    if not 0.5 <= ojos_a_boca / entre_ojos <= 3.0:
+        return False
+    if not 0.25 * entre_ojos <= ancho_boca <= 1.6 * entre_ojos:
+        return False
+    # La nariz queda entre los ojos y la boca, no lejos de ambos.
+    return math.dist(nariz, centro_ojos) < 1.2 * ojos_a_boca and math.dist(nariz, centro_boca) < 1.2 * ojos_a_boca
+
+
 class DetectorCaras:
     def __init__(self, carpeta_modelos: Path) -> None:
         ruta = carpeta_modelos / ARCHIVO_MODELO
@@ -90,7 +126,11 @@ class DetectorCaras:
         _, salida = detector.detect(bgr)
         if salida is None:  # pyright: ignore[reportUnnecessaryComparison]
             return []
-        return [(float(f[0]), float(f[1]), float(f[2]), float(f[3]), float(f[14])) for f in salida]
+        return [
+            (float(f[0]), float(f[1]), float(f[2]), float(f[3]), float(f[14]))
+            for f in salida
+            if float(f[14]) >= CONFIANZA_SIN_REVISAR_FORMA or forma_de_cara([float(v) for v in f[:14]])
+        ]
 
     def detectar(self, pixeles: Pixeles, umbral: float) -> list[Cara]:
         rgb = pixeles[:, :, :3]

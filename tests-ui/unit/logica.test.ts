@@ -227,15 +227,14 @@ describe('tamaño del sticker sobre una cara', () => {
     expect(ajustaSticker(conEmoji(), { ...conNucleo(), caja: null })).toBe(false);
   });
 
-  it('sin cara del detector, el sticker no baja de su tamaño y solo se mueve al agrandarlo', () => {
+  it('sin cara del detector, el sticker se encoge y se mueve libre: debajo queda el relleno', () => {
     const placa: Hallazgo = { ...conNucleo(), regla_id: 'MAT-01', nucleo: null };
-    expect(escalaMinimaSticker(placa)).toBe(1);
-    // A tamaño normal no se aleja del centro; al 150 % ya puede.
-    expect(posicionDe(ajustarSticker(conEmoji(), placa, { posicion: { x: 0.3, y: 0 } }), 'a')).toEqual({ x: 0, y: 0 });
-    const grande = ajustarSticker(conEmoji(), placa, { escala: 1.5 });
-    expect(posicionDe(ajustarSticker(grande, placa, { posicion: { x: 0.3, y: 0 } }), 'a')).toEqual({ x: 0.3, y: 0 });
-    const [o] = construirOcultamientos(ajustarSticker(grande, placa, { posicion: { x: 0.3, y: 0 } }), [placa]);
-    expect(o).toMatchObject({ forma: 'caja', nucleo: null, escala: 1.5, desplazamiento_x: 0.3, desplazamiento_y: 0 });
+    expect(escalaMinimaSticker(placa)).toBe(LIMITES.escalaSticker.min);
+    expect(posicionDe(ajustarSticker(conEmoji(), placa, { posicion: { x: 0.3, y: 0 } }), 'a')).toEqual({ x: 0.3, y: 0 });
+    const chica = ajustarSticker(conEmoji(), placa, { escala: 0.3 });
+    expect(escalaDe(chica, 'a')).toBe(0.3);
+    const [o] = construirOcultamientos(ajustarSticker(chica, placa, { posicion: { x: 0.3, y: 0 } }), [placa]);
+    expect(o).toMatchObject({ forma: 'caja', nucleo: null, escala: 0.3, desplazamiento_x: 0.3, desplazamiento_y: 0 });
     expect(esquemaOcultamiento.safeParse(o).success).toBe(true);
   });
 
@@ -262,17 +261,13 @@ describe('tamaño del sticker sobre una cara', () => {
     expect(zonasConSticker(decidir(r, 'p', 'ocultar'), [placa])).toEqual([placa]);
   });
 
-  it('el mínimo sale de la cara frente a la zona con margen, redondeado hacia arriba al paso', () => {
-    // (100 + 2·8) / (130 + 2·13) = 0.744 → 0.75
-    expect(escalaMinimaSticker(conNucleo())).toBe(0.75);
-    expect(escalaMinimaSticker(cara('a'))).toBe(1);
-    expect(escalaMinimaSticker({ ...conNucleo(), caja: { x: 0, y: 0, ancho: 4000, alto: 4000 }, nucleo: { x: 10, y: 10, ancho: 1, alto: 1 } })).toBe(LIMITES.escalaSticker.min);
-    // La cara ocupa toda su zona: solo se puede quitar la diferencia entre los márgenes.
-    expect(escalaMinimaSticker({ ...conNucleo(), nucleo: { x: 100, y: 100, ancho: 130, alto: 130 } })).toBe(0.95);
+  it('no hay un mínimo propio: se puede achicar hasta el límite general', () => {
+    expect(escalaMinimaSticker(conNucleo())).toBe(LIMITES.escalaSticker.min);
+    expect(escalaMinimaSticker(cara('a'))).toBe(LIMITES.escalaSticker.min);
   });
 
   it.each([
-    [0.1, 0.25], [0.25, 0.25], [0.5, 0.5], [1.03, 1.05], [2, 2], [2.5, 2], [-1, 0.25],
+    [0.05, 0.1], [0.1, 0.1], [0.25, 0.25], [0.5, 0.5], [1.03, 1.05], [2, 2], [2.5, 2], [-1, 0.1],
     [Number.NaN, 1], [Number.POSITIVE_INFINITY, 1], [Number.NEGATIVE_INFINITY, 1],
   ])('limitarEscala(%s) = %s', (entrada, esperado) => {
     expect(limitarEscala(entrada)).toBe(esperado);
@@ -305,7 +300,7 @@ describe('tamaño del sticker sobre una cara', () => {
   it('el esquema rechaza una escala fuera de rango y una cara fuera de su zona', () => {
     const [o] = construirOcultamientos(conEmoji(), [conNucleo()]);
     expect(o).toBeDefined();
-    for (const escala of [0.2, 2.01, Number.NaN, '1', null, undefined]) {
+    for (const escala of [0.05, 2.01, Number.NaN, '1', null, undefined]) {
       expect(esquemaOcultamiento.safeParse({ ...o, escala }).success).toBe(false);
     }
     for (const nucleo of [{ x: 99, y: 115, ancho: 100, alto: 100 }, { x: 115, y: 115, ancho: 116, alto: 100 }, { x: 115, y: 115, ancho: 0, alto: 100 }, undefined]) {
@@ -323,26 +318,25 @@ describe('tamaño del sticker sobre una cara', () => {
     expect(esquemaEdicion.safeParse({ ...e, escalas: { a: 3 } }).success).toBe(false);
   });
 
-  it('moverlo se guarda mientras tape la cara; más lejos se queda en el tope (imán)', () => {
+  it('moverlo se guarda dentro del rango; más lejos se queda en el borde', () => {
     const h = conNucleo();
-    // Con escala 1 y mínimo 0.75, el centro puede alejarse hasta 0.25 semiejes.
-    const r = ajustarSticker(conEmoji(), h, { posicion: { x: 0.1, y: -0.1 } });
-    expect(posicionDe(r, 'a')).toEqual({ x: 0.1, y: -0.1 });
+    const r = ajustarSticker(conEmoji(), h, { posicion: { x: 0.6, y: -0.4 } });
+    expect(posicionDe(r, 'a')).toEqual({ x: 0.6, y: -0.4 });
     expect(enElTope(h, 1, posicionDe(r, 'a'))).toBe(false);
-    const lejos = ajustarSticker(conEmoji(), h, { posicion: { x: 1, y: 0 } });
-    expect(posicionDe(lejos, 'a')).toEqual({ x: 0.25, y: 0 });
+    const lejos = ajustarSticker(conEmoji(), h, { posicion: { x: 9, y: 0 } });
+    expect(posicionDe(lejos, 'a')).toEqual({ x: LIMITES.posicionSticker.max, y: 0 });
     expect(enElTope(h, 1, posicionDe(lejos, 'a'))).toBe(true);
     expect(stickerAjustado(lejos, 'a')).toBe(true);
     expect(hayCambios({ ...REVISION_INICIAL, posiciones: lejos.posiciones })).toBe(true);
   });
 
-  it('en el tamaño mínimo no se mueve, y al encogerlo se acerca al centro', () => {
+  it('achicarlo no lo mueve, y en cualquier tamaño se puede mover', () => {
     const h = conNucleo();
-    const minimo = ajustarSticker(conEmoji(), h, { escala: 0.1 });
-    expect(escalaDe(minimo, 'a')).toBe(0.75);
-    expect(ajustarSticker(minimo, h, { posicion: { x: 0.5, y: 0 } })).toBe(minimo);
+    const chico = ajustarSticker(conEmoji(), h, { escala: 0.1 });
+    expect(escalaDe(chico, 'a')).toBe(0.1);
+    expect(posicionDe(ajustarSticker(chico, h, { posicion: { x: 0.5, y: 0 } }), 'a')).toEqual({ x: 0.5, y: 0 });
     const movido = ajustarSticker(conEmoji(), h, { posicion: { x: 0.25, y: 0 } });
-    expect(posicionDe(ajustarSticker(movido, h, { escala: 0.85 }), 'a')).toEqual({ x: 0.1, y: 0 });
+    expect(posicionDe(ajustarSticker(movido, h, { escala: 0.85 }), 'a')).toEqual({ x: 0.25, y: 0 });
   });
 
   it('restablecer quita tamaño y posición; sin ajustes no gasta un paso', () => {
@@ -358,18 +352,18 @@ describe('tamaño del sticker sobre una cara', () => {
   it.each([
     [{ x: Number.NaN, y: 0 }, { x: 0, y: 0 }],
     [{ x: Number.POSITIVE_INFINITY, y: 0 }, { x: 0, y: 0 }],
-    [{ x: 0, y: -9 }, { x: 0, y: -0.25 }],
+    [{ x: 0, y: -9 }, { x: 0, y: -2 }],
     [{ x: 0.123, y: 0 }, { x: 0.12, y: 0 }],
   ])('limitarPosicion(%j) con escala 1 = %j', (entrada, esperado) => {
     expect(limitarPosicion(conNucleo(), 1, entrada)).toEqual(esperado);
   });
 
-  it('propiedad: la posición limitada nunca deja de tapar la cara', () => {
+  it('propiedad: la posición limitada siempre queda en el rango y es finita', () => {
     const h = conNucleo();
-    const minimo = escalaMinimaSticker(h);
+    const { max } = LIMITES.posicionSticker;
     fc.assert(fc.property(fc.double(), fc.double(), fc.double({ min: 0, max: 3, noNaN: true }), (x, y, escala) => {
       const p = limitarPosicion(h, escala, { x, y });
-      return Math.hypot(p.x, p.y) <= Math.max(0, escala - minimo) + 1e-6 && Number.isFinite(p.x) && Number.isFinite(p.y);
+      return Math.abs(p.x) <= max && Math.abs(p.y) <= max && Number.isFinite(p.x) && Number.isFinite(p.y);
     }));
   });
 
