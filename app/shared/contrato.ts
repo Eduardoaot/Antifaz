@@ -262,7 +262,7 @@ export interface VideoInfo {
 export interface VistaVideo {
   mime: string;
   datos: Uint8Array;
-  /** En este frame se perdió un objeto: se ocultó de más y conviene revisarlo. */
+  /** En este frame se perdió un objeto: conviene revisarlo (a veces se ocultó de más; a veces no hay cuadro). */
   revisar: boolean;
 }
 

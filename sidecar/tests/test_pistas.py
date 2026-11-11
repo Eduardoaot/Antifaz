@@ -113,18 +113,44 @@ def test_movimiento_lineal_siempre_cubierto(x0: int, y0: int, x1: int, y1: int, 
         assert lista[t].mascara[cuadro(x, y)].all()
 
 
-def test_objeto_perdido_se_sigue_ocultando_y_se_marca() -> None:
-    rastreadas = {0: cuadro(20, 20), 2: vacia(), 4: cuadro(140, 80)}
-    lista = list(zonas(rastreadas, 5, margen_frames=0))
+def test_objeto_perdido_hueco_corto_sigue_ocultando() -> None:
+    # Con margen que cubre el hueco, ambas orillas aplican: corredor ampliado.
+    rastreadas = {0: cuadro(20, 20), 2: vacia(), 4: cuadro(90, 60)}
+    lista = list(zonas(rastreadas, 5, margen_frames=2))
     for z in lista[1:4]:
         assert z.revisar
-        # La caja cubre de la última a la siguiente posición conocida.
-        assert z.mascara[20:100, 20:160].all()
+    assert lista[2].mascara[cuadro(55, 40)].all()
+    assert not lista[2].mascara[20:40, 90:110].all()
     assert not lista[0].revisar and not lista[4].revisar
 
 
+def test_objeto_perdido_oculta_mas_que_interpolacion_normal() -> None:
+    """Con el mismo movimiento, el margen de perdido es más ancho que sin hueco."""
+    buenos = list(zonas({0: cuadro(20, 20), 4: cuadro(90, 60)}, 5, margen_frames=2))
+    perdidos = list(zonas({0: cuadro(20, 20), 2: vacia(), 4: cuadro(90, 60)}, 5, margen_frames=2))
+    assert perdidos[2].mascara.sum() > buenos[2].mascara.sum()
+    assert perdidos[2].revisar and not buenos[2].revisar
+
+
+def test_hueco_largo_sin_cuadro_en_el_medio() -> None:
+    """Si el objeto sale del encuadre un rato, el medio del hueco no inventa zona."""
+    rastreadas = {0: cuadro(20, 20), **{i: vacia() for i in range(1, 20)}, 20: cuadro(20, 20)}
+    lista = list(zonas(rastreadas, 21, margen_frames=5))
+    assert lista[10].revisar and not lista[10].mascara.any()
+    assert lista[3].revisar and lista[3].mascara[cuadro(20, 20)].all()
+    assert lista[17].revisar and lista[17].mascara[cuadro(20, 20)].all()
+
+
+def test_salto_grande_en_hueco_corto_ancla_no_corredor() -> None:
+    """Hueco corto con salto grande: ancla cercana, no corredor a mitad de sala."""
+    rastreadas = {0: cuadro(20, 20), 2: vacia(), 4: cuadro(160, 80)}
+    lista = list(zonas(rastreadas, 5, margen_frames=2))
+    assert lista[2].revisar and lista[2].mascara[cuadro(20, 20)].all()
+    assert not lista[2].mascara[cuadro(90, 50)].all()
+
+
 def test_perdido_en_el_frame_rastreado_mismo() -> None:
-    lista = list(zonas({0: cuadro(20, 20), 1: vacia(), 2: cuadro(30, 20)}, 3, margen_frames=0))
+    lista = list(zonas({0: cuadro(20, 20), 1: vacia(), 2: cuadro(30, 20)}, 3, margen_frames=1))
     assert lista[1].revisar and lista[1].mascara[20:40, 20:50].all()
 
 

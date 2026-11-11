@@ -6,8 +6,8 @@ Fecha: 6 de noviembre de 2026. Equipo de referencia: Intel i5-10210U (4 núcleos
 
 ## Decisiones del responsable (6 de noviembre de 2026)
 
-- **Beta:** videos de hasta **3 segundos**, con seguimiento a **24 fps** (hasta 72 frames rastreados). Si el video trae menos fps, se rastrea cada frame.
-- **Tolerancia:** se acepta un frame de más sobre los 3 s, con tope de 0.05 s, porque un clip "de 3 s" del teléfono suele durar 3.003 s.
+- **Beta:** videos de hasta **15 segundos** (antes 3 s; ampliado tras medir el híbrido en `docs/benchmarks`), con seguimiento a **24 fps**. Si el video trae menos fps, se rastrea cada frame.
+- **Tolerancia:** se acepta un frame de más sobre el máximo, con tope de 0.05 s, porque un clip "de N s" del teléfono suele durar N.003 s.
 - **Método de seguimiento:** EdgeTAM, con el benchmark de abajo.
 
 ## Benchmark en el equipo de referencia
@@ -81,7 +81,7 @@ Qué cambió:
 
 ## Pendiente
 
-1. **Primera prueba con FFmpeg real**, a cargo del responsable: abrir un video de hasta 3 s, seguir un objeto y exportar. Si la exportación falla con "No pudimos comprobar que el archivo saliera limpio", es probable que FFmpeg escriba una caja que la lista blanca no conoce: se revisa el log y se ajusta la lista, sin relajar la regla.
+1. **Primera prueba con FFmpeg real**, a cargo del responsable: abrir un video de hasta 15 s, seguir un objeto y exportar. Si la exportación falla con "No pudimos comprobar que el archivo saliera limpio", es probable que FFmpeg escriba una caja que la lista blanca no conoce: se revisa el log y se ajusta la lista, sin relajar la regla.
 2. Confirmar rutas largas y con acentos con FFmpeg y exiftool.
 3. Sin barra de avance real durante el seguimiento: el protocolo es de pedido y respuesta. Se muestra el tiempo estimado y se puede cancelar.
 4. Casos de la matriz: ARC-024 (GIF), ARC-031 (Live Photo), ARC-042 (video dañado a la mitad), SEG-004, SEG-008 y FCL-008 con FFmpeg real.

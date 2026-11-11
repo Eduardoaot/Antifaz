@@ -1147,7 +1147,7 @@ test('modo de video: se entra sin archivo, dice lo que no hace y es accesible', 
   const { pagina } = sesion;
   await pagina.getByRole('button', { name: 'Video' }).click();
   await expect(pagina.getByRole('heading', { name: 'Revisa un video antes de publicarlo' })).toBeVisible();
-  await expect(pagina.getByText('hasta 3 segundos')).toBeVisible();
+  await expect(pagina.getByText('hasta 15 segundos')).toBeVisible();
   await expect(pagina.getByText('Todavía no detectamos nada solos en video')).toBeVisible();
   // Un solo destino para "Saltar al contenido", aunque el modo de fotos siga montado.
   await expect(pagina.locator('#principal')).toHaveCount(1);

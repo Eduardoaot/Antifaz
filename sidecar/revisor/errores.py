@@ -73,7 +73,7 @@ MENSAJES: dict[Codigo, str] = {
     Codigo.NO_ES_VIDEO: "Este archivo no es un video que podamos abrir, aunque su nombre lo parezca. Prueba con otro.",
     Codigo.VIDEO_CORRUPTO: "No pudimos leer este video: parece dañado o incompleto. Prueba con otra copia.",
     Codigo.VIDEO_DEMASIADO_LARGO: (
-        "En esta versión beta revisamos videos de hasta 3 segundos. Recórtalo e intenta de nuevo."
+        "En esta versión beta revisamos videos de hasta 15 segundos. Recórtalo e intenta de nuevo."
     ),
     Codigo.VIDEO_TAMANO_NO_SOPORTADO: (
         "El tamaño de este video está fuera de lo que podemos revisar (de 16 a 8192 píxeles por lado). "

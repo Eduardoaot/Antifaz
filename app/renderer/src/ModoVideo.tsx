@@ -31,7 +31,7 @@ function segundos(info: VideoInfo, posicion: number): string {
 }
 
 /**
- * Video en la beta: hasta 3 s. No hay detección automática: la persona hace clic sobre lo que quiere
+ * Video en la beta: hasta 15 s. No hay detección automática: la persona hace clic sobre lo que quiere
  * ocultar y EdgeTAM lo sigue en todo el video. La vista previa la dibuja el sidecar con los mismos
  * efectos que la exportación.
  */
@@ -136,7 +136,7 @@ export function ModoVideo({ activo, alAnunciar, alFallar }: Props): React.JSX.El
         alAnunciar(
           framesRevisar === 0
             ? 'Listo: seguimos el objeto en todo el video y lo ocultamos con bloque sólido. Revisa la vista previa.'
-            : `Seguimos el objeto, pero en ${framesRevisar} ${framesRevisar === 1 ? 'frame' : 'frames'} lo perdimos. Ahí ocultamos una zona más grande; revísalos.`,
+            : `Seguimos el objeto, pero en ${framesRevisar} ${framesRevisar === 1 ? 'frame' : 'frames'} lo perdimos. Revísalos: a veces ocultamos de más y a veces, si salió del encuadre, no pintamos cuadro.`,
         );
       } catch {
         alAnunciar(ERROR_INTERNO.mensaje);
@@ -182,7 +182,7 @@ export function ModoVideo({ activo, alAnunciar, alFallar }: Props): React.JSX.El
     if (pistas.length === 0) {
       setConfirmar('No elegiste nada para ocultar. La copia saldrá igual, solo sin metadatos. ¿Quieres guardarla así?');
     } else if (revisar > 0) {
-      setConfirmar(`En ${revisar} ${revisar === 1 ? 'frame' : 'frames'} perdimos un objeto y ocultamos una zona más grande. ¿Ya los revisaste?`);
+      setConfirmar(`En ${revisar} ${revisar === 1 ? 'frame' : 'frames'} perdimos un objeto. ¿Ya revisaste esos frames?`);
     } else {
       void exportarAhora();
     }
@@ -236,7 +236,7 @@ export function ModoVideo({ activo, alAnunciar, alFallar }: Props): React.JSX.El
               </div>
             </div>
             <h1 className="vacio-titulo">Revisa un video antes de publicarlo</h1>
-            <p className="vacio-subtitulo">En esta versión beta revisamos videos de hasta 3 segundos. Todo se procesa en tu computadora.</p>
+            <p className="vacio-subtitulo">En esta versión beta revisamos videos de hasta 15 segundos. Todo se procesa en tu computadora.</p>
             <p className="suave">Todavía no detectamos nada solos en video: tú eliges qué ocultar con un clic y lo seguimos en todo el video.</p>
             <div className="vacio-acciones">
               <button type="button" className="boton primario boton-destacado" disabled={ocupado !== null} onClick={() => { void abrir(); }}>
@@ -261,7 +261,7 @@ export function ModoVideo({ activo, alAnunciar, alFallar }: Props): React.JSX.El
           <p><strong>Beta de video:</strong> no detectamos nada automáticamente. Haz clic sobre una persona u objeto y lo seguimos en todo el video.</p>
         </div>
         {errorVista !== null && <p role="alert">No pudimos mostrar este frame. {errorVista}</p>}
-        <figure className="visor">
+        <figure className="visor visor-video">
           {url === null ? (
             <p className="suave">{ocupado === 'siguiendo' ? 'Siguiendo el objeto…' : 'Preparando la vista previa…'}</p>
           ) : (
@@ -273,15 +273,19 @@ export function ModoVideo({ activo, alAnunciar, alFallar }: Props): React.JSX.El
               onPointerUp={alSoltar}
             >
               <img src={url} draggable={false} alt={`Frame en el segundo ${segundos(info, posicion)} de ${info.nombre}, con las zonas ocultas.`} />
+              <p
+                className={`aviso-frame-perdido${revisarFrame ? ' visible' : ''}`}
+                role="status"
+                aria-hidden={!revisarFrame}
+              >
+                En este frame perdimos el objeto. Revisa que no aparezca, o que la zona oculta se vea bien.
+              </p>
             </div>
           )}
           <figcaption className="suave">
             {info.ancho} × {info.alto} px · {info.duracion.toFixed(2)} s · {Math.round(info.fps)} fps{info.tieneAudio ? ' · con audio' : ' · sin audio'}
           </figcaption>
         </figure>
-        {revisarFrame && (
-          <p className="caja-parcial" role="status">En este frame perdimos un objeto, así que ocultamos una zona más grande. Revisa que se vea bien.</p>
-        )}
         <div className="campo-frame">
           <label htmlFor="frame-video">
             Frame {posicion + 1} de {info.posiciones} (segundo {segundos(info, posicion)})

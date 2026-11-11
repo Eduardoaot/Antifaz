@@ -136,12 +136,12 @@ def test_fps_ilegible(fps: str | None) -> None:
     assert codigo(salida(pista_video(avg_frame_rate=fps, r_frame_rate=fps))) is Codigo.VIDEO_CORRUPTO
 
 
-@pytest.mark.parametrize("duracion", ["3", "3.0", "0.5", "0.001", "3.003", "3.0333"])
+@pytest.mark.parametrize("duracion", ["15", "15.0", "0.5", "0.001", "15.003", "15.0333"])
 def test_duracion_en_rango(duracion: str) -> None:
     video.interpretar_ffprobe(salida(duration=duracion))
 
 
-@pytest.mark.parametrize("duracion", ["3.0334", "3.05", "60", "7200"])
+@pytest.mark.parametrize("duracion", ["15.0334", "15.05", "60", "7200"])
 def test_arc011_duracion_por_encima_del_maximo(duracion: str) -> None:
     assert codigo(salida(duration=duracion)) is Codigo.VIDEO_DEMASIADO_LARGO
 
@@ -149,10 +149,10 @@ def test_arc011_duracion_por_encima_del_maximo(duracion: str) -> None:
 @pytest.mark.parametrize(
     ("fps", "pasa", "no_pasa"),
     [
-        ("24/1", "3.0416", "3.0417"),  # un frame de 24 fps: 0.04166 s
-        ("60/1", "3.0166", "3.0167"),
-        ("10/1", "3.05", "3.0501"),  # un frame duraría 0.1 s: manda el tope de 0.05 s
-        ("1/1", "3.05", "3.0501"),
+        ("24/1", "15.0416", "15.0417"),  # un frame de 24 fps: 0.04166 s
+        ("60/1", "15.0166", "15.0167"),
+        ("10/1", "15.05", "15.0501"),  # un frame duraría 0.1 s: manda el tope de 0.05 s
+        ("1/1", "15.05", "15.0501"),
     ],
 )
 def test_tolerancia_de_un_frame_con_tope(fps: str, pasa: str, no_pasa: str) -> None:
@@ -160,7 +160,7 @@ def test_tolerancia_de_un_frame_con_tope(fps: str, pasa: str, no_pasa: str) -> N
     assert codigo(salida(pista_video(avg_frame_rate=fps), duration=no_pasa)) is Codigo.VIDEO_DEMASIADO_LARGO
 
 
-@pytest.mark.parametrize("duracion", ["0.5", "3"])
+@pytest.mark.parametrize("duracion", ["0.5", "15"])
 def test_en_beta_nunca_pide_confirmar(duracion: str) -> None:
     assert video.interpretar_ffprobe(salida(duration=duracion)).requiere_confirmar is False
 

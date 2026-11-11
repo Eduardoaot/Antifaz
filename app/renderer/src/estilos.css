@@ -591,6 +591,25 @@ summary { cursor: pointer; min-height: 1.75rem; font-weight: 500; }
   .cuerpo-video { grid-template-columns: minmax(0, 1fr); }
 }
 .aviso-video { margin-bottom: 0.75rem; }
+/* Overlay: el aviso de frame perdido no empuja el slider ni el layout. */
+.aviso-frame-perdido {
+  position: absolute;
+  left: 0.5rem;
+  right: 0.5rem;
+  bottom: 0.5rem;
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--superficie) 92%, transparent);
+  border: 2px solid var(--borde-control);
+  border-left-width: 6px;
+  font: 400 0.875rem 'Inter', 'Segoe UI', sans-serif;
+  color: var(--texto);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+.aviso-frame-perdido.visible { opacity: 1; }
 .campo-frame { display: grid; gap: 0.25rem; margin-top: 0.75rem; }
 .campo-frame input { width: 100%; }
 .acciones-video { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem; }

@@ -30,7 +30,7 @@ Electron + React/TypeScript (strict) + sidecar Python 3.12 con uv.
 - **Contenido:** CLIP avisa sobre la imagen completa (armas, extremismo, desnudez, sugerente), y NudeNet da zonas de desnudez y de contenido sugerente. Siempre se dice "podría", nunca se afirma. La desnudez se marca sola para ocultar con bloque sólido, y la persona decide. Las muestras sensibles nunca se versionan.
 - **Texto y códigos:** RapidOCR y zxing-cpp en local. El contenido leído nunca se muestra, ni se guarda, ni va a los logs: solo se usa para clasificar.
 - **Selección manual:** SlimSAM por clic, rectángulo y pincel, con alternativa por coordenadas para usar sin mouse. El sidecar convierte cada trazo en silueta. El pincel solo agrega zonas: quitar parte de una silueta podría destapar algo. Las siluetas viven en memoria: si se pierden, se oculta toda la caja.
-- **Video (beta):** hasta 3 s, más un frame de tolerancia con tope de 0.05 s, y seguimiento a 24 fps con EdgeTAM sobre un proxy de 480 px. Decisión del responsable (2026-11-06). Los frames sin ocultar solo pasan por tuberías, nunca por el disco.
+- **Video (beta):** hasta 15 s, más un frame de tolerancia con tope de 0.05 s, y seguimiento a 24 fps sobre un proxy de 360 px con híbrido EdgeTAM (cada `tracking.paso_clave` frames, default 6) + CSRT. En el i5-1245U, ~145 s de espera por 15 s de video. Los frames sin ocultar solo pasan por tuberías, nunca por el disco.
 - **Caras:** dos niveles. Con confianza de 0.6 o más es "cara" y pregunta por menores. Por debajo es "podría ser una cara", sin esa pregunta.
 
 ## Reglas de validación

@@ -1,0 +1,39 @@
+{
+  "equipo": {
+    "cpu": "Intel64 Family 6 Model 154 Stepping 4, GenuineIntel",
+    "nucleos_fisicos": 10,
+    "nucleos_logicos": 12,
+    "ram_gb": 15.4,
+    "hilos_usados": 10,
+    "segundos_de_video": 15.0,
+    "fps_video": 24,
+    "modelos": {
+      "sam2.1-tiny": [
+        "facebook/sam2.1-hiera-tiny",
+        "de431c4043854a71d8101e17995dfe596bf101a5"
+      ],
+      "edgetam": [
+        "yonigozlan/EdgeTAM-hf",
+        "c266ce53b3fc00f0f495b583f6a116c4e57f53bb"
+      ]
+    }
+  },
+  "resultados": [
+    {
+      "metodo": "edgetam",
+      "fps_tracking": 24,
+      "lado_proxy": 360,
+      "hilos": 10,
+      "frames_video": 360,
+      "frames_rastreados": 360,
+      "s_por_frame_rastreado": 1.7331,
+      "minutos_por_minuto_de_video": 41.59,
+      "segundos_por_video": 623.9,
+      "memoria_pico_mb": 10309.0,
+      "frames_con_algo_visible_pct": 0.0,
+      "peor_frame_visible_pct": 0.0,
+      "cobertura_media_pct": 100.0,
+      "cara_elegida_en_frame0_pct": 99.4
+    }
+  ]
+}
