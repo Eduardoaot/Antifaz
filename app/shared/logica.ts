@@ -48,6 +48,10 @@ export interface Revision {
   posiciones: Readonly<Record<string, Posicion>>;
   /** Intensidad propia de una zona. Sin entrada, la de toda la foto (`intensidad`). */
   intensidades: Readonly<Record<string, number>>;
+  /** Giro del sticker de cada zona, en grados. Sin entrada, derecho. */
+  rotaciones: Readonly<Record<string, number>>;
+  /** Zonas detectadas que quitaste de la foto: quedan visibles y sin marca. Se pueden volver a poner. */
+  descartadas: readonly string[];
 }
 
 export interface Posicion {
@@ -64,6 +68,8 @@ export const REVISION_INICIAL: Revision = {
   escalas: {},
   posiciones: {},
   intensidades: {},
+  rotaciones: {},
+  descartadas: [],
 };
 
 export interface Historial {
@@ -294,6 +300,29 @@ export function enElTope(h: Hallazgo, escala: number, p: Posicion): boolean {
 export interface CambioSticker {
   escala?: number;
   posicion?: Posicion;
+  rotacion?: number;
+}
+
+/** Cualquier ángulo, llevado a −180…180 y al grado. */
+export function limitarRotacion(grados: number): number {
+  if (!Number.isFinite(grados)) return 0;
+  const vuelta = ((((grados + 180) % 360) + 360) % 360) - 180;
+  return Math.round(vuelta) === -180 ? 180 : Math.round(vuelta) || 0;
+}
+
+export const rotacionDe = (r: Revision, id: string): number => r.rotaciones[id] ?? 0;
+
+/**
+ * La posición pedida, agrandando el sticker lo justo para llegar ahí sin destapar nada. Así se puede
+ * mover aunque esté al tamaño mínimo: crece hasta donde haga falta, sin pasar del máximo.
+ */
+export function moverCreciendo(h: Hallazgo, escala: number, pedida: Posicion): { escala: number; posicion: Posicion } {
+  const { max, paso } = LIMITES.escalaSticker;
+  for (let e = escala; e <= max + 1e-9; e = redondearPaso(e + paso)) {
+    const p = limitarPosicion(h, e, pedida);
+    if (Math.abs(p.x - pedida.x) < 0.01 && Math.abs(p.y - pedida.y) < 0.01) return { escala: e, posicion: p };
+  }
+  return { escala: max, posicion: limitarPosicion(h, max, pedida) };
 }
 
 /**
@@ -304,22 +333,39 @@ export function ajustarSticker(r: Revision, h: Hallazgo, cambio: CambioSticker):
   const escala = cambio.escala === undefined ? escalaDe(r, h.id) : Math.max(escalaMinimaSticker(h), limitarEscala(cambio.escala));
   const posicion = limitarPosicion(h, escala, cambio.posicion ?? posicionDe(r, h.id));
   const previa = posicionDe(r, h.id);
-  if (escala === escalaDe(r, h.id) && posicion.x === previa.x && posicion.y === previa.y) return r;
+  const rotacion = cambio.rotacion === undefined ? rotacionDe(r, h.id) : limitarRotacion(cambio.rotacion);
+  if (escala === escalaDe(r, h.id) && posicion.x === previa.x && posicion.y === previa.y && rotacion === rotacionDe(r, h.id)) return r;
   const sin = <T,>(m: Readonly<Record<string, T>>): Record<string, T> => sinClave(m, h.id);
   const centrado = posicion.x === 0 && posicion.y === 0;
   return {
     ...r,
     escalas: escala === LIMITES.escalaSticker.porDefecto ? sin(r.escalas) : { ...sin(r.escalas), [h.id]: escala },
     posiciones: centrado ? sin(r.posiciones) : { ...sin(r.posiciones), [h.id]: posicion },
+    rotaciones: rotacion === 0 ? sin(r.rotaciones) : { ...sin(r.rotaciones), [h.id]: rotacion },
   };
 }
 
-export const stickerAjustado = (r: Revision, id: string): boolean => id in r.escalas || id in r.posiciones;
+export const stickerAjustado = (r: Revision, id: string): boolean => id in r.escalas || id in r.posiciones || id in r.rotaciones;
 
-/** Regresa el sticker al tamaño y lugar que la app eligió sola. */
+/** Regresa el sticker al tamaño, lugar y giro que la app eligió sola. */
 export function restablecerSticker(r: Revision, id: string): Revision {
   if (!stickerAjustado(r, id)) return r;
-  return { ...r, escalas: sinClave(r.escalas, id), posiciones: sinClave(r.posiciones, id) };
+  return { ...r, escalas: sinClave(r.escalas, id), posiciones: sinClave(r.posiciones, id), rotaciones: sinClave(r.rotaciones, id) };
+}
+
+/**
+ * Quita una zona detectada de la foto: queda visible y sin marca, como si no se hubiera detectado.
+ * En el panel sigue a la mano para volver a ponerla.
+ */
+export function descartarZona(r: Revision, id: string): Revision {
+  if (r.descartadas.includes(id)) return r;
+  return { ...r, decisiones: { ...r.decisiones, [id]: 'ignorar' }, descartadas: [...r.descartadas, id] };
+}
+
+/** La vuelve a poner como recién detectada: sin decidir, para que la persona elija otra vez. */
+export function restaurarZona(r: Revision, id: string): Revision {
+  if (!r.descartadas.includes(id)) return r;
+  return { ...r, decisiones: sinClave(r.decisiones, id), descartadas: r.descartadas.filter((d) => d !== id) };
 }
 
 /**
@@ -358,6 +404,7 @@ export function construirOcultamientos(r: Revision, hallazgos: readonly Hallazgo
       escala: ajustaSticker(r, h) ? escalaDe(r, h.id) : LIMITES.escalaSticker.porDefecto,
       desplazamiento_x: ajustaSticker(r, h) ? posicionDe(r, h.id).x : 0,
       desplazamiento_y: ajustaSticker(r, h) ? posicionDe(r, h.id).y : 0,
+      rotacion: ajustaSticker(r, h) ? rotacionDe(r, h.id) : 0,
     });
   }
   for (const z of r.manuales) {
@@ -380,6 +427,7 @@ export function construirOcultamientos(r: Revision, hallazgos: readonly Hallazgo
       escala: ajusta ? escalaDe(r, z.id) : LIMITES.escalaSticker.porDefecto,
       desplazamiento_x: ajusta ? posicionDe(r, z.id).x : 0,
       desplazamiento_y: ajusta ? posicionDe(r, z.id).y : 0,
+      rotacion: ajusta ? rotacionDe(r, z.id) : 0,
     });
   }
   return salida;
@@ -638,6 +686,7 @@ export function quitarManual(r: Revision, id: string): Revision {
     escalas: sinClave(r.escalas, id),
     posiciones: sinClave(r.posiciones, id),
     intensidades: sinClave(r.intensidades, id),
+    rotaciones: sinClave(r.rotaciones, id),
   };
 }
 
@@ -741,6 +790,8 @@ export function aEdicion(archivoId: string, r: Revision): Edicion {
     escalas: { ...r.escalas },
     posiciones: Object.fromEntries(Object.entries(r.posiciones).map(([id, p]) => [id, { ...p }])),
     intensidades: { ...r.intensidades },
+    rotaciones: { ...r.rotaciones },
+    descartadas: [...r.descartadas],
   };
 }
 
@@ -754,6 +805,8 @@ export function desdeEdicion(e: Edicion): Revision {
     escalas: e.escalas,
     posiciones: e.posiciones,
     intensidades: e.intensidades,
+    rotaciones: e.rotaciones,
+    descartadas: e.descartadas,
   };
 }
 
@@ -766,6 +819,8 @@ export function hayCambios(r: Revision): boolean {
     Object.keys(r.escalas).length > 0 ||
     Object.keys(r.posiciones).length > 0 ||
     Object.keys(r.intensidades).length > 0 ||
+    Object.keys(r.rotaciones).length > 0 ||
+    r.descartadas.length > 0 ||
     r.intensidad !== LIMITES.intensidad.porDefecto
   );
 }

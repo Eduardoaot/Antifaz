@@ -25,6 +25,7 @@ export const CANALES = {
   soltarVideo: 'video:soltar',
   vistaVideo: 'video:vista',
   seguirVideo: 'video:seguir',
+  zonaVideo: 'video:zona',
   quitarPista: 'video:quitar',
   exportarVideo: 'video:exportar',
   cerrarVideo: 'video:cerrar',

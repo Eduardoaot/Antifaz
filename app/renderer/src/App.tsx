@@ -1,4 +1,4 @@
-import { Download, FolderOpen, Keyboard, Menu, ScanEye, ShieldCheck, X } from 'lucide-react';
+import { Download, FolderOpen, Keyboard, Menu, PanelLeftOpen, PanelRightClose, PanelRightOpen, ScanEye, ShieldCheck, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import logoClaro from '../../../brand/logo/horizontal-claro.svg';
 import logoOscuro from '../../../brand/logo/horizontal-oscuro.svg';
@@ -55,7 +55,7 @@ import { Cajon, type Vista } from './Cajon';
 import { Configuracion } from './Configuracion';
 import { Confirmacion, DialogoPorQue } from './Dialogos';
 import { Guia } from './Guia';
-import { ListaFotos } from './ListaFotos';
+import { guardarLocal, ListaFotos } from './ListaFotos';
 import { Manual } from './Manual';
 import { ModoVideo } from './ModoVideo';
 import { esNombreDeVideo, SoltarAqui } from './SoltarAqui';
@@ -126,6 +126,18 @@ export function App(): React.JSX.Element {
   const [ajustes, setAjustes] = useState<Ajustes>(AJUSTES_INICIALES);
   const [configurando, setConfigurando] = useState(false);
   const [viendoAtajos, setViendoAtajos] = useState(false);
+  // Paneles laterales plegados, para dejarle todo el espacio a la imagen. Se recuerdan en este equipo.
+  const [plegados, setPlegados] = useState<{ fotos: boolean; panel: boolean }>(() => {
+    try {
+      return { fotos: localStorage.getItem('plegar-fotos') === '1', panel: localStorage.getItem('plegar-panel') === '1' };
+    } catch {
+      return { fotos: false, panel: false };
+    }
+  });
+  const plegar = (cual: 'fotos' | 'panel', valor: boolean): void => {
+    setPlegados((p) => ({ ...p, [cual]: valor }));
+    guardarLocal(`plegar-${cual}`, valor ? '1' : '0');
+  };
   const [menuAbierto, setMenuAbierto] = useState(false);
   const [exportando, setExportando] = useState(false);
   const [progresoLote, setProgresoLote] = useState<{ hechas: number; total: number; carpeta: string } | null>(null);
@@ -725,8 +737,15 @@ export function App(): React.JSX.Element {
           </div>
         </main>
       ) : (
-        <div className="cuerpo">
+        <div className={`cuerpo${plegados.fotos ? ' fotos-plegadas' : ''}${plegados.panel ? ' panel-plegado' : ''}`}>
+          {plegados.fotos ? (
+            <button type="button" className="riel" aria-label={`Mostrar la lista de fotos (${archivos.length})`} title="Mostrar la lista de fotos" onClick={() => { plegar('fotos', false); }}>
+              <PanelLeftOpen aria-hidden="true" />
+              <span className="chip-conteo">{archivos.length}</span>
+            </button>
+          ) : (
           <ListaFotos
+            alPlegar={() => { plegar('fotos', true); }}
             archivos={archivos}
             seleccion={seleccion}
             analizando={analizando}
@@ -738,6 +757,7 @@ export function App(): React.JSX.Element {
             alCancelar={cancelar}
             alExportarTodas={pedirExportarTodas}
           />
+          )}
 
           <main id="principal" tabIndex={-1} className="principal">
             {actual === null ? (
@@ -784,7 +804,15 @@ export function App(): React.JSX.Element {
             )}
           </main>
 
+          {plegados.panel ? (
+            <button type="button" className="riel" aria-label="Mostrar el panel de advertencias" title="Mostrar el panel de advertencias" onClick={() => { plegar('panel', false); }}>
+              <PanelRightOpen aria-hidden="true" />
+            </button>
+          ) : (
           <aside className="panel" aria-label="Advertencias">
+            <button type="button" className="boton fantasma chico plegar-panel" aria-label="Ocultar el panel de advertencias" title="Ocultar el panel" onClick={() => { plegar('panel', true); }}>
+              <PanelRightClose aria-hidden="true" />
+            </button>
             {actual?.estado.tipo === 'en_cola' && <p className="estado-panel">Esta foto está en espera de revisión.</p>}
             {actual?.estado.tipo === 'analizando' && <p className="estado-panel"><span className="girador" aria-hidden="true" /> Revisando esta foto…</p>}
             {actual?.estado.tipo === 'error' && (
@@ -835,6 +863,7 @@ export function App(): React.JSX.Element {
               </>
             )}
           </aside>
+          )}
         </div>
       )}
 

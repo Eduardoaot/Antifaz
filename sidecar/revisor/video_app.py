@@ -28,7 +28,7 @@ from typing import Any, cast
 import cv2
 import numpy as np
 
-from . import efectos, metadatos_video, pistas, video
+from . import efectos, metadatos_video, pincel, pistas, video
 from .errores import Codigo, ErrorRevisor
 from .esquemas import INTENSIDAD_POR_DEFECTO, Ocultamiento, TipoEfecto
 from .exportar import error_de_sistema, limpiar_parciales
@@ -179,6 +179,38 @@ def seguir(abierto: VideoAbierto, seguidor: Seguidor, posicion: int, x: int, y: 
         "frames_revisar": len(revisar),
         "posiciones_revisar": [p for p, i in enumerate(abierto.indices) if i in revisar],
         "frames_con_objeto": con_objeto,
+        "frames_rastreados": len(rastreadas),
+    }
+
+
+def zona_fija(
+    abierto: VideoAbierto, forma: str, puntos: Sequence[tuple[int, int]], tamano: int
+) -> dict[str, object]:
+    """Una zona tuya: la misma silueta en todos los frames, sin seguimiento. Nunca se pierde."""
+    alto, ancho = int(abierto.proxy[0].shape[0]), int(abierto.proxy[0].shape[1])
+    for x, y in puntos:
+        if x >= ancho or y >= alto:
+            raise ErrorRevisor(Codigo.VALIDACION, "punto fuera del video")
+    if forma == "rectangulo":
+        if len(puntos) != 2:
+            raise ErrorRevisor(Codigo.VALIDACION, "el rectángulo lleva dos esquinas")
+        (xa, ya), (xb, yb) = puntos
+        mascara: Mascara = np.zeros((alto, ancho), dtype=np.bool_)
+        mascara[min(ya, yb) : max(ya, yb) + 1, min(xa, xb) : max(xa, xb) + 1] = True
+    elif forma == "pincel":
+        mascara = np.asarray(pincel.rasterizar(puntos, tamano, ancho, alto), dtype=np.bool_)
+    else:
+        raise ErrorRevisor(Codigo.VALIDACION, "forma desconocida")
+    if not mascara.any():
+        raise ErrorRevisor(Codigo.VALIDACION, "la zona está vacía")
+    rastreadas = {indice: mascara for indice in abierto.indices}
+    pista_id = uuid.uuid4().hex
+    abierto.pistas[pista_id] = PistaVideo(rastreadas, frozenset())
+    return {
+        "pista_id": pista_id,
+        "frames_revisar": 0,
+        "posiciones_revisar": [],
+        "frames_con_objeto": len(rastreadas),
         "frames_rastreados": len(rastreadas),
     }
 

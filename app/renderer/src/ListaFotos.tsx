@@ -1,4 +1,4 @@
-import { AlertTriangle, CheckCircle2, Clock, ImageOff, LayoutGrid, List, Loader2, Plus, Save, Search, X } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Clock, ImageOff, LayoutGrid, List, Loader2, PanelLeftClose, Plus, Save, Search, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { contarAdvertencias } from '../../shared/logica';
 import type { Archivo } from './App';
@@ -158,9 +158,11 @@ interface Props {
   alAbrir: () => void;
   alCancelar: () => void;
   alExportarTodas: () => void;
+  /** Pliega la lista para dejarle más espacio a la imagen. */
+  alPlegar: () => void;
 }
 
-export function ListaFotos({ archivos, seleccion, analizando, listasParaExportar, exportando, alElegir, alCerrar, alAbrir, alCancelar, alExportarTodas }: Props): React.JSX.Element {
+export function ListaFotos({ archivos, seleccion, analizando, listasParaExportar, exportando, alElegir, alCerrar, alAbrir, alCancelar, alExportarTodas, alPlegar }: Props): React.JSX.Element {
   const [modo, setModo] = useState<Modo>(() => {
     try {
       return localStorage.getItem('lista-fotos') === 'cuadricula' ? 'cuadricula' : 'lista';
@@ -192,6 +194,9 @@ export function ListaFotos({ archivos, seleccion, analizando, listasParaExportar
           </button>
           <button type="button" className="boton fantasma chico" aria-label="Abrir más fotos" title="Abrir más fotos (Ctrl O)" onClick={alAbrir}>
             <Plus aria-hidden="true" />
+          </button>
+          <button type="button" className="boton fantasma chico" aria-label="Ocultar la lista de fotos" title="Ocultar la lista" onClick={alPlegar}>
+            <PanelLeftClose aria-hidden="true" />
           </button>
         </div>
       </div>

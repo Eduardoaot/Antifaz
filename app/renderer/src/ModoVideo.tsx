@@ -1,13 +1,17 @@
-import { ChevronDown, Crosshair, Film, FolderOpen, Hand, Pause, Play, Save, SkipBack, SkipForward, SquareSplitHorizontal, Trash2 } from 'lucide-react';
+import { Brush, ChevronDown, Crosshair, Film, FolderOpen, Hand, Pause, Play, Save, SkipBack, SkipForward, SquareDashed, SquareSplitHorizontal, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useId, useRef, useState, type PointerEvent, type SyntheticEvent } from 'react';
-import { ERROR_INTERNO, LIMITES, type Efecto, type PistaElegida, type VideoInfo } from '../../shared/contrato';
-import { aPuntoDeImagen, limitarIntensidad, usaIntensidad, valorComun } from '../../shared/logica';
+import { ERROR_INTERNO, LIMITES, type Efecto, type PistaElegida, type Punto, type Seguido, type VideoInfo } from '../../shared/contrato';
+import { agregarPuntoTrazo, aPuntoDeImagen, cajaEntre, limitarIntensidad, usaIntensidad, valorComun } from '../../shared/logica';
 import { leerEnRango } from '../../shared/numeros';
 import { ControlDecision, ControlIntensidad, SelectorEfecto } from './Advertencias';
 import { Confirmacion } from './Dialogos';
 
+/** Seguido con un clic, o una zona tuya fija en todo el video. */
+type OrigenPista = 'seguimiento' | 'rectangulo' | 'pincel';
+
 interface Pista {
   id: string;
+  origen: OrigenPista;
   efecto: Efecto;
   intensidad: number;
   /** Falso si decidiste dejarlo visible: sigue rastreado, pero no se oculta. */
@@ -17,7 +21,9 @@ interface Pista {
 }
 
 type Ocupado = 'abriendo' | 'siguiendo' | 'exportando' | null;
-type HerramientaVideo = 'ver' | 'seguir';
+type HerramientaVideo = 'ver' | 'seguir' | 'rectangulo' | 'pincel';
+/** Pincel del video, en píxeles de la vista (el proxy). */
+const PINCEL_VIDEO = { min: 2, max: 120, porDefecto: 16 } as const;
 
 interface Props {
   /** Visible ahora: solo entonces lleva el id al que salta "Saltar al contenido". */
@@ -58,6 +64,9 @@ export function ModoVideo({ activo, alAnunciar, alFallar, pedido }: Props): Reac
   const [coordenadas, setCoordenadas] = useState({ x: '', y: '' });
   const [errorCoordenadas, setErrorCoordenadas] = useState<string | null>(null);
   const [herramienta, setHerramienta] = useState<HerramientaVideo>('seguir');
+  const [tamanoPincel, setTamanoPincel] = useState<number>(PINCEL_VIDEO.porDefecto);
+  const [dibujo, setDibujo] = useState<{ inicio: { x: number; y: number }; actual: { x: number; y: number } } | null>(null);
+  const [trazo, setTrazo] = useState<readonly Punto[] | null>(null);
   const [comparando, setComparando] = useState(false);
   const [reproduciendo, setReproduciendo] = useState(false);
   const [abiertas, setAbiertas] = useState<ReadonlySet<string>>(new Set());
@@ -200,7 +209,7 @@ export function ModoVideo({ activo, alAnunciar, alFallar, pedido }: Props): Reac
           return;
         }
         const { pistaId, framesRevisar, posicionesRevisar } = resultado.datos;
-        setPistas((lista) => [...lista, { id: pistaId, efecto: 'solido', intensidad: LIMITES.intensidad.porDefecto, oculta: true, framesRevisar, posicionesRevisar }]);
+        setPistas((lista) => [...lista, { id: pistaId, origen: 'seguimiento', efecto: 'solido', intensidad: LIMITES.intensidad.porDefecto, oculta: true, framesRevisar, posicionesRevisar }]);
         alAnunciar(
           framesRevisar === 0
             ? 'Listo: seguimos el objeto en todo el video y lo ocultamos con bloque sólido. Revisa la vista previa.'
@@ -273,10 +282,71 @@ export function ModoVideo({ activo, alAnunciar, alFallar, pedido }: Props): Reac
     setPistas((lista) => lista.map((p) => (ids.includes(p.id) ? { ...p, ...cambio } : p)));
   };
 
-  const alSoltar = (e: PointerEvent): void => {
-    if (info === null || ocupado !== null || herramienta !== 'seguir' || comparando || e.button !== 0) return;
+  /** Agrega una zona tuya, fija en todo el video, con el mismo efecto inicial que en fotos. */
+  const agregarZona = async (forma: 'rectangulo' | 'pincel', puntos: Punto[]): Promise<void> => {
+    if (info === null) return;
+    try {
+      const resultado: { ok: true; datos: Seguido } | { ok: false; error: { codigo: string; mensaje: string } } =
+        await api().zonaVideo(info.id, forma, puntos, tamanoPincel);
+      if (!resultado.ok) {
+        if (resultado.error.codigo === 'VIDEO_NO_ABIERTO') perderVideo(resultado.error.mensaje);
+        else alAnunciar(resultado.error.mensaje);
+        return;
+      }
+      const { pistaId } = resultado.datos;
+      setPistas((lista) => [...lista, { id: pistaId, origen: forma, efecto: 'solido', intensidad: LIMITES.intensidad.porDefecto, oculta: true, framesRevisar: 0, posicionesRevisar: [] }]);
+      alAnunciar('Agregamos tu zona: se oculta en todo el video. Revisa la vista previa.');
+    } catch {
+      alAnunciar(ERROR_INTERNO.mensaje);
+    }
+  };
+
+  const puntoEn = (e: PointerEvent, ajustar = false): { x: number; y: number } | null => {
     const rect = lienzo.current?.getBoundingClientRect();
-    const p = rect === undefined ? null : aPuntoDeImagen(e.clientX, e.clientY, rect, info.proxyAncho, info.proxyAlto);
+    return info === null || rect === undefined ? null : aPuntoDeImagen(e.clientX, e.clientY, rect, info.proxyAncho, info.proxyAlto, ajustar);
+  };
+
+  const alBajar = (e: PointerEvent): void => {
+    if (info === null || ocupado !== null || comparando || e.button !== 0) return;
+    if (herramienta === 'rectangulo') {
+      const p = puntoEn(e);
+      if (p === null) return;
+      setDibujo({ inicio: p, actual: p });
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } else if (herramienta === 'pincel') {
+      const p = puntoEn(e);
+      if (p === null) return;
+      setTrazo([p]);
+      e.currentTarget.setPointerCapture(e.pointerId);
+    }
+  };
+
+  const alMover = (e: PointerEvent): void => {
+    if (dibujo !== null) {
+      const p = puntoEn(e, true);
+      if (p !== null) setDibujo({ ...dibujo, actual: p });
+    } else if (trazo !== null) {
+      const p = puntoEn(e, true);
+      if (p !== null) setTrazo((t) => (t === null ? t : agregarPuntoTrazo(t, p, tamanoPincel)));
+    }
+  };
+
+  const alSoltar = (e: PointerEvent): void => {
+    if (info === null || ocupado !== null || comparando || e.button !== 0) return;
+    if (herramienta === 'rectangulo' && dibujo !== null) {
+      const caja = cajaEntre(dibujo.inicio, dibujo.actual);
+      setDibujo(null);
+      if (caja !== null) void agregarZona('rectangulo', [{ x: caja.x, y: caja.y }, { x: caja.x + caja.ancho - 1, y: caja.y + caja.alto - 1 }]);
+      return;
+    }
+    if (herramienta === 'pincel' && trazo !== null) {
+      const puntos = [...trazo];
+      setTrazo(null);
+      void agregarZona('pincel', puntos);
+      return;
+    }
+    if (herramienta !== 'seguir') return;
+    const p = puntoEn(e);
     if (p === null) {
       alAnunciar('Ese punto queda fuera del video.');
       return;
@@ -410,7 +480,19 @@ export function ModoVideo({ activo, alAnunciar, alFallar, pedido }: Props): Reac
                 <button type="button" className="boton-cinta" aria-pressed={herramienta === 'seguir'} title="Haz clic en el video sobre lo que quieras ocultar" disabled={comparando} onClick={() => { setHerramienta('seguir'); }}>
                   <Crosshair aria-hidden="true" /><span className="texto-cinta">Seguir objeto</span>
                 </button>
+                <button type="button" className="boton-cinta solo-icono" aria-label="Dibujar rectángulo" title="Dibujar un rectángulo: se oculta en todo el video" aria-pressed={herramienta === 'rectangulo'} disabled={comparando} onClick={() => { setHerramienta('rectangulo'); }}>
+                  <SquareDashed aria-hidden="true" />
+                </button>
+                <button type="button" className="boton-cinta solo-icono" aria-label="Pintar con pincel" title="Pintar con pincel: se oculta en todo el video" aria-pressed={herramienta === 'pincel'} disabled={comparando} onClick={() => { setHerramienta('pincel'); }}>
+                  <Brush aria-hidden="true" />
+                </button>
               </div>
+              {herramienta === 'pincel' && !comparando && (
+                <div className="cinta-pincel">
+                  <label htmlFor={`${id}-pincel`}>Tamaño del pincel: {tamanoPincel} px</label>
+                  <input id={`${id}-pincel`} type="range" min={PINCEL_VIDEO.min} max={PINCEL_VIDEO.max} value={tamanoPincel} onChange={(e) => { setTamanoPincel(Number(e.target.value)); }} />
+                </div>
+              )}
               <span className="separador" aria-hidden="true" />
               <button type="button" className="boton-cinta solo-icono" aria-label="Comparar antes y después" title="Comparar antes y después" aria-pressed={comparando} onClick={() => { setComparando((c) => !c); }}>
                 <SquareSplitHorizontal aria-hidden="true" />
@@ -425,10 +507,13 @@ export function ModoVideo({ activo, alAnunciar, alFallar, pedido }: Props): Reac
               ) : (
                 <div
                   ref={lienzo}
-                  className={`lienzo${comparando ? ' comparando-video' : ''}${libre && herramienta === 'seguir' && !comparando ? ' herramienta-clic' : ''}`}
+                  className={`lienzo${comparando ? ' comparando-video' : ''}${libre && herramienta !== 'ver' && !comparando ? ' herramienta-clic' : ''}`}
                   style={{ aspectRatio: `${info.proxyAncho} / ${info.proxyAlto}` }}
                   data-testid="lienzo-video"
+                  onPointerDown={alBajar}
+                  onPointerMove={alMover}
                   onPointerUp={alSoltar}
+                  onPointerCancel={() => { setDibujo(null); setTrazo(null); }}
                 >
                   {comparando && urlOriginal !== null ? (
                     <div className="dos-lados">
@@ -437,6 +522,26 @@ export function ModoVideo({ activo, alAnunciar, alFallar, pedido }: Props): Reac
                     </div>
                   ) : (
                     <img src={url} draggable={false} alt={`Frame en el segundo ${segundos(info, posicion)} de ${info.nombre}, con las zonas ocultas.`} />
+                  )}
+                  {dibujo !== null && (() => {
+                    const caja = cajaEntre(dibujo.inicio, dibujo.actual);
+                    return caja === null ? null : (
+                      <div
+                        aria-hidden="true"
+                        className="marca sin-decidir"
+                        style={{
+                          left: `${(caja.x / info.proxyAncho) * 100}%`,
+                          top: `${(caja.y / info.proxyAlto) * 100}%`,
+                          width: `${(caja.ancho / info.proxyAncho) * 100}%`,
+                          height: `${(caja.alto / info.proxyAlto) * 100}%`,
+                        }}
+                      />
+                    );
+                  })()}
+                  {trazo !== null && (
+                    <svg aria-hidden="true" className="trazo" viewBox={`0 0 ${info.proxyAncho} ${info.proxyAlto}`} preserveAspectRatio="none">
+                      <polyline points={trazo.map((pt) => `${pt.x + 0.5},${pt.y + 0.5}`).join(' ')} strokeWidth={tamanoPincel} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
                   )}
                   <p className={`aviso-frame-perdido${revisarFrame ? ' visible' : ''}`} role="status" aria-hidden={!revisarFrame}>
                     En este frame perdimos el objeto. Revisa que no aparezca, o que la zona oculta se vea bien.
@@ -517,17 +622,23 @@ export function ModoVideo({ activo, alAnunciar, alFallar, pedido }: Props): Reac
 
         {pistas.length > 0 && (
           <ul className="grupos-riesgo">
-            {pistas.map((p, i) => {
+            {pistas.map((p) => {
               const abierta = abiertas.has(p.id);
-              const nombre = `el objeto ${i + 1}`;
+              const seguida = p.origen === 'seguimiento';
+              // Se numeran por separado: "Objeto 2" es el segundo seguido; "Tu zona 1", la primera dibujada.
+              const numero = pistas.filter((x) => (x.origen === 'seguimiento') === seguida).findIndex((x) => x.id === p.id) + 1;
+              const titulo = seguida ? `Objeto ${numero}` : `Tu zona ${numero}`;
+              const nombre = seguida ? `el objeto ${numero}` : `tu zona ${numero}`;
               return (
                 <li key={p.id} className="grupo-riesgo bajo">
                   <div className="grupo-cabecera">
-                    <span className="grupo-icono" aria-hidden="true"><Crosshair /></span>
+                    <span className="grupo-icono" aria-hidden="true">{p.origen === 'rectangulo' ? <SquareDashed /> : p.origen === 'pincel' ? <Brush /> : <Crosshair />}</span>
                     <div className="grupo-titulo">
-                      <h3>Objeto {i + 1}</h3>
+                      <h3>{titulo}</h3>
                       <div className="grupo-meta">
-                        {p.framesRevisar > 0 ? <span className="pendiente">Revisa {p.framesRevisar} {p.framesRevisar === 1 ? 'frame' : 'frames'}</span> : <span className="suave">Seguido en todo el video</span>}
+                        {p.framesRevisar > 0
+                          ? <span className="pendiente">Revisa {p.framesRevisar} {p.framesRevisar === 1 ? 'frame' : 'frames'}</span>
+                          : <span className="suave">{seguida ? 'Seguido en todo el video' : 'Fija en todo el video'}</span>}
                       </div>
                     </div>
                     <button type="button" className="boton fantasma chico" aria-label={`Quitar ${nombre}`} title="Quitar este objeto" disabled={!libre} onClick={() => { quitar(p.id); }}>

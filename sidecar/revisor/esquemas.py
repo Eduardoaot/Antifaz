@@ -22,6 +22,8 @@ ESCALA_STICKER_MIN = 0.25
 ESCALA_STICKER_MAX = 2.0
 # Posición del sticker, en fracciones de los semiejes de su zona. Coincide con LIMITES.posicionSticker.
 POSICION_STICKER_MAX = 2.0
+# Giro del emoji, en grados. El sidecar gira también su parte opaca, así sigue tapando lo mismo.
+ROTACION_STICKER_MAX = 180.0
 
 
 class Estricto(BaseModel):
@@ -68,6 +70,8 @@ class Ocultamiento(Estricto):
     # crece lo necesario para seguir tapando lo que debe, y el relleno de debajo no cambia.
     desplazamiento_x: Annotated[float, Field(ge=-POSICION_STICKER_MAX, le=POSICION_STICKER_MAX)] = 0.0
     desplazamiento_y: Annotated[float, Field(ge=-POSICION_STICKER_MAX, le=POSICION_STICKER_MAX)] = 0.0
+    # Giro del emoji en grados, a favor de las manecillas. Los demás efectos lo ignoran.
+    rotacion: Annotated[float, Field(ge=-ROTACION_STICKER_MAX, le=ROTACION_STICKER_MAX)] = 0.0
 
     @model_validator(mode="after")
     def nucleo_dentro(self) -> Ocultamiento:
@@ -199,6 +203,24 @@ class SeguirVideo(Estricto):
     y: Annotated[int, Field(ge=0, le=PROXY_LADO_MAX - 1)]
 
 
+class PuntoProxy(Estricto):
+    x: Annotated[int, Field(ge=0, le=PROXY_LADO_MAX - 1)]
+    y: Annotated[int, Field(ge=0, le=PROXY_LADO_MAX - 1)]
+
+
+class ZonaVideo(Estricto):
+    """Una zona tuya en el video, en el proxy: un rectángulo (dos esquinas) o un trazo de pincel.
+
+    No se sigue: queda fija en todos los frames, como en una foto.
+    """
+
+    tipo: Literal["zona_video"]
+    video_id: Id
+    forma: Literal["rectangulo", "pincel"]
+    puntos: Annotated[list[PuntoProxy], Field(min_length=1, max_length=PUNTOS_TRAZO_MAX)]
+    tamano: Annotated[int, Field(ge=PINCEL_MIN, le=PINCEL_MAX)] = PINCEL_MIN
+
+
 class QuitarPista(Estricto):
     tipo: Literal["quitar_pista"]
     video_id: Id
@@ -236,6 +258,7 @@ Comando = Annotated[
     | AbrirVideo
     | VistaVideo
     | SeguirVideo
+    | ZonaVideo
     | QuitarPista
     | ExportarVideo
     | CerrarVideo,

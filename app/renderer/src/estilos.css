@@ -74,13 +74,13 @@ kbd {
 .app { display: flex; flex-direction: column; height: 100%; }
 .cabecera {
   flex: none; display: flex; align-items: center; justify-content: space-between; gap: 0.75rem 1.5rem;
-  min-height: 3.5rem; padding: 0.5rem 1rem;
+  min-height: 4rem; padding: 0.5rem 1rem;
   background: var(--superficie); border-bottom: 1px solid var(--borde-sutil);
   position: relative; z-index: 10;
 }
 .identidad { display: flex; align-items: center; gap: 0.75rem; min-width: 0; }
-.logo { display: block; height: 1.625rem; width: auto; }
-.eslogan { color: var(--texto-suave); font-size: 0.875rem; min-width: 0; }
+.logo { display: block; height: 2.25rem; width: auto; }
+.eslogan { color: var(--texto-suave); font-size: 0.9375rem; min-width: 0; }
 .seccion-actual {
   font-size: 0.8125rem; font-weight: 600; color: var(--texto-suave);
   padding: 0.25rem 0.75rem; border-radius: 999px; background: var(--superficie-2);
@@ -312,7 +312,8 @@ input[type='range']:disabled { opacity: 0.5; cursor: not-allowed; }
 .visor figcaption { font: 400 0.8125rem 'Inter', 'Segoe UI', sans-serif; font-variant-numeric: tabular-nums; }
 .preparando { padding: 3rem 1rem; text-align: center; }
 /* Las barras viven en el marco: con zoom, la imagen se desplaza y ellas no. */
-.marco-visor { position: relative; min-width: 0; container-type: inline-size; }
+.marco-visor { position: relative; min-width: 0; container-type: inline-size; -webkit-user-select: none; user-select: none; }
+.marco-visor img { -webkit-user-drag: none; }
 /*
  * Área de trabajo: gris neutro casi igual al fondo. Arriba deja lugar a la cinta de herramientas, así
  * la cinta nunca tapa la foto ajustada a la ventana. Al acercarla, se mueve dentro sin mover la página.
@@ -467,7 +468,7 @@ input[type='range']:disabled { opacity: 0.5; cursor: not-allowed; }
   -webkit-backdrop-filter: blur(12px) saturate(140%); backdrop-filter: blur(12px) saturate(140%);
   border: 1px solid var(--vidrio-borde); box-shadow: 0 2px 8px rgb(0 0 0 / 0.25);
   font: 600 0.8125rem/1.4 'Inter', 'Segoe UI', sans-serif; letter-spacing: 0.01em; white-space: nowrap;
-  transition: opacity 160ms ease-out;
+  transition: opacity 400ms ease-out;
 }
 .rotulo.antes { left: 0.75rem; }
 .rotulo.despues { right: 0.75rem; background: var(--marca); color: var(--sobre-marca); border-color: transparent; }
@@ -1041,4 +1042,47 @@ summary { cursor: pointer; min-height: 1.75rem; font-weight: 500; color: var(--t
 @keyframes introPista {
   from { opacity: 0; }
   to { opacity: 0.7; }
+}
+
+/* Paneles plegables: un riel angosto con el botón para volver a abrirlos. */
+.cuerpo.fotos-plegadas { grid-template-columns: 3rem minmax(0, 1fr) minmax(19rem, 24rem); }
+.cuerpo.panel-plegado { grid-template-columns: minmax(14rem, 17rem) minmax(0, 1fr) 3rem; }
+.cuerpo.fotos-plegadas.panel-plegado { grid-template-columns: 3rem minmax(0, 1fr) 3rem; }
+.riel {
+  display: flex; flex-direction: column; align-items: center; gap: 0.5rem; padding: 0.75rem 0;
+  background: var(--superficie); color: var(--texto-suave); cursor: pointer;
+  border: 1px solid var(--borde-suave); border-radius: var(--radio-lg); box-shadow: var(--sombra-sm);
+}
+.riel:hover { color: var(--texto); background: var(--superficie-2); }
+.riel svg { width: 1.25rem; height: 1.25rem; }
+.panel { position: relative; }
+.plegar-panel { position: absolute; top: 0.5rem; right: 0.5rem; z-index: 1; }
+.panel > .resumen-foto { padding-right: 2.75rem; }
+
+/* Tarjeta de la zona: pie con ¿Por qué? y Quitar de la foto. */
+.tarjeta-pie { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem; padding-top: 0.5rem; border-top: 1px solid var(--borde-suave); }
+.quitar-foto { justify-self: start; color: var(--texto-suave); }
+
+/* Zonas quitadas de la foto: a la mano para volver a ponerlas. */
+.quitadas { padding: 0.75rem; border: 1px dashed var(--borde-suave); border-radius: var(--radio-md); }
+.quitadas > .suave { font-size: 0.8125rem; margin: 0.25rem 0 0.5rem; }
+.fila-quitada { grid-template-columns: minmax(0, 1fr) auto; align-items: center; opacity: 0.85; }
+
+/* Girar el sticker: una manija arriba, al centro, unida por una línea. */
+.sticker .manija.girar { left: 50%; top: -22px; transform: translate(-50%, -50%); cursor: grab; border-radius: 50%; }
+.sticker .manija.girar::after { content: ''; position: absolute; left: 50%; top: 100%; width: 2px; height: 14px; transform: translateX(-50%); background: #fff; box-shadow: 0 0 0 1px #000; }
+
+/* "¿Por qué?": primero la explicación; las fuentes, plegadas. */
+.porque-texto { font-size: 1.0625rem; line-height: 1.55; }
+.fuentes-plegables { border-top: 1px solid var(--borde-suave); padding-top: 0.75rem; }
+.fuentes-plegables > summary { font-weight: 600; color: var(--marca); }
+.fuentes-plegables .fuentes { margin-top: 0.75rem; }
+
+/* Comparar: elegir entre la línea y lado a lado. */
+.modo-comparar { justify-self: start; }
+.ventana-lienzo .dos-lados { width: 100%; align-self: center; }
+.dos-lados img { display: block; width: 100%; height: auto; border-radius: 6px; }
+@media (max-width: 1000px) {
+  .cuerpo.fotos-plegadas, .cuerpo.panel-plegado, .cuerpo.fotos-plegadas.panel-plegado { grid-template-columns: minmax(0, 1fr); }
+  .riel { flex-direction: row; justify-content: center; padding: 0.5rem; }
 }

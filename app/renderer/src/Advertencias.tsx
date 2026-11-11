@@ -1,4 +1,4 @@
-import { AlertCircle, AlertTriangle, ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Baby, Bath, Car, ChevronDown, CircleHelp, CreditCard, Crosshair, Eye, EyeOff, Flag, Gem, IdCard, Info, MapPin, Monitor, Move, Phone, Plane, QrCode, Shirt, SlidersHorizontal, Stethoscope, Users } from 'lucide-react';
+import { AlertCircle, AlertTriangle, ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Baby, Bath, Car, ChevronDown, CircleHelp, CreditCard, Crosshair, EraserIcon, Eye, EyeOff, Flag, Gem, IdCard, Info, MapPin, Monitor, Move, Phone, Plane, QrCode, RotateCcw, Shirt, SlidersHorizontal, Stethoscope, Users } from 'lucide-react';
 import { useId, useState } from 'react';
 import { reglaDe, type Regla } from '../../shared/catalogo';
 import { esquemaEfecto, LIMITES, type Analisis, type Efecto, type Hallazgo } from '../../shared/contrato';
@@ -8,6 +8,7 @@ import {
   ajustaSticker,
   contarRevision,
   decidirVarias,
+  descartarZona,
   describirHallazgo,
   describirZona,
   efectoDe,
@@ -16,6 +17,9 @@ import {
   elegirIntensidadVarias,
   enElTope,
   escalaDe,
+  limitarRotacion,
+  moverCreciendo,
+  rotacionDe,
   escalaMinimaSticker,
   estadoDeZonas,
   etiquetaNivelMostrado,
@@ -24,10 +28,12 @@ import {
   posicionDe,
   responderMenores,
   restablecerSticker,
+  restaurarZona,
   soloAvisaSinZona,
   stickerAjustado,
   textoMotivo,
   tieneNucleo,
+  tituloGrupo,
   tituloVeredicto,
   usaIntensidad,
   valorComun,
@@ -118,18 +124,20 @@ interface PropsDecision {
   que: string;
   alDecidir: (decision: 'ocultar' | 'ignorar') => void;
   compacto?: boolean;
+  /** Varias zonas a la vez: "Ocultar todas" y "Todas visibles". */
+  varias?: boolean;
 }
 
 /** Un solo control de dos posiciones. "Mixto" y "sin decidir" no marcan ninguna. */
-export function ControlDecision({ estado, que, alDecidir, compacto = false }: PropsDecision): React.JSX.Element {
+export function ControlDecision({ estado, que, alDecidir, compacto = false, varias = false }: PropsDecision): React.JSX.Element {
   return (
     <div className={`segmentado${compacto ? ' compacto' : ''}`} role="group" aria-label={`¿Ocultar ${que}?`}>
       <button type="button" aria-pressed={estado === 'ocultar'} onClick={() => { alDecidir('ocultar'); }}>
-        <EyeOff aria-hidden="true" /> Ocultar<span className="solo-lector"> {que}</span>
+        <EyeOff aria-hidden="true" /> {varias ? 'Ocultar todas' : 'Ocultar'}<span className="solo-lector"> {que}</span>
       </button>
       {/* El nombre contiene el texto visible ("Visible"), como pide WCAG 2.5.3. */}
       <button type="button" aria-label={`Dejar visible ${que}`} aria-pressed={estado === 'ignorar'} onClick={() => { alDecidir('ignorar'); }}>
-        <Eye aria-hidden="true" /> Visible
+        <Eye aria-hidden="true" /> {varias ? 'Todas visibles' : 'Visible'}
       </button>
     </div>
   );
@@ -222,8 +230,7 @@ function textoTamano(valor: number, minimo: number, cara: boolean): string {
 }
 
 function textoPosicion(h: Hallazgo, escala: number, p: Posicion): string | null {
-  if (escala <= escalaMinimaSticker(h)) return 'Para moverlo, primero hazlo más grande.';
-  if (p.x === 0 && p.y === 0) return null;
+  if (p.x === 0 && p.y === 0) return 'Al moverlo, crece lo necesario para seguir tapando.';
   if (!enElTope(h, escala, p)) return 'Lo moviste del centro.';
   return tieneNucleo(h) ? 'Hasta aquí: más lejos dejaría ver la cara.' : 'Hasta aquí: más lejos dejaría ver la zona.';
 }
@@ -247,6 +254,14 @@ export function AjusteSticker({ hallazgo, nombre, revision, abierto, alAbrir, al
   const id = useId();
   const [moviendo, setMoviendo] = useState<number | null>(null);
   const guardada = escalaDe(revision, hallazgo.id);
+  const giro = rotacionDe(revision, hallazgo.id);
+  const [girando, setGirando] = useState<number | null>(null);
+  const giroMostrado = girando ?? giro;
+  const confirmarGiro = (): void => {
+    if (girando === null) return;
+    setGirando(null);
+    alAjustar(hallazgo, { rotacion: girando });
+  };
   const posicion = posicionDe(revision, hallazgo.id);
   const minimo = escalaMinimaSticker(hallazgo);
   const valor = Math.max(minimo, moviendo ?? guardada);
@@ -260,7 +275,8 @@ export function AjusteSticker({ hallazgo, nombre, revision, abierto, alAbrir, al
   };
   const { paso } = LIMITES.posicionSticker;
   const mover = (dx: number, dy: number): void => {
-    alAjustar(hallazgo, { posicion: { x: posicion.x + dx, y: posicion.y + dy } });
+    // Si no alcanza a llegar sin destapar algo, crece lo justo.
+    alAjustar(hallazgo, moverCreciendo(hallazgo, valor, { x: posicion.x + dx, y: posicion.y + dy }));
   };
   const enPosicion = textoPosicion(hallazgo, valor, posicion);
   return (
@@ -287,6 +303,21 @@ export function AjusteSticker({ hallazgo, nombre, revision, abierto, alAbrir, al
             onBlur={confirmar}
           />
           <output htmlFor={`${id}-control`}>{porcentaje}</output>
+          <label htmlFor={`${id}-giro`}>Giro{zona}</label>
+          <input
+            id={`${id}-giro`}
+            type="range"
+            min={-LIMITES.rotacionSticker.max}
+            max={LIMITES.rotacionSticker.max}
+            step={LIMITES.rotacionSticker.paso}
+            value={giroMostrado}
+            aria-valuetext={`${giroMostrado} grados`}
+            onChange={(e) => { setGirando(limitarRotacion(Number(e.target.value))); }}
+            onPointerUp={confirmarGiro}
+            onKeyUp={confirmarGiro}
+            onBlur={confirmarGiro}
+          />
+          <output htmlFor={`${id}-giro`}>{giroMostrado}°</output>
           <div className="cruceta" role="group" aria-label="Mover el sticker">
             <button type="button" className="boton chico arriba" aria-label="Mover arriba" title="Mover arriba (↑)" onClick={() => { mover(0, -paso); }}>
               <ArrowUp aria-hidden="true" />
@@ -484,6 +515,7 @@ function GrupoRiesgo({ grupo, hallazgos, revision, alCambiar, abierto, alAbrir, 
         <>
           <div className="grupo-control">
             <ControlDecision
+              varias={conZona.length > 1}
               estado={estadoDeZonas(revision, ids)}
               que={conZona.length === 1 ? `zona de ${grupo.titulo}` : `zonas de ${grupo.titulo}`}
               alDecidir={(d) => { alCambiar((r) => decidirVarias(r, ids, d)); }}
@@ -528,6 +560,14 @@ function GrupoRiesgo({ grupo, hallazgos, revision, alCambiar, abierto, alAbrir, 
               {conZona.length === 1 && conZona[0] !== undefined && (
                 <ExtrasZona hallazgo={conZona[0]} nombre={grupo.titulo} revision={revision} alCambiar={alCambiar} seleccionSticker={seleccionSticker} alSeleccionarSticker={alSeleccionarSticker} />
               )}
+              <button
+                type="button"
+                className="boton chico-texto quitar-foto"
+                title="La zona queda visible y sin marca. Puedes volver a ponerla abajo, en Quitadas de la foto."
+                onClick={() => { alCambiar((r) => ids.reduce(descartarZona, r)); }}
+              >
+                <EraserIcon aria-hidden="true" /> {conZona.length === 1 ? 'Quitar de la foto' : 'Quitar todas de la foto'}<span className="solo-lector">: {grupo.titulo}</span>
+              </button>
             </div>
           )}
         </>
@@ -571,7 +611,12 @@ function FilaZona({ hallazgo, nombre, titulo, revision, alCambiar, resaltado, al
   const efecto = efectoDe(revision, hallazgo);
   return (
     <li className={`fila-zona${resaltado?.id === hallazgo.id ? ' resaltada' : ''}`} data-zona={hallazgo.id} {...eventosResaltar(hallazgo.id, resaltado, alResaltar)}>
-      <p className="fila-zona-titulo"><strong>{titulo}</strong> <span className="suave">{describirZona(hallazgo)}</span></p>
+      <div className="fila-zona-cabecera">
+        <p className="fila-zona-titulo"><strong>{titulo}</strong> <span className="suave">{describirZona(hallazgo)}</span></p>
+        <button type="button" className="boton fantasma chico" aria-label={`Quitar de la foto ${nombre}`} title="Quitar de la foto: queda visible" onClick={() => { alCambiar((r) => descartarZona(r, hallazgo.id)); }}>
+          <EraserIcon aria-hidden="true" />
+        </button>
+      </div>
       <ControlDecision compacto estado={estadoDeZonas(revision, [hallazgo.id])} que={nombre} alDecidir={(d) => { alCambiar((r) => decidirVarias(r, [hallazgo.id], d)); }} />
       <SelectorEfecto valor={efecto} etiqueta="Efecto" alCambiar={(e) => { alCambiar((r) => elegirEfectoVarias(r, [hallazgo.id], e)); }} />
       {usaIntensidad(efecto) && (
@@ -600,7 +645,8 @@ export function Advertencias({ hallazgos, revision, alCambiar, resaltado = null,
   const [porQue, setPorQue] = useState<Regla | null>(null);
   const [abiertos, setAbiertos] = useState<ReadonlySet<string>>(new Set());
   if (hallazgos.length === 0) return null;
-  const grupos = agruparHallazgos(hallazgos, revision);
+  const quitadas = hallazgos.filter((h) => revision.descartadas.includes(h.id));
+  const grupos = agruparHallazgos(hallazgos.filter((h) => !revision.descartadas.includes(h.id)), revision);
   // Elegir un sticker en la foto abre su grupo, para que sus ajustes queden a la vista.
   const conSticker = seleccionSticker === null ? undefined : grupos.find((g) => g.hallazgos.some((h) => h.id === seleccionSticker))?.reglaId;
 
@@ -632,6 +678,22 @@ export function Advertencias({ hallazgos, revision, alCambiar, resaltado = null,
           />
         ))}
       </ul>
+      {quitadas.length > 0 && (
+        <details className="quitadas">
+          <summary>Quitadas de la foto ({quitadas.length})</summary>
+          <p className="suave">Quedan visibles y sin marca. Si te equivocaste, vuelve a ponerlas.</p>
+          <ul className="zonas">
+            {quitadas.map((h) => (
+              <li key={h.id} className="fila-zona fila-quitada">
+                <p className="fila-zona-titulo"><strong>{tituloGrupo(h.regla_id)}</strong> <span className="suave">{describirZona(h)}</span></p>
+                <button type="button" className="boton chico-texto" onClick={() => { alCambiar((r) => restaurarZona(r, h.id)); }}>
+                  <RotateCcw aria-hidden="true" /> Volver a poner<span className="solo-lector">: {tituloGrupo(h.regla_id)}, {describirZona(h)}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
       {porQue !== null && <DialogoPorQue regla={porQue} alCerrar={() => { setPorQue(null); }} />}
     </section>
   );

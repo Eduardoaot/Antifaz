@@ -628,6 +628,34 @@ function registrarCanalesVideo(): void {
     };
   });
 
+  manejar(CANALES.zonaVideo, FALLO, async (id: unknown, forma: unknown, puntos: unknown, tamano: unknown): Promise<Resultado<unknown>> => {
+    const videoId = validar(esquemaVideoId, id);
+    const zona = validar(
+      z.strictObject({
+        forma: z.enum(['rectangulo', 'pincel']),
+        puntos: z.array(z.strictObject({ x: esquemaCoordenadaProxy, y: esquemaCoordenadaProxy })).min(1).max(LIMITES.puntosTrazo),
+        tamano: z.number().int().min(LIMITES.pincel.min).max(LIMITES.pincel.max),
+      }).refine((v) => v.forma !== 'rectangulo' || v.puntos.length === 2, 'el rectángulo lleva dos esquinas'),
+      { forma, puntos, tamano },
+    );
+    if (videoId === null || zona === null) return invalido;
+    const sidecarId = videos.sidecarId(videoId);
+    if (!sidecarId.ok) return sidecarId;
+    const { resultado } = await sidecar.pedir({ tipo: 'zona_video', video_id: sidecarId.datos, ...zona });
+    if (!resultado.ok) return resultado;
+    const seguido = esquemaSeguido.parse(resultado.datos);
+    return {
+      ok: true,
+      datos: {
+        pistaId: seguido.pista_id,
+        framesRevisar: seguido.frames_revisar,
+        posicionesRevisar: seguido.posiciones_revisar,
+        framesConObjeto: seguido.frames_con_objeto,
+        framesRastreados: seguido.frames_rastreados,
+      },
+    };
+  });
+
   manejar(CANALES.quitarPista, undefined, async (id: unknown, pistaId: unknown): Promise<void> => {
     const videoId = validar(esquemaVideoId, id);
     const pista = validar(esquemaPistaId, pistaId);

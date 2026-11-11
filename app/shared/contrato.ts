@@ -19,6 +19,8 @@ export const LIMITES = {
    * Solo se mueve mientras siga tapando la cara del detector; el sidecar lo agranda si hiciera falta.
    */
   posicionSticker: { max: 2, paso: 0.05, pasoGrande: 0.25 },
+  /** Giro del sticker, en grados. El sidecar gira también su parte opaca: sigue tapando lo mismo. */
+  rotacionSticker: { max: 180, paso: 15 },
   loteArchivos: 500,
   ocultamientos: 5000,
   jpegCalidad: { min: 60, max: 100, porDefecto: 92 },
@@ -134,6 +136,8 @@ export const esquemaOcultamiento = z.strictObject({
   /** Desplazamiento del emoji en fracciones de los semiejes de su zona. Solo con `nucleo`. */
   desplazamiento_x: z.number().min(-LIMITES.posicionSticker.max).max(LIMITES.posicionSticker.max),
   desplazamiento_y: z.number().min(-LIMITES.posicionSticker.max).max(LIMITES.posicionSticker.max),
+  /** Giro del emoji en grados, a favor de las manecillas. Los demás efectos lo ignoran. */
+  rotacion: z.number().min(-LIMITES.rotacionSticker.max).max(LIMITES.rotacionSticker.max),
 }).refine((o) => o.nucleo === null || nucleoDentro(o.nucleo, o), {
   message: 'La cara debe quedar dentro de su zona',
   path: ['nucleo'],
@@ -389,6 +393,9 @@ export const esquemaEdicion = z.strictObject({
   posiciones: z.record(z.string(), z.strictObject({ x: coordenadaSticker, y: coordenadaSticker })).default({}),
   // Intensidad propia de una zona. Opcional: las recuperaciones anteriores no la traen.
   intensidades: z.record(z.string(), enteroEnRango(LIMITES.intensidad.min, LIMITES.intensidad.max)).default({}),
+  // Opcionales por la misma razón: giro del sticker y zonas detectadas que quitaste de la foto.
+  rotaciones: z.record(z.string(), z.number().min(-LIMITES.rotacionSticker.max).max(LIMITES.rotacionSticker.max)).default({}),
+  descartadas: z.array(z.string().min(1).max(64)).max(LIMITES.ocultamientos).default([]),
 });
 export type Edicion = z.infer<typeof esquemaEdicion>;
 
@@ -435,6 +442,8 @@ export interface ApiRevisor {
   soltarVideo(archivo: File): Promise<Resultado<VideoInfo>>;
   vistaVideo(id: string, posicion: number, pistas: PistaElegida[]): Promise<Resultado<VistaVideo>>;
   seguirVideo(id: string, posicion: number, x: number, y: number): Promise<Resultado<Seguido>>;
+  /** Una zona tuya en el video, fija en todos los frames: rectángulo (dos esquinas) o trazo, en el proxy. */
+  zonaVideo(id: string, forma: 'rectangulo' | 'pincel', puntos: Punto[], tamano: number): Promise<Resultado<Seguido>>;
   quitarPista(id: string, pistaId: string): Promise<void>;
   exportarVideo(id: string, pistas: PistaElegida[]): Promise<Resultado<VideoExportado | null>>;
   cerrarVideo(id: string): Promise<void>;

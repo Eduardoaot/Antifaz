@@ -14,7 +14,9 @@ import {
   limitarZoom,
   opacidadRotulo,
   pasoZoom,
+  moverCreciendo,
   posicionDe,
+  rotacionDe,
   textoZoom,
   zonaEnPunto,
   zonasConSticker,
@@ -70,6 +72,8 @@ const UMBRAL_ARRASTRE = 4;
 const TOLERANCIA_CLIC = 10;
 /** Por debajo de esto, en píxeles de pantalla, la zona se señala con un anillo alrededor. */
 const ZONA_DIMINUTA = 22;
+/** Tiempo que se ven los rótulos de la comparación tras moverla. */
+const ROTULOS_MS = 1800;
 /** En ventanas angostas la imagen usa todo el ancho; al acercarla, la ventana de la imagen se limita. */
 const CONSULTA_ANGOSTA = '(max-width: 1000px)';
 
@@ -108,6 +112,17 @@ export function Visor({ archivo, hallazgos, ocultamientos, revision, herramienta
   const [urlOriginal, setUrlOriginal] = useState<string | null>(null);
   const [errorOriginal, setErrorOriginal] = useState<string | null>(null);
   const [corte, setCorte] = useState<number>(LIMITES.comparacion.porDefecto);
+  // "cortina": una línea que se arrastra; "lado": las dos versiones una junto a la otra.
+  const [modoComparar, setModoComparar] = useState<'cortina' | 'lado'>('cortina');
+  // Los rótulos "Original" y "Tu copia" se van solos tras un momento para ver la imagen completa.
+  const [rotulos, setRotulos] = useState(true);
+  const esperaRotulos = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const mostrarRotulos = (): void => {
+    setRotulos(true);
+    clearTimeout(esperaRotulos.current);
+    esperaRotulos.current = setTimeout(() => { setRotulos(false); }, ROTULOS_MS);
+  };
+  useEffect(() => () => { clearTimeout(esperaRotulos.current); }, []);
   const moviendoCorte = useRef(false);
   // Zona cuya explicación está abierta, y una clave que cambia al moverse la imagen para recolocarla.
   const [abierta, setAbierta] = useState<string | null>(null);
@@ -165,6 +180,7 @@ export function Visor({ archivo, hallazgos, ocultamientos, revision, herramienta
 
   const alternarComparar = (): void => {
     setComparando((c) => !c);
+    mostrarRotulos();
     // Si falló antes, al volver a pedir la comparación se intenta otra vez.
     setErrorOriginal(null);
   };
@@ -251,13 +267,25 @@ export function Visor({ archivo, hallazgos, ocultamientos, revision, herramienta
     return () => { window.removeEventListener('keydown', oyente); };
   }, []);
 
-  // Ctrl + rueda acerca o aleja. Necesita un oyente no pasivo para que la página no haga su propio zoom.
+  /*
+   * Zoom con la rueda y con dos dedos. Necesita un oyente no pasivo para que la página no haga su zoom.
+   * - Pellizco del touchpad (llega como rueda con Ctrl) y Ctrl + rueda: zoom continuo, suave.
+   * - Rueda del mouse (saltos enteros y verticales): un nivel por muesca.
+   * - Deslizar dos dedos en el touchpad (pasos chicos o de lado): mueve la imagen ampliada.
+   */
   const alRuedaActual = useRef<(e: WheelEvent) => void>(() => undefined);
   useEffect(() => {
     alRuedaActual.current = (e: WheelEvent): void => {
-      if (!e.ctrlKey) return;
+      const punto = { x: e.clientX, y: e.clientY };
+      if (e.ctrlKey) {
+        e.preventDefault();
+        cambiarZoom(zoom * Math.exp(-e.deltaY * 0.01), punto);
+        return;
+      }
+      const deRaton = e.deltaMode !== 0 || (e.deltaX === 0 && Number.isInteger(e.deltaY) && Math.abs(e.deltaY) >= 50);
+      if (!deRaton) return;
       e.preventDefault();
-      cambiarZoom(pasoZoom(zoom, e.deltaY < 0 ? 1 : -1), { x: e.clientX, y: e.clientY });
+      cambiarZoom(pasoZoom(zoom, e.deltaY < 0 ? 1 : -1), punto);
     };
   });
   useEffect(() => {
@@ -268,7 +296,7 @@ export function Visor({ archivo, hallazgos, ocultamientos, revision, herramienta
     return () => { v.removeEventListener('wheel', alRueda); };
   }, [listo]);
 
-  const conCaja = hallazgos.filter((h) => h.caja !== null);
+  const conCaja = hallazgos.filter((h) => h.caja !== null && revision?.descartadas.includes(h.id) !== true);
   const zonas = [
     ...conCaja.flatMap((h) => (h.caja === null ? [] : [{ id: h.id, caja: h.caja }])),
     ...(revision?.manuales ?? []).map((z) => ({ id: z.id, caja: { x: z.x, y: z.y, ancho: z.ancho, alto: z.alto } })),
@@ -292,6 +320,19 @@ export function Visor({ archivo, hallazgos, ocultamientos, revision, herramienta
     const ancho_pantalla = lienzo.current?.getBoundingClientRect().width ?? 0;
     return ancho_pantalla > 0 ? (TOLERANCIA_CLIC * ancho) / ancho_pantalla : 0;
   };
+
+  useEffect(() => {
+    if (abierta === null) return undefined;
+    const alPresionar = (e: globalThis.PointerEvent): void => {
+      const objetivo = e.target;
+      if (!(objetivo instanceof Node)) return;
+      const enTarjeta = marco.current?.querySelector('.tarjeta-zona')?.contains(objetivo) === true;
+      const enImagen = lienzo.current?.contains(objetivo) === true;
+      if (!enTarjeta && !enImagen) setAbierta(null);
+    };
+    document.addEventListener('pointerdown', alPresionar);
+    return () => { document.removeEventListener('pointerdown', alPresionar); };
+  }, [abierta]);
 
   const elegida: ZonaElegida | null = (() => {
     if (abierta === null || revision === null) return null;
@@ -367,7 +408,10 @@ export function Visor({ archivo, hallazgos, ocultamientos, revision, herramienta
       return;
     }
     if (comparando) {
-      if (moviendoCorte.current) corteEn(e.clientX);
+      if (moviendoCorte.current) {
+        corteEn(e.clientX);
+        mostrarRotulos();
+      }
       return;
     }
     if (trazo !== null) {
@@ -431,10 +475,12 @@ export function Visor({ archivo, hallazgos, ocultamientos, revision, herramienta
     const p = posicionDe(revision, elegido.id);
     const escala = escalaDe(revision, elegido.id);
     switch (e.key) {
-      case 'ArrowUp': alAjustarSticker(elegido, { posicion: { x: p.x, y: p.y - d } }); return true;
-      case 'ArrowDown': alAjustarSticker(elegido, { posicion: { x: p.x, y: p.y + d } }); return true;
-      case 'ArrowLeft': alAjustarSticker(elegido, { posicion: { x: p.x - d, y: p.y } }); return true;
-      case 'ArrowRight': alAjustarSticker(elegido, { posicion: { x: p.x + d, y: p.y } }); return true;
+      case 'ArrowUp': alAjustarSticker(elegido, moverCreciendo(elegido, escala, { x: p.x, y: p.y - d })); return true;
+      case 'ArrowDown': alAjustarSticker(elegido, moverCreciendo(elegido, escala, { x: p.x, y: p.y + d })); return true;
+      case 'ArrowLeft': alAjustarSticker(elegido, moverCreciendo(elegido, escala, { x: p.x - d, y: p.y })); return true;
+      case 'ArrowRight': alAjustarSticker(elegido, moverCreciendo(elegido, escala, { x: p.x + d, y: p.y })); return true;
+      case ',': alAjustarSticker(elegido, { rotacion: rotacionDe(revision, elegido.id) - LIMITES.rotacionSticker.paso }); return true;
+      case '.': alAjustarSticker(elegido, { rotacion: rotacionDe(revision, elegido.id) + LIMITES.rotacionSticker.paso }); return true;
       case '[': alAjustarSticker(elegido, { escala: escala - LIMITES.escalaSticker.paso }); return true;
       case ']': alAjustarSticker(elegido, { escala: escala + LIMITES.escalaSticker.paso }); return true;
       case 'Escape': alSeleccionarSticker?.(null); return true;
@@ -494,7 +540,20 @@ export function Visor({ archivo, hallazgos, ocultamientos, revision, herramienta
           onKeyDown={alTecla}
           onScroll={() => { if (abierta !== null) setDesplazamiento((n) => n + 1); }}
         >
+          {comparando && modoComparar === 'lado' && urlOriginal !== null && (
+            <div className="dos-lados" onPointerMove={mostrarRotulos}>
+              <figure>
+                <img src={urlOriginal} draggable={false} alt={`Original de ${nombre}, sin ocultar nada.`} />
+                <figcaption className="rotulo antes" style={{ opacity: rotulos ? 1 : 0 }}>Original</figcaption>
+              </figure>
+              <figure>
+                <img src={url} draggable={false} alt={`Tu copia de ${nombre}, con lo que decidiste ocultar.`} />
+                <figcaption className="rotulo despues" style={{ opacity: rotulos ? 1 : 0 }}>Tu copia</figcaption>
+              </figure>
+            </div>
+          )}
           <div
+            hidden={comparando && modoComparar === 'lado' && urlOriginal !== null}
             ref={lienzo}
             className={`lienzo ${comparando ? 'comparando' : `herramienta-${herramienta}`}${arrastrando ? ' arrastrando' : ''}${sobreZona ? ' sobre-zona' : ''}${dibujando ? ' dibujando' : ''}`}
             style={{ aspectRatio: `${ancho} / ${alto}`, width: ajuste === null ? '100%' : `${Math.round(ajuste * zoom)}px` }}
@@ -512,8 +571,8 @@ export function Visor({ archivo, hallazgos, ocultamientos, revision, herramienta
                 <img className="original" src={original} draggable={false} alt={`Original de ${nombre}, sin ocultar nada, en el ${corte} % izquierdo.`} style={{ clipPath: `inset(0 ${100 - corte}% 0 0)` }} />
                 <div className="corte" aria-hidden="true" style={{ left: `${corte}%` }}><span /></div>
                 {/* Se desvanecen cuando la línea se acerca a su lado, para no quedar encima de la otra versión. */}
-                <span className="rotulo antes" aria-hidden="true" style={{ opacity: opacidadRotulo(corte) }}>Original</span>
-                <span className="rotulo despues" aria-hidden="true" style={{ opacity: opacidadRotulo(100 - corte) }}>Tu copia</span>
+                <span className="rotulo antes" aria-hidden="true" style={{ opacity: rotulos ? opacidadRotulo(corte) : 0 }}>Original</span>
+                <span className="rotulo despues" aria-hidden="true" style={{ opacity: rotulos ? opacidadRotulo(100 - corte) : 0 }}>Tu copia</span>
               </>
             )}
             {/* Sin números encima: el contorno va por fuera y una zona diminuta lleva un anillo. */}
@@ -597,16 +656,24 @@ export function Visor({ archivo, hallazgos, ocultamientos, revision, herramienta
             <p className="suave" role="status">Preparando la original…</p>
           ) : (
             <>
-              <label htmlFor="corte-comparacion">Original a la izquierda, tu copia a la derecha</label>
-              <input
-                id="corte-comparacion"
-                type="range"
-                min={LIMITES.comparacion.min}
-                max={LIMITES.comparacion.max}
-                value={corte}
-                aria-valuetext={`${corte} % original`}
-                onChange={(e) => { setCorte(limitarCorte(Number(e.target.value))); }}
-              />
+              <div className="segmentado compacto modo-comparar" role="group" aria-label="Cómo comparar">
+                <button type="button" aria-pressed={modoComparar === 'cortina'} onClick={() => { setModoComparar('cortina'); mostrarRotulos(); }}>Con línea</button>
+                <button type="button" aria-pressed={modoComparar === 'lado'} onClick={() => { setModoComparar('lado'); mostrarRotulos(); }}>Lado a lado</button>
+              </div>
+              {modoComparar === 'cortina' && (
+                <>
+                  <label htmlFor="corte-comparacion">Original a la izquierda, tu copia a la derecha</label>
+                  <input
+                    id="corte-comparacion"
+                    type="range"
+                    min={LIMITES.comparacion.min}
+                    max={LIMITES.comparacion.max}
+                    value={corte}
+                    aria-valuetext={`${corte} % original`}
+                    onChange={(e) => { setCorte(limitarCorte(Number(e.target.value))); mostrarRotulos(); }}
+                  />
+                </>
+              )}
             </>
           )}
         </div>

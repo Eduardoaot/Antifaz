@@ -40,6 +40,7 @@ from .esquemas import (
     SeguirVideo,
     Solicitud,
     VistaVideo,
+    ZonaVideo,
 )
 from .herramientas import Herramientas
 
@@ -176,6 +177,10 @@ class Sesion:
                 abierto = self._video(comando.video_id)
                 seguidor = seguimiento.seguidor_de(self.carpeta_modelos)
                 return video_app.seguir(abierto, seguidor, comando.posicion, comando.x, comando.y), None
+            case ZonaVideo():
+                puntos = [(p.x, p.y) for p in comando.puntos]
+                abierto = self._video(comando.video_id)
+                return video_app.zona_fija(abierto, comando.forma, puntos, comando.tamano), None
             case QuitarPista():
                 video_app.quitar(self._video(comando.video_id), comando.pista_id)
                 return {"quitada": True}, None
@@ -240,7 +245,13 @@ class Sesion:
             case Pintar():
                 return self._pintar(comando), None
             case (
-                AbrirVideo() | VistaVideo() | SeguirVideo() | QuitarPista() | ExportarVideo() | CerrarVideo()
+                AbrirVideo()
+                | VistaVideo()
+                | SeguirVideo()
+                | ZonaVideo()
+                | QuitarPista()
+                | ExportarVideo()
+                | CerrarVideo()
             ):
                 return self._ejecutar_video(comando)
             case Cerrar(imagen_id=imagen_id):

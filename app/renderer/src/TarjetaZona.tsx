@@ -1,8 +1,9 @@
-import { BookOpen, Trash2, X } from 'lucide-react';
+import { BookOpen, EraserIcon, Trash2, X } from 'lucide-react';
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
 import { reglaDe, type Regla } from '../../shared/catalogo';
 import type { Hallazgo } from '../../shared/contrato';
 import {
+  descartarZona,
   describirHallazgo,
   elegirEfectoVarias,
   elegirIntensidadVarias,
@@ -134,9 +135,15 @@ function ContenidoHallazgo({ h, revision, alCambiar, alPorQue, cerrar }: { h: Ha
       <p className="tarjeta-que">{describirHallazgo(h)}</p>
       <p className="tarjeta-por-que">{regla.por_que}</p>
       <ControlesZona hallazgo={h} nombre={`esta zona de ${titulo}`} revision={revision} alCambiar={alCambiar} />
-      <button type="button" className="enlace" onClick={() => { alPorQue(regla); }}>
-        <BookOpen aria-hidden="true" /> Ver fuentes<span className="solo-lector">: {titulo}</span>
-      </button>
+      <div className="tarjeta-pie">
+        <button type="button" className="enlace" onClick={() => { alPorQue(regla); }}>
+          <BookOpen aria-hidden="true" /> ¿Por qué?<span className="solo-lector"> {titulo}</span>
+        </button>
+        {/* No es un error de detección grave: queda visible y se puede volver a poner desde el panel. */}
+        <button type="button" className="boton chico-texto" title="Quitar esta marca: la zona queda visible. Puedes volver a ponerla desde el panel." onClick={() => { alCambiar((r) => descartarZona(r, h.id)); }}>
+          <EraserIcon aria-hidden="true" /> Quitar de la foto
+        </button>
+      </div>
     </>
   );
 }

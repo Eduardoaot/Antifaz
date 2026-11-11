@@ -31,6 +31,7 @@ const api: ApiRevisor = {
   soltarVideo: (archivo) => ipcRenderer.invoke(CANALES.soltarVideo, webUtils.getPathForFile(archivo)),
   vistaVideo: (id, posicion, pistas) => ipcRenderer.invoke(CANALES.vistaVideo, id, posicion, pistas),
   seguirVideo: (id, posicion, x, y) => ipcRenderer.invoke(CANALES.seguirVideo, id, posicion, x, y),
+  zonaVideo: (id, forma, puntos, tamano) => ipcRenderer.invoke(CANALES.zonaVideo, id, forma, puntos, tamano),
   quitarPista: (id, pistaId) => ipcRenderer.invoke(CANALES.quitarPista, id, pistaId),
   exportarVideo: (id, pistas) => ipcRenderer.invoke(CANALES.exportarVideo, id, pistas),
   cerrarVideo: (id) => ipcRenderer.invoke(CANALES.cerrarVideo, id),

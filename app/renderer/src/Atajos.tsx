@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef } from 'react';
+import { clicFuera } from './Dialogos';
 
 interface Grupo {
   titulo: string;
@@ -76,7 +77,7 @@ export function DialogoAtajos({ alCerrar }: { alCerrar: () => void }): React.JSX
   }, []);
 
   return (
-    <dialog ref={referencia} className="dialogo ancho atajos-dialogo" aria-labelledby={`${id}-titulo`}>
+    <dialog ref={referencia} className="dialogo ancho atajos-dialogo" aria-labelledby={`${id}-titulo`} onClick={(e) => { if (clicFuera(e)) alCerrar(); }}>
       <h2 id={`${id}-titulo`}>Atajos de teclado</h2>
       <div className="atajos-grupos">
         {ATAJOS.map((g) => (

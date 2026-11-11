@@ -1,5 +1,6 @@
 import { FolderOpen } from 'lucide-react';
 import { useEffect, useId, useRef, useState } from 'react';
+import { clicFuera } from './Dialogos';
 import { esquemaFormatoCopia, esquemaSufijo, esquemaTema, LIMITES, type Ajustes, type PreferenciasCopia, type Tema } from '../../shared/contrato';
 
 interface Props {
@@ -39,7 +40,7 @@ export function Configuracion({ ajustes, alCambiarTema, alCambiarCopia, alElegir
   const ejemplo = `foto${leido.success ? leido.data : copia.sufijo}.${copia.formato === 'png' ? 'png' : 'jpg'}`;
 
   return (
-    <dialog ref={referencia} className="dialogo ancho configuracion" aria-labelledby={`${id}-titulo`}>
+    <dialog ref={referencia} className="dialogo ancho configuracion" aria-labelledby={`${id}-titulo`} onClick={(e) => { if (clicFuera(e)) alCerrar(); }}>
       <h2 id={`${id}-titulo`}>Configuración</h2>
 
       <section className="config-seccion" aria-labelledby={`${id}-apariencia`}>

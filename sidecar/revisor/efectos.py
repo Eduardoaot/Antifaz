@@ -188,6 +188,7 @@ def _pegar_emoji(
     escala: float = 1.0,
     minimo: NDArray[np.bool_] | None = None,
     pegar_en: tuple[float, float] | None = None,
+    rotacion: float = 0.0,
 ) -> tuple[int, int, int, int]:
     """Del tamaño justo para tapar `objetivo` desde `centro`, por `escala`. Devuelve la región que tocó.
 
@@ -199,6 +200,16 @@ def _pegar_emoji(
     alto_img, ancho_img = salida.shape[:2]
     original = emojis.cargar(emoji)
     n = original.shape[0]
+    opaco = emojis.opaco(emoji)
+    if rotacion != 0.0:
+        # Se gira la imagen y también su parte opaca: el tamaño se calcula con la parte opaca ya girada,
+        # así el emoji girado sigue tapando todo lo que debe.
+        giro = cv2.getRotationMatrix2D((n / 2, n / 2), -rotacion, 1.0)
+        original = cv2.warpAffine(
+            original, giro, (n, n), flags=cv2.INTER_LINEAR,
+            borderMode=cv2.BORDER_CONSTANT, borderValue=(0, 0, 0, 0),
+        )
+        opaco = cv2.warpAffine(opaco.astype(np.uint8), giro, (n, n), flags=cv2.INTER_NEAREST).astype(bool)
     x0, y0, _, _ = region
     ys, xs = _orilla(objetivo)
     if xs.size == 0:
@@ -206,7 +217,6 @@ def _pegar_emoji(
     cx, cy = centro
     dx = xs.astype(np.float64) + (x0 - cx)
     dy = ys.astype(np.float64) + (y0 - cy)
-    opaco = emojis.opaco(emoji)
     justo = lado_emoji(opaco, dx, dy)
     lado = max(1, round(justo * escala))
     if minimo is None:
@@ -366,7 +376,9 @@ def aplicar(
             )
             emoji = cast(TipoEmoji, o.efecto)
             finales.append(
-                _pegar_emoji(salida, emoji, (x0, y0, x1, y1), centro, objetivo, o.escala, nucleo, pegar_en)
+                _pegar_emoji(
+                    salida, emoji, (x0, y0, x1, y1), centro, objetivo, o.escala, nucleo, pegar_en, o.rotacion
+                )
             )
         else:
             finales.append((x0, y0, x1, y1))
