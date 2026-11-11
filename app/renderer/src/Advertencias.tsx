@@ -216,10 +216,8 @@ export function ControlIntensidad({ valor, etiqueta, alCambiar, conAviso = false
 
 // --- Sticker ------------------------------------------------------------------------------------
 
-function textoTamano(valor: number, _minimo: number, cara: boolean): string {
-  const debajo = cara
-    ? 'Debajo del emoji la cara queda tapada con un color sólido: aunque lo achiques, no se ve.'
-    : 'Debajo del emoji la zona queda tapada con un color sólido: aunque lo achiques, no se ve.';
+function textoTamano(valor: number, _minimo: number, _cara: boolean): string {
+  const debajo = 'Debajo del emoji la zona queda tapada con un color sólido: aunque lo achiques o lo muevas, no se ve.';
   if (valor === LIMITES.escalaSticker.porDefecto) return `Es el tamaño que elegimos. ${debajo}`;
   return debajo;
 }
