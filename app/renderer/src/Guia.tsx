@@ -1,4 +1,4 @@
-import { BookOpen, CheckCircle2, CircleDashed, Search, X } from 'lucide-react';
+import { BookOpen, CheckCircle2, ChevronDown, CircleDashed, Search, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { AVISO_LEGAL, catalogo, type Nivel, type Regla } from '../../shared/catalogo';
 import { agruparReglas, alcanceRevision, revisaSola } from '../../shared/logica';
@@ -67,42 +67,6 @@ export function Guia(): React.JSX.Element {
             </div>
           </header>
 
-          <section id="guia-como-leer" aria-labelledby="guia-como-leer-titulo" className="guia-bloque">
-            <h2 id="guia-como-leer-titulo">Cómo leer esta guía</h2>
-            <ul className="guia-niveles">
-              {SIGNIFICADO.map(({ nivel, texto }) => (
-                <li key={nivel}><PildoraNivel nivel={nivel} /><span>{texto}</span></li>
-              ))}
-            </ul>
-            <ul className="guia-leyenda">
-              <li><span className="insignia-revision sola"><CheckCircle2 aria-hidden="true" /> Lo buscamos solos</span> La app lo marca en cada foto.</li>
-              <li><span className="insignia-revision tuya"><CircleDashed aria-hidden="true" /> Revísalo tú</span> Todavía no lo detectamos: puedes taparlo con las herramientas.</li>
-            </ul>
-            <p className="suave guia-nota">Cuando no encontramos una fuente oficial directa, lo decimos. {AVISO_LEGAL} Versión del catálogo: {catalogo.version}.</p>
-          </section>
-
-          <section id="guia-alcance" aria-labelledby="guia-alcance-titulo" className="guia-bloque">
-            <h2 id="guia-alcance-titulo">Qué revisamos en cada foto</h2>
-            <p className="suave">
-              La revisión es orientativa. Si en una foto algo no se pudo revisar, te lo decimos en esa foto.
-              Un documento o una tarjeta sin texto legible podría pasar sin aviso.
-            </p>
-            <div className="alcance-columnas">
-              <div className="alcance-caja">
-                <h3><CheckCircle2 aria-hidden="true" /> Lo buscamos solos ({revisa.length})</h3>
-                <ul className="lista-chips">
-                  {revisa.map((nombre) => <li key={nombre}>{nombre}</li>)}
-                </ul>
-              </div>
-              <div className="alcance-caja">
-                <h3><CircleDashed aria-hidden="true" /> Todavía no lo revisamos solos ({noRevisa.length})</h3>
-                <ul className="lista-chips">
-                  {noRevisa.map((r) => <li key={r.id}>{r.que_detecta}</li>)}
-                </ul>
-              </div>
-            </div>
-          </section>
-
           <div className="guia-filtros" role="search">
             <label className="buscar-guia">
               <Search aria-hidden="true" />
@@ -121,6 +85,47 @@ export function Guia(): React.JSX.Element {
             </div>
             <p className="suave guia-resultados" aria-live="polite">{total} de {catalogo.reglas.length} temas</p>
           </div>
+
+          {/* Plegados: lo primero que se ve son los temas, no la explicación. */}
+          <details id="guia-como-leer" className="guia-bloque">
+            <summary><h2>Cómo leer esta guía</h2><ChevronDown aria-hidden="true" /></summary>
+            <div className="guia-bloque-cuerpo">
+              <ul className="guia-niveles">
+                {SIGNIFICADO.map(({ nivel, texto }) => (
+                  <li key={nivel}><PildoraNivel nivel={nivel} /><span>{texto}</span></li>
+                ))}
+              </ul>
+              <ul className="guia-leyenda">
+                <li><span className="insignia-revision sola"><CheckCircle2 aria-hidden="true" /> Lo buscamos solos</span> La app lo marca en cada foto.</li>
+                <li><span className="insignia-revision tuya"><CircleDashed aria-hidden="true" /> Revísalo tú</span> Todavía no lo detectamos: puedes taparlo con las herramientas.</li>
+              </ul>
+              <p className="suave guia-nota">Cuando no encontramos una fuente oficial directa, lo decimos. {AVISO_LEGAL} Versión del catálogo: {catalogo.version}.</p>
+            </div>
+          </details>
+
+          <details id="guia-alcance" className="guia-bloque">
+            <summary><h2>Qué revisamos en cada foto</h2><ChevronDown aria-hidden="true" /></summary>
+            <div className="guia-bloque-cuerpo">
+              <p className="suave">
+                La revisión es orientativa. Si en una foto algo no se pudo revisar, te lo decimos en esa foto.
+                Un documento o una tarjeta sin texto legible podría pasar sin aviso.
+              </p>
+              <div className="alcance-columnas">
+                <div className="alcance-caja">
+                  <h3><CheckCircle2 aria-hidden="true" /> Lo buscamos solos ({revisa.length})</h3>
+                  <ul className="lista-chips">
+                    {revisa.map((nombre) => <li key={nombre}>{nombre}</li>)}
+                  </ul>
+                </div>
+                <div className="alcance-caja">
+                  <h3><CircleDashed aria-hidden="true" /> Todavía no lo revisamos solos ({noRevisa.length})</h3>
+                  <ul className="lista-chips">
+                    {noRevisa.map((r) => <li key={r.id}>{r.que_detecta}</li>)}
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </details>
 
           {filtrados.length === 0 && (
             <p className="guia-vacia">Nada coincide con tu búsqueda. Prueba con otra palabra o quita el filtro.</p>

@@ -302,7 +302,8 @@ test('foto sin nada: lo dice sin prometer de más', async () => {
   // Qué se revisa y qué no ya no se repite en cada foto: está en la Guía.
   await expect(pagina.getByText(/Lo que todavía no revisamos/)).toHaveCount(0);
   await irA(pagina, 'Guía de privacidad');
-  await expect(pagina.getByRole('heading', { name: 'Qué revisamos en cada foto' })).toBeVisible();
+  await expect(pagina.getByText(/La revisión es orientativa/)).toBeHidden();
+  await pagina.getByRole('heading', { name: 'Qué revisamos en cada foto' }).click();
   await expect(pagina.getByText(/La revisión es orientativa/)).toBeVisible();
   await expect(pagina.getByRole('heading', { name: /^Todavía no lo revisamos solos/ })).toBeVisible();
 });
