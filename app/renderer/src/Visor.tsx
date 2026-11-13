@@ -282,7 +282,9 @@ export function Visor({ archivo, hallazgos, ocultamientos, revision, herramienta
         cambiarZoom(zoom * Math.exp(-e.deltaY * 0.01), punto);
         return;
       }
-      const deRaton = e.deltaMode !== 0 || (e.deltaX === 0 && Number.isInteger(e.deltaY) && Math.abs(e.deltaY) >= 50);
+      // Sin exigir entero: en Windows la rueda a veces manda 100.0… y el zoom no disparaba.
+      const vertical = Math.abs(e.deltaY) >= Math.abs(e.deltaX) * 2;
+      const deRaton = e.deltaMode !== 0 || (vertical && Math.abs(e.deltaY) >= 40);
       if (!deRaton) return;
       e.preventDefault();
       cambiarZoom(pasoZoom(zoom, e.deltaY < 0 ? 1 : -1), punto);
