@@ -24,6 +24,9 @@ ESCALA_STICKER_MAX = 2.0
 POSICION_STICKER_MAX = 10.0
 # Giro del emoji, en grados. El sidecar gira también su parte opaca, así sigue tapando lo mismo.
 ROTACION_STICKER_MAX = 180.0
+# Estiramiento del emoji a lo ancho y a lo alto. Coincide con LIMITES.estiramientoSticker.
+ESTIRAMIENTO_STICKER_MIN = 0.4
+ESTIRAMIENTO_STICKER_MAX = 2.5
 
 
 class Estricto(BaseModel):
@@ -72,6 +75,9 @@ class Ocultamiento(Estricto):
     desplazamiento_y: Annotated[float, Field(ge=-POSICION_STICKER_MAX, le=POSICION_STICKER_MAX)] = 0.0
     # Giro del emoji en grados, a favor de las manecillas. Los demás efectos lo ignoran.
     rotacion: Annotated[float, Field(ge=-ROTACION_STICKER_MAX, le=ROTACION_STICKER_MAX)] = 0.0
+    # Estiramiento del emoji, antes de girarlo. En 1 por defecto: quien no lo manda (el video) no cambia.
+    estiramiento_x: Annotated[float, Field(ge=ESTIRAMIENTO_STICKER_MIN, le=ESTIRAMIENTO_STICKER_MAX)] = 1.0
+    estiramiento_y: Annotated[float, Field(ge=ESTIRAMIENTO_STICKER_MIN, le=ESTIRAMIENTO_STICKER_MAX)] = 1.0
 
     @model_validator(mode="after")
     def nucleo_dentro(self) -> Ocultamiento:

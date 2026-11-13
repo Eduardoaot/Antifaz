@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import marca from '../../brand/brand.json';
+import { LIMITES } from '../../app/shared/contrato';
 import { abrir, cerrar, crearMuestras, elegirTema, entorno, irA, lanzar, llaveGuardada, matarArbol, personalizar, PYTHON, RAIZ, simularGuardar, type Sesion } from './ayuda';
 
 const CAPTURAS = join(RAIZ, 'tests-ui', 'capturas');
@@ -221,6 +222,29 @@ test('sticker en una cara: se arrastra y se agranda en la foto, y el teclado lo 
   expect(caja2?.width ?? 0).toBeGreaterThan(caja1.width);
   await expect(cara.locator('.tamano-sticker output').first()).not.toHaveText('100 %');
 
+  // El lado izquierdo lo estira solo a lo ancho (el derecho quedó fuera de la foto al agrandarlo).
+  await pagina.waitForTimeout(800);
+  const caja3 = await marco.boundingBox();
+  const lado = await pagina.locator('[data-manija="o"]').boundingBox();
+  if (caja3 === null || lado === null) throw new Error('sin lado');
+  await pagina.mouse.move(lado.x + lado.width / 2, lado.y + lado.height / 2);
+  await pagina.mouse.down();
+  await pagina.mouse.move(lado.x - 60, lado.y + lado.height / 2, { steps: 6 });
+  await pagina.mouse.up();
+  const caja4 = await marco.boundingBox();
+  expect(caja4?.width ?? 0).toBeGreaterThan(caja3.width + 20);
+  expect(Math.abs((caja4?.height ?? 0) - caja3.height)).toBeLessThan(2);
+  await expect(cara.getByRole('slider', { name: /^Ancho/ })).not.toHaveValue('1');
+  await expect(cara).toContainText('Deformado');
+  await pagina.waitForTimeout(800);
+  await pagina.screenshot({ path: join(CAPTURAS, 'sticker-estirado.png') });
+
+  // Con teclado, el control de alto lo estira a lo alto.
+  const altoControl = cara.getByRole('slider', { name: /^Alto/ });
+  await altoControl.focus();
+  await pagina.keyboard.press('End');
+  await expect(altoControl).toHaveValue(String(LIMITES.estiramientoSticker.max));
+
   // Con teclado en la imagen: flechas, [ y ], y Esc lo suelta.
   await pagina.getByRole('group', { name: 'Imagen', exact: true }).focus();
   const antes = await marco.boundingBox();
@@ -236,9 +260,8 @@ test('sticker en una cara: se arrastra y se agranda en la foto, y el teclado lo 
   const salida = join(mkdtempSync(join(tmpdir(), 'revisor-salida-')), 'arrastrado.jpg');
   await simularGuardar(app, salida);
   await pagina.getByRole('button', { name: 'Exportar copia' }).click();
+  // Movido, agrandado y estirado: se exporta tal como lo dejó la persona.
   await expect(pagina.getByTestId('anuncio')).toContainText('con 1 zona oculta');
-  // La persona lo movió fuera de la cara: la exportación lo respeta y la cara queda a la vista.
-  expect(cuentaCaras(salida), 'movido lejos, la cara debería verse').not.toBe('0');
 });
 
 test('sticker en tu zona: se agranda y se mueve en la foto y con el panel', async () => {

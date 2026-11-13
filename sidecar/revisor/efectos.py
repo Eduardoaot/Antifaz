@@ -4,9 +4,9 @@ Decisión del responsable (2026-11-06): el difuminado y el pixelado usan los col
 porque se ven naturales, aunque técnicas de reconstrucción podrían recuperar parte del contenido
 (ver docs/INVESTIGACION.md). Solo el bloque sólido y el emoji no dependen de lo que había debajo.
 
-Decisión del responsable (2026-11-12): la persona decide qué tapa el emoji. Centrado y sin achicar,
-tapa la zona completa; movido o más chico, el relleno sólido va solo bajo su silueta y viaja con él,
-así que lo que quede fuera se ve.
+Decisión del responsable (2026-11-12): la persona decide qué tapa el emoji. Centrado, sin achicar y
+sin deformar, tapa la zona completa; movido, más chico o deformado, el relleno sólido va solo bajo su
+silueta y viaja con él, así que lo que quede fuera se ve.
 """
 
 from __future__ import annotations
@@ -110,10 +110,11 @@ def _elipse(o: Ocultamiento, region: tuple[int, int, int, int]) -> NDArray[np.bo
 
 
 def tapa_la_zona(o: Ocultamiento) -> bool:
-    """Bloque sólido, o emoji sin mover ni achicar: la zona completa queda tapada."""
+    """Bloque sólido, o emoji sin mover, achicar ni deformar: la zona completa queda tapada."""
     if not es_emoji(o.efecto):
         return o.efecto == "solido"
-    return o.escala >= 1 and o.desplazamiento_x == 0 and o.desplazamiento_y == 0
+    sin_deformar = o.estiramiento_x == 1 and o.estiramiento_y == 1
+    return o.escala >= 1 and o.desplazamiento_x == 0 and o.desplazamiento_y == 0 and sin_deformar
 
 
 def lado_emoji(opaco: NDArray[np.bool_], dx: NDArray[np.float64], dy: NDArray[np.float64]) -> int:
@@ -162,6 +163,7 @@ def _pegar_emoji(
     escala: float = 1.0,
     pegar_en: tuple[float, float] | None = None,
     rotacion: float = 0.0,
+    estiramiento: tuple[float, float] = (1.0, 1.0),
 ) -> tuple[int, int, int, int]:
     """Del tamaño justo para tapar `objetivo` desde `centro`, por `escala`, pegado en `pegar_en`.
 
@@ -172,6 +174,16 @@ def _pegar_emoji(
     original = emojis.cargar(emoji)
     n = original.shape[0]
     opaco = emojis.opaco(emoji)
+    mayor = max(estiramiento)
+    if estiramiento != (1.0, 1.0):
+        # Se estira dentro del mismo cuadro y el cuadro crece con el lado mayor: el giro de abajo gira la
+        # forma ya estirada, igual que el marco de la interfaz. El tamaño base sigue siendo el sin estirar.
+        sx, sy = estiramiento[0] / mayor, estiramiento[1] / mayor
+        estirar = np.array([[sx, 0.0, (1 - sx) * n / 2], [0.0, sy, (1 - sy) * n / 2]], dtype=np.float64)
+        original = cv2.warpAffine(
+            original, estirar, (n, n), flags=cv2.INTER_AREA,
+            borderMode=cv2.BORDER_CONSTANT, borderValue=(0, 0, 0, 0),
+        )
     if rotacion != 0.0:
         # Se gira la imagen y también su parte opaca: el tamaño se calcula con la parte opaca ya girada,
         # así el emoji girado sigue tapando todo lo que debe.
@@ -188,7 +200,7 @@ def _pegar_emoji(
     cx, cy = centro
     dx = xs.astype(np.float64) + (x0 - cx)
     dy = ys.astype(np.float64) + (y0 - cy)
-    lado = max(1, round(lado_emoji(opaco, dx, dy) * escala))
+    lado = max(1, round(lado_emoji(opaco, dx, dy) * escala * mayor))
     if pegar_en is not None:
         cx, cy = pegar_en
     ex0, ey0 = math.floor(cx - lado / 2 + 0.5), math.floor(cy - lado / 2 + 0.5)
@@ -334,8 +346,11 @@ def aplicar(
             )
             emoji = cast(TipoEmoji, o.efecto)
             region = (x0, y0, x1, y1)
+            estiramiento = (o.estiramiento_x, o.estiramiento_y)
             finales.append(
-                _pegar_emoji(salida, emoji, region, centro, objetivo, o.escala, pegar_en, o.rotacion)
+                _pegar_emoji(
+                    salida, emoji, region, centro, objetivo, o.escala, pegar_en, o.rotacion, estiramiento
+                )
             )
         else:
             finales.append((x0, y0, x1, y1))

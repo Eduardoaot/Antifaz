@@ -1,5 +1,5 @@
 import { AlertCircle, AlertTriangle, ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Baby, Bath, Car, ChevronDown, CircleHelp, CreditCard, Crosshair, EraserIcon, Eye, EyeOff, Flag, Gem, IdCard, Info, MapPin, Monitor, Move, Phone, Plane, QrCode, RotateCcw, Shirt, SlidersHorizontal, Stethoscope, Users } from 'lucide-react';
-import { useId, useState } from 'react';
+import { Fragment, useId, useState } from 'react';
 import { reglaDe, type Regla } from '../../shared/catalogo';
 import { esquemaEfecto, LIMITES, type Analisis, type Efecto, type Hallazgo } from '../../shared/contrato';
 import {
@@ -17,6 +17,8 @@ import {
   elegirIntensidadVarias,
   enElTope,
   escalaDe,
+  estiramientoDe,
+  limitarEstiramiento,
   limitarRotacion,
   rotacionDe,
   escalaMinimaSticker,
@@ -40,6 +42,7 @@ import {
   type EstadoGrupo,
   type Grupo,
   type NivelMostrado,
+  type Estiramiento,
   type Posicion,
   type Resaltado,
   type Revision,
@@ -254,6 +257,15 @@ export function AjusteSticker({ hallazgo, nombre, revision, abierto, alAbrir, al
     setGirando(null);
     alAjustar(hallazgo, { rotacion: girando });
   };
+  const forma = estiramientoDe(revision, hallazgo.id);
+  const [estirando, setEstirando] = useState<Estiramiento | null>(null);
+  const formaMostrada = estirando ?? forma;
+  const deformado = formaMostrada.x !== LIMITES.estiramientoSticker.porDefecto || formaMostrada.y !== LIMITES.estiramientoSticker.porDefecto;
+  const confirmarForma = (): void => {
+    if (estirando === null) return;
+    setEstirando(null);
+    alAjustar(hallazgo, { estiramiento: estirando });
+  };
   const posicion = posicionDe(revision, hallazgo.id);
   const minimo = escalaMinimaSticker(hallazgo);
   const valor = Math.max(minimo, moviendo ?? guardada);
@@ -309,6 +321,30 @@ export function AjusteSticker({ hallazgo, nombre, revision, abierto, alAbrir, al
             onBlur={confirmarGiro}
           />
           <output htmlFor={`${id}-giro`}>{giroMostrado}°</output>
+          {(['x', 'y'] as const).map((eje) => {
+            const valorEje = formaMostrada[eje];
+            const texto = `${String(Math.round(valorEje * 100))} %`;
+            return (
+              <Fragment key={eje}>
+                <label htmlFor={`${id}-estirar-${eje}`}>{eje === 'x' ? 'Ancho' : 'Alto'}{zona}</label>
+                <input
+                  id={`${id}-estirar-${eje}`}
+                  type="range"
+                  min={LIMITES.estiramientoSticker.min}
+                  max={LIMITES.estiramientoSticker.max}
+                  step={LIMITES.estiramientoSticker.paso}
+                  value={valorEje}
+                  aria-valuetext={texto}
+                  aria-describedby={`${id}-ayuda`}
+                  onChange={(e) => { setEstirando({ ...formaMostrada, [eje]: limitarEstiramiento(Number(e.target.value)) }); }}
+                  onPointerUp={confirmarForma}
+                  onKeyUp={confirmarForma}
+                  onBlur={confirmarForma}
+                />
+                <output htmlFor={`${id}-estirar-${eje}`}>{texto}</output>
+              </Fragment>
+            );
+          })}
           <div className="cruceta" role="group" aria-label="Mover el sticker">
             <button type="button" className="boton chico arriba" aria-label="Mover arriba" title="Mover arriba (↑)" onClick={() => { mover(0, -paso); }}>
               <ArrowUp aria-hidden="true" />
@@ -326,8 +362,9 @@ export function AjusteSticker({ hallazgo, nombre, revision, abierto, alAbrir, al
           <p id={`${id}-ayuda`} className="suave" aria-live="polite">
             {textoTamano(valor)}
             {enPosicion !== null && <> {enPosicion}</>}
+            {deformado && ' Deformado: lo que el emoji no cubra se verá en tu foto.'}
           </p>
-          {ajustado && moviendo === null && (
+          {ajustado && moviendo === null && estirando === null && (
             <button type="button" className="enlace" onClick={() => { alRestablecer(hallazgo.id); }}>
               Restablecer{zona}
             </button>

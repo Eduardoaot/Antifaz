@@ -647,7 +647,14 @@ input[type='range']:disabled { opacity: 0.5; cursor: not-allowed; }
 .sticker .manija.ne { left: 100%; top: 0; transform: translate(-50%, -50%); cursor: nesw-resize; }
 .sticker .manija.so { left: 0; top: 100%; transform: translate(-50%, -50%); cursor: nesw-resize; }
 .sticker .manija.se { left: 100%; top: 100%; transform: translate(-50%, -50%); cursor: nwse-resize; }
-/* Mientras se arrastra: la cara que nunca puede quedar al descubierto. */
+/* Los lados estiran: van como barritas, para no confundirlos con las esquinas, que solo cambian el tamaño. */
+.sticker .manija.lado { border-radius: 4px; }
+.sticker .manija.n, .sticker .manija.s { width: 20px; height: 10px; left: 50%; transform: translate(-50%, -50%); cursor: ns-resize; }
+.sticker .manija.n { top: 0; }
+.sticker .manija.s { top: 100%; }
+.sticker .manija.e, .sticker .manija.o { width: 10px; height: 20px; top: 50%; transform: translate(-50%, -50%); cursor: ew-resize; }
+.sticker .manija.e { left: 100%; }
+.sticker .manija.o { left: 0; }
 
 /* Tus zonas */
 .manual { display: grid; gap: 0.625rem; padding-top: 0.875rem; border-top: 1px solid var(--borde-suave); }

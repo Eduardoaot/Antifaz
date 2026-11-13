@@ -10,6 +10,8 @@ import {
   ajustarSticker,
   ajustaSticker,
   enElTope,
+  estiramientoDe,
+  limitarEstiramiento,
   geometriaSticker,
   limitarPosicion,
   posicionDe,
@@ -337,6 +339,51 @@ describe('tamaño del sticker sobre una cara', () => {
     expect(posicionDe(ajustarSticker(chico, h, { posicion: { x: 0.5, y: 0 } }), 'a')).toEqual({ x: 0.5, y: 0 });
     const movido = ajustarSticker(conEmoji(), h, { posicion: { x: 0.25, y: 0 } });
     expect(posicionDe(ajustarSticker(movido, h, { escala: 0.85 }), 'a')).toEqual({ x: 0.25, y: 0 });
+  });
+
+  it('estirar a lo ancho y a lo alto se guarda, va al sidecar y se recupera', () => {
+    const h = conNucleo();
+    const r = ajustarSticker(conEmoji(), h, { estiramiento: { x: 1.8, y: 0.6 } });
+    expect(estiramientoDe(r, 'a')).toEqual({ x: 1.8, y: 0.6 });
+    expect(stickerAjustado(r, 'a')).toBe(true);
+    expect(hayCambios({ ...REVISION_INICIAL, estiramientos: r.estiramientos })).toBe(true);
+    const [o] = construirOcultamientos(r, [h]);
+    expect(o).toMatchObject({ estiramiento_x: 1.8, estiramiento_y: 0.6 });
+    expect(esquemaOcultamiento.safeParse(o).success).toBe(true);
+    const e = esquemaEdicion.parse(JSON.parse(JSON.stringify(aEdicion('3f2b6c1e-8a4d-4b7e-9c2a-1d5e6f7a8b9c', r))));
+    expect(desdeEdicion(e).estiramientos).toEqual({ a: { x: 1.8, y: 0.6 } });
+    // Las recuperaciones anteriores no lo traen, y uno fuera de rango se rechaza.
+    const { estiramientos: _, ...vieja } = e;
+    expect(esquemaEdicion.parse(vieja).estiramientos).toEqual({});
+    expect(esquemaEdicion.safeParse({ ...e, estiramientos: { a: { x: 3, y: 1 } } }).success).toBe(false);
+  });
+
+  it('sin estirar no se guarda nada, y restablecer quita la deformación', () => {
+    const h = conNucleo();
+    expect(ajustarSticker(conEmoji(), h, { estiramiento: { x: 1, y: 1 } }).estiramientos).toEqual({});
+    const estirado = ajustarSticker(conEmoji(), h, { estiramiento: { x: 2, y: 1 } });
+    expect(restablecerSticker(estirado, 'a').estiramientos).toEqual({});
+    // Otros efectos van siempre sin estirar.
+    const [d] = construirOcultamientos(elegirEfecto(estirado, 'a', 'difuminado'), [h]);
+    expect(d).toMatchObject({ estiramiento_x: 1, estiramiento_y: 1 });
+  });
+
+  it.each([
+    [Number.NaN, 1],
+    [Number.POSITIVE_INFINITY, 1],
+    [0.1, LIMITES.estiramientoSticker.min],
+    [9, LIMITES.estiramientoSticker.max],
+    [1.234, 1.25],
+  ])('limitarEstiramiento(%s) = %s', (entrada, esperado) => {
+    expect(limitarEstiramiento(entrada)).toBe(esperado);
+  });
+
+  it('propiedad: el estiramiento limitado siempre queda en el rango', () => {
+    const { min, max } = LIMITES.estiramientoSticker;
+    fc.assert(fc.property(fc.double(), (v) => {
+      const x = limitarEstiramiento(v);
+      return Number.isFinite(x) && x >= min && x <= max;
+    }));
   });
 
   it('restablecer quita tamaño y posición; sin ajustes no gasta un paso', () => {

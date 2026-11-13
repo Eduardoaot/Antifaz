@@ -15,6 +15,8 @@ export const LIMITES = {
   posicionSticker: { max: 10, paso: 0.05, pasoGrande: 0.25 },
   /** Giro del sticker, en grados. El sidecar gira también su parte opaca: sigue tapando lo mismo. */
   rotacionSticker: { max: 180, paso: 15 },
+  /** Cuánto se estira el sticker a lo ancho o a lo alto, en veces su forma original. Deformado, ya no tapa toda la zona. */
+  estiramientoSticker: { min: 0.4, max: 2.5, porDefecto: 1, paso: 0.05 },
   loteArchivos: 500,
   ocultamientos: 5000,
   jpegCalidad: { min: 60, max: 100, porDefecto: 92 },
@@ -132,6 +134,9 @@ export const esquemaOcultamiento = z.strictObject({
   desplazamiento_y: z.number().min(-LIMITES.posicionSticker.max).max(LIMITES.posicionSticker.max),
   /** Giro del emoji en grados, a favor de las manecillas. Los demás efectos lo ignoran. */
   rotacion: z.number().min(-LIMITES.rotacionSticker.max).max(LIMITES.rotacionSticker.max),
+  /** Estiramiento del emoji a lo ancho y a lo alto, antes de girarlo. Los demás efectos lo ignoran. */
+  estiramiento_x: z.number().min(LIMITES.estiramientoSticker.min).max(LIMITES.estiramientoSticker.max),
+  estiramiento_y: z.number().min(LIMITES.estiramientoSticker.min).max(LIMITES.estiramientoSticker.max),
 }).refine((o) => o.nucleo === null || nucleoDentro(o.nucleo, o), {
   message: 'La cara debe quedar dentro de su zona',
   path: ['nucleo'],
@@ -373,6 +378,7 @@ const esquemaManual = z.strictObject({
 });
 
 const coordenadaSticker = z.number().min(-LIMITES.posicionSticker.max).max(LIMITES.posicionSticker.max);
+const factorEstiramiento = z.number().min(LIMITES.estiramientoSticker.min).max(LIMITES.estiramientoSticker.max);
 
 export const esquemaEdicion = z.strictObject({
   archivoId: esquemaArchivoId,
@@ -389,6 +395,7 @@ export const esquemaEdicion = z.strictObject({
   intensidades: z.record(z.string(), enteroEnRango(LIMITES.intensidad.min, LIMITES.intensidad.max)).default({}),
   // Opcionales por la misma razón: giro del sticker y zonas detectadas que quitaste de la foto.
   rotaciones: z.record(z.string(), z.number().min(-LIMITES.rotacionSticker.max).max(LIMITES.rotacionSticker.max)).default({}),
+  estiramientos: z.record(z.string(), z.strictObject({ x: factorEstiramiento, y: factorEstiramiento })).default({}),
   descartadas: z.array(z.string().min(1).max(64)).max(LIMITES.ocultamientos).default([]),
 });
 export type Edicion = z.infer<typeof esquemaEdicion>;

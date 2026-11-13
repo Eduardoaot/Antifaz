@@ -50,11 +50,19 @@ export interface Revision {
   intensidades: Readonly<Record<string, number>>;
   /** Giro del sticker de cada zona, en grados. Sin entrada, derecho. */
   rotaciones: Readonly<Record<string, number>>;
+  /** Estiramiento del sticker de cada zona, a lo ancho y a lo alto. Sin entrada, sin deformar. */
+  estiramientos: Readonly<Record<string, Estiramiento>>;
   /** Zonas detectadas que quitaste de la foto: quedan visibles y sin marca. Se pueden volver a poner. */
   descartadas: readonly string[];
 }
 
 export interface Posicion {
+  x: number;
+  y: number;
+}
+
+/** En veces la forma original: 1 a lo ancho y 1 a lo alto es sin deformar. */
+export interface Estiramiento {
   x: number;
   y: number;
 }
@@ -69,6 +77,7 @@ export const REVISION_INICIAL: Revision = {
   posiciones: {},
   intensidades: {},
   rotaciones: {},
+  estiramientos: {},
   descartadas: [],
 };
 
@@ -267,7 +276,20 @@ export interface CambioSticker {
   escala?: number;
   posicion?: Posicion;
   rotacion?: number;
+  estiramiento?: Estiramiento;
 }
+
+const SIN_ESTIRAR: Estiramiento = { x: LIMITES.estiramientoSticker.porDefecto, y: LIMITES.estiramientoSticker.porDefecto };
+
+/** Fuera de rango o no numérico, se limita; al paso, para guardarlo tal cual. */
+export function limitarEstiramiento(valor: number): number {
+  const { min, max, porDefecto, paso } = LIMITES.estiramientoSticker;
+  if (!Number.isFinite(valor)) return porDefecto;
+  const alPaso = Math.round(Math.round(valor / paso) * paso * 100) / 100;
+  return Math.min(max, Math.max(min, alPaso));
+}
+
+export const estiramientoDe = (r: Revision, id: string): Estiramiento => r.estiramientos[id] ?? SIN_ESTIRAR;
 
 /** Cualquier ángulo, llevado a −180…180 y al grado. */
 export function limitarRotacion(grados: number): number {
@@ -280,30 +302,46 @@ export const rotacionDe = (r: Revision, id: string): number => r.rotaciones[id] 
 
 
 /**
- * Cambia el tamaño, la posición, el giro o varios, cada uno limitado a su rango.
+ * Cambia el tamaño, la posición, el giro, el estiramiento o varios, cada uno limitado a su rango.
  */
 export function ajustarSticker(r: Revision, h: Hallazgo, cambio: CambioSticker): Revision {
   const escala = cambio.escala === undefined ? escalaDe(r, h.id) : Math.max(escalaMinimaSticker(h), limitarEscala(cambio.escala));
   const posicion = limitarPosicion(h, escala, cambio.posicion ?? posicionDe(r, h.id));
   const previa = posicionDe(r, h.id);
   const rotacion = cambio.rotacion === undefined ? rotacionDe(r, h.id) : limitarRotacion(cambio.rotacion);
-  if (escala === escalaDe(r, h.id) && posicion.x === previa.x && posicion.y === previa.y && rotacion === rotacionDe(r, h.id)) return r;
+  const antes = estiramientoDe(r, h.id);
+  const estiramiento = cambio.estiramiento === undefined
+    ? antes
+    : { x: limitarEstiramiento(cambio.estiramiento.x), y: limitarEstiramiento(cambio.estiramiento.y) };
+  if (
+    escala === escalaDe(r, h.id) && posicion.x === previa.x && posicion.y === previa.y && rotacion === rotacionDe(r, h.id)
+    && estiramiento.x === antes.x && estiramiento.y === antes.y
+  ) return r;
   const sin = <T,>(m: Readonly<Record<string, T>>): Record<string, T> => sinClave(m, h.id);
   const centrado = posicion.x === 0 && posicion.y === 0;
+  const sinEstirar = estiramiento.x === SIN_ESTIRAR.x && estiramiento.y === SIN_ESTIRAR.y;
   return {
     ...r,
     escalas: escala === LIMITES.escalaSticker.porDefecto ? sin(r.escalas) : { ...sin(r.escalas), [h.id]: escala },
     posiciones: centrado ? sin(r.posiciones) : { ...sin(r.posiciones), [h.id]: posicion },
     rotaciones: rotacion === 0 ? sin(r.rotaciones) : { ...sin(r.rotaciones), [h.id]: rotacion },
+    estiramientos: sinEstirar ? sin(r.estiramientos) : { ...sin(r.estiramientos), [h.id]: estiramiento },
   };
 }
 
-export const stickerAjustado = (r: Revision, id: string): boolean => id in r.escalas || id in r.posiciones || id in r.rotaciones;
+export const stickerAjustado = (r: Revision, id: string): boolean =>
+  id in r.escalas || id in r.posiciones || id in r.rotaciones || id in r.estiramientos;
 
-/** Regresa el sticker al tamaño, lugar y giro que la app eligió sola. */
+/** Regresa el sticker al tamaño, lugar, giro y forma que la app eligió sola. */
 export function restablecerSticker(r: Revision, id: string): Revision {
   if (!stickerAjustado(r, id)) return r;
-  return { ...r, escalas: sinClave(r.escalas, id), posiciones: sinClave(r.posiciones, id), rotaciones: sinClave(r.rotaciones, id) };
+  return {
+    ...r,
+    escalas: sinClave(r.escalas, id),
+    posiciones: sinClave(r.posiciones, id),
+    rotaciones: sinClave(r.rotaciones, id),
+    estiramientos: sinClave(r.estiramientos, id),
+  };
 }
 
 /**
@@ -358,6 +396,8 @@ export function construirOcultamientos(r: Revision, hallazgos: readonly Hallazgo
       desplazamiento_x: ajustaSticker(r, h) ? posicionDe(r, h.id).x : 0,
       desplazamiento_y: ajustaSticker(r, h) ? posicionDe(r, h.id).y : 0,
       rotacion: ajustaSticker(r, h) ? rotacionDe(r, h.id) : 0,
+      estiramiento_x: ajustaSticker(r, h) ? estiramientoDe(r, h.id).x : SIN_ESTIRAR.x,
+      estiramiento_y: ajustaSticker(r, h) ? estiramientoDe(r, h.id).y : SIN_ESTIRAR.y,
     });
   }
   for (const z of r.manuales) {
@@ -381,6 +421,8 @@ export function construirOcultamientos(r: Revision, hallazgos: readonly Hallazgo
       desplazamiento_x: ajusta ? posicionDe(r, z.id).x : 0,
       desplazamiento_y: ajusta ? posicionDe(r, z.id).y : 0,
       rotacion: ajusta ? rotacionDe(r, z.id) : 0,
+      estiramiento_x: ajusta ? estiramientoDe(r, z.id).x : SIN_ESTIRAR.x,
+      estiramiento_y: ajusta ? estiramientoDe(r, z.id).y : SIN_ESTIRAR.y,
     });
   }
   return salida;
@@ -640,6 +682,7 @@ export function quitarManual(r: Revision, id: string): Revision {
     posiciones: sinClave(r.posiciones, id),
     intensidades: sinClave(r.intensidades, id),
     rotaciones: sinClave(r.rotaciones, id),
+    estiramientos: sinClave(r.estiramientos, id),
   };
 }
 
@@ -744,6 +787,7 @@ export function aEdicion(archivoId: string, r: Revision): Edicion {
     posiciones: Object.fromEntries(Object.entries(r.posiciones).map(([id, p]) => [id, { ...p }])),
     intensidades: { ...r.intensidades },
     rotaciones: { ...r.rotaciones },
+    estiramientos: Object.fromEntries(Object.entries(r.estiramientos).map(([id, e]) => [id, { ...e }])),
     descartadas: [...r.descartadas],
   };
 }
@@ -759,6 +803,7 @@ export function desdeEdicion(e: Edicion): Revision {
     posiciones: e.posiciones,
     intensidades: e.intensidades,
     rotaciones: e.rotaciones,
+    estiramientos: e.estiramientos,
     descartadas: e.descartadas,
   };
 }
@@ -773,6 +818,7 @@ export function hayCambios(r: Revision): boolean {
     Object.keys(r.posiciones).length > 0 ||
     Object.keys(r.intensidades).length > 0 ||
     Object.keys(r.rotaciones).length > 0 ||
+    Object.keys(r.estiramientos).length > 0 ||
     r.descartadas.length > 0 ||
     r.intensidad !== LIMITES.intensidad.porDefecto
   );

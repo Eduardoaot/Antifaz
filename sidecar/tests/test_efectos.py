@@ -643,6 +643,59 @@ def test_propiedad_bajo_el_emoji_nunca_se_ve_la_foto(dx: float, dy: float, escal
     _bajo_el_emoji_no_depende_de_la_foto(_zona(efecto, escala=escala, desplazamiento_x=dx, desplazamiento_y=dy), radio=1)
 
 
+def _caja_tocada(salida: np.ndarray, original: np.ndarray) -> tuple[int, int]:
+    """Ancho y alto de lo que cambió respecto a la foto."""
+    ys, xs = np.nonzero((salida != original).any(axis=2))
+    return int(xs.max() - xs.min() + 1), int(ys.max() - ys.min() + 1)
+
+
+def test_estirar_a_lo_ancho_lo_hace_mas_ancho_que_alto() -> None:
+    a = _imagen()
+    ancho, alto = _caja_tocada(efectos.aplicar(a, [_zona(escala=0.5, estiramiento_x=2.0)])[0], a)
+    assert ancho > 1.6 * alto
+    ancho, alto = _caja_tocada(efectos.aplicar(a, [_zona(escala=0.5, estiramiento_y=2.0)])[0], a)
+    assert alto > 1.6 * ancho
+
+
+@pytest.mark.parametrize("efecto", EMOJIS)
+@pytest.mark.parametrize(("ex", "ey", "rotacion"), [(2.5, 1.0, 0.0), (0.4, 1.0, 0.0), (1.0, 2.0, 30.0), (0.5, 2.5, -90.0)])
+def test_deformado_tapa_donde_quedo(efecto: str, ex: float, ey: float, rotacion: float) -> None:
+    _bajo_el_emoji_no_depende_de_la_foto(_cara(efecto, estiramiento_x=ex, estiramiento_y=ey, rotacion=rotacion))
+
+
+def test_deformado_ya_no_tapa_toda_la_zona_sola() -> None:
+    """Como movido o más chico: lo decide la persona, sin relleno de la zona debajo."""
+    o = _cara(estiramiento_x=0.4)
+    assert not efectos.tapa_la_zona(o)
+    assert efectos.tapa_la_zona(_cara())
+
+
+def test_sin_estiramiento_es_igual_que_antes() -> None:
+    """Quien no manda el estiramiento (el video) obtiene exactamente lo mismo que con 1 y 1."""
+    a = _imagen()
+    for efecto in EMOJIS:
+        sin_campo, _ = efectos.aplicar(a, [_cara(efecto)])
+        con_uno, _ = efectos.aplicar(a, [_cara(efecto, estiramiento_x=1.0, estiramiento_y=1.0)])
+        assert np.array_equal(sin_campo, con_uno), efecto
+
+
+@pytest.mark.parametrize("efecto", ["solido", "difuminado", "pixelado"])
+def test_sin_emoji_el_estiramiento_no_cuenta(efecto: str) -> None:
+    a = _imagen()
+    normal, _ = efectos.aplicar(a, [_cara(efecto, nucleo=None)])
+    estirado, _ = efectos.aplicar(a, [_cara(efecto, nucleo=None, estiramiento_x=2.0, estiramiento_y=0.5)])
+    assert np.array_equal(normal, estirado)
+
+
+@pytest.mark.parametrize("valor", [0.39, 2.51, float("nan"), float("inf")])
+@pytest.mark.parametrize("campo", ["estiramiento_x", "estiramiento_y"])
+def test_estiramiento_fuera_de_rango_se_rechaza(campo: str, valor: float) -> None:
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError):
+        _cara(**{campo: valor})
+
+
 @pytest.mark.parametrize("valor", [10.01, -10.01, float("nan"), float("inf")])
 @pytest.mark.parametrize("campo", ["desplazamiento_x", "desplazamiento_y"])
 def test_desplazamiento_fuera_de_rango_se_rechaza(campo: str, valor: float) -> None:

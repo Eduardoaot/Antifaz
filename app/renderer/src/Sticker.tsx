@@ -8,14 +8,17 @@ import { LIMITES, type Emoji, type Hallazgo } from '../../shared/contrato';
 import {
   escalaDe,
   escalaMinimaSticker,
+  estiramientoDe,
   geometriaSticker,
   limitarEscala,
+  limitarEstiramiento,
   limitarPosicion,
   limitarRotacion,
   posicionDe,
   rotacionDe,
   semiejesZona,
   type CambioSticker,
+  type Estiramiento,
   type Posicion,
   type Revision,
 } from '../../shared/logica';
@@ -34,19 +37,33 @@ const IMAGEN: Readonly<Record<Emoji, string>> = {
 
 type Esquina = 'no' | 'ne' | 'so' | 'se';
 const ESQUINAS: readonly Esquina[] = ['no', 'ne', 'so', 'se'];
+// Las esquinas cambian el tamaño sin deformar; los lados estiran solo a lo ancho o a lo alto.
+const LADOS: readonly { lado: 'n' | 's' | 'e' | 'o'; tipo: 'ancho' | 'alto'; titulo: string }[] = [
+  { lado: 'n', tipo: 'alto', titulo: 'Arrastra para estirar a lo alto' },
+  { lado: 's', tipo: 'alto', titulo: 'Arrastra para estirar a lo alto' },
+  { lado: 'e', tipo: 'ancho', titulo: 'Arrastra para estirar a lo ancho' },
+  { lado: 'o', tipo: 'ancho', titulo: 'Arrastra para estirar a lo ancho' },
+];
+
+type Ajuste = { escala: number; posicion: Posicion; rotacion: number; estiramiento: Estiramiento };
 
 interface Arrastre {
-  tipo: 'mover' | 'escala' | 'girar';
-  rotacion: number;
+  tipo: 'mover' | 'escala' | 'girar' | 'ancho' | 'alto';
+  /** Cómo estaba el sticker al empezar. */
+  base: Ajuste;
   /** Ángulo inicial del puntero alrededor del centro, en grados. Solo al girar. */
   angulo: number;
   x: number;
   y: number;
-  escala: number;
-  posicion: Posicion;
-  /** Distancia inicial del puntero al centro del sticker, en pantalla. Solo al cambiar el tamaño. */
+  /** Distancia inicial del puntero al centro, en pantalla: total al cambiar el tamaño, sobre su eje al estirar. */
   distancia: number;
   movido: boolean;
+}
+
+/** Un vector de pantalla en los ejes del sticker girado. */
+function enEjes(vx: number, vy: number, grados: number): { x: number; y: number } {
+  const t = (grados * Math.PI) / 180;
+  return { x: vx * Math.cos(t) + vy * Math.sin(t), y: -vx * Math.sin(t) + vy * Math.cos(t) };
 }
 
 interface Props {
@@ -64,8 +81,6 @@ interface Props {
   /** Falso mientras la vista previa no corresponde a lo que se pidió. */
   vistaAlDia: boolean;
 }
-
-type Ajuste = { escala: number; posicion: Posicion; rotacion: number };
 
 const pct = (v: number, total: number): string => `${(v / total) * 100}%`;
 
@@ -86,7 +101,10 @@ export function MarcoSticker({ hallazgo, emoji, revision, ancho, alto, lienzo, s
   const escala = copia?.escala ?? escalaDe(revision, hallazgo.id);
   const posicion = copia?.posicion ?? posicionDe(revision, hallazgo.id);
   const rotacion = copia?.rotacion ?? rotacionDe(revision, hallazgo.id);
+  const estiramiento = copia?.estiramiento ?? estiramientoDe(revision, hallazgo.id);
   const { cx, cy, lado } = geometriaSticker(caja, emoji, escala, posicion);
+  const anchoMarco = lado * estiramiento.x;
+  const altoMarco = lado * estiramiento.y;
 
   const empezar = (e: PointerEvent<HTMLElement>, tipo: Arrastre['tipo']): void => {
     if (e.button !== 0) return;
@@ -99,15 +117,17 @@ export function MarcoSticker({ hallazgo, emoji, revision, ancho, alto, lienzo, s
       x: rect.left + (cx / ancho) * rect.width,
       y: rect.top + (cy / alto) * rect.height,
     };
+    const vx = e.clientX - centroPantalla.x;
+    const vy = e.clientY - centroPantalla.y;
+    const local = enEjes(vx, vy, rotacion);
+    const distancia = tipo === 'ancho' ? Math.abs(local.x) : tipo === 'alto' ? Math.abs(local.y) : Math.hypot(vx, vy);
     arrastre.current = {
       tipo,
-      rotacion,
-      angulo: (Math.atan2(e.clientY - centroPantalla.y, e.clientX - centroPantalla.x) * 180) / Math.PI,
+      base: { escala, posicion, rotacion, estiramiento },
+      angulo: (Math.atan2(vy, vx) * 180) / Math.PI,
       x: e.clientX,
       y: e.clientY,
-      escala,
-      posicion,
-      distancia: Math.max(1, Math.hypot(e.clientX - centroPantalla.x, e.clientY - centroPantalla.y)),
+      distancia: Math.max(1, distancia),
       movido: false,
     };
     e.currentTarget.setPointerCapture(e.pointerId);
@@ -124,23 +144,47 @@ export function MarcoSticker({ hallazgo, emoji, revision, ancho, alto, lienzo, s
     if (!a.movido) alArrastrar(hallazgo.id);
     a.movido = true;
     const centro = { x: rect.left + (cx / ancho) * rect.width, y: rect.top + (cy / alto) * rect.height };
-    if (a.tipo === 'mover') {
-      const semi = semiejesZona(caja);
-      const pedida = {
-        x: a.posicion.x + (dx * (ancho / rect.width)) / semi.x,
-        y: a.posicion.y + (dy * (alto / rect.height)) / semi.y,
-      };
-      setProvisional({ escala: a.escala, posicion: limitarPosicion(hallazgo, a.escala, pedida), rotacion: a.rotacion });
-    } else if (a.tipo === 'girar') {
-      const angulo = (Math.atan2(e.clientY - centro.y, e.clientX - centro.x) * 180) / Math.PI;
-      // Con Mayús, de 15 en 15 grados.
-      const libre = a.rotacion + angulo - a.angulo;
-      const paso = LIMITES.rotacionSticker.paso;
-      setProvisional({ escala: a.escala, posicion: a.posicion, rotacion: limitarRotacion(e.shiftKey ? Math.round(libre / paso) * paso : libre) });
-    } else {
-      const factor = Math.hypot(e.clientX - centro.x, e.clientY - centro.y) / a.distancia;
-      const nueva = Math.max(escalaMinimaSticker(hallazgo), limitarEscala(a.escala * factor));
-      setProvisional({ escala: nueva, posicion: limitarPosicion(hallazgo, nueva, a.posicion), rotacion: a.rotacion });
+    const { base } = a;
+    switch (a.tipo) {
+      case 'mover': {
+        const semi = semiejesZona(caja);
+        const pedida = {
+          x: base.posicion.x + (dx * (ancho / rect.width)) / semi.x,
+          y: base.posicion.y + (dy * (alto / rect.height)) / semi.y,
+        };
+        setProvisional({ ...base, posicion: limitarPosicion(hallazgo, base.escala, pedida) });
+        break;
+      }
+      case 'girar': {
+        const angulo = (Math.atan2(e.clientY - centro.y, e.clientX - centro.x) * 180) / Math.PI;
+        // Con Mayús, de 15 en 15 grados.
+        const libre = base.rotacion + angulo - a.angulo;
+        const paso = LIMITES.rotacionSticker.paso;
+        setProvisional({ ...base, rotacion: limitarRotacion(e.shiftKey ? Math.round(libre / paso) * paso : libre) });
+        break;
+      }
+      case 'escala': {
+        const factor = Math.hypot(e.clientX - centro.x, e.clientY - centro.y) / a.distancia;
+        const nueva = Math.max(escalaMinimaSticker(hallazgo), limitarEscala(base.escala * factor));
+        setProvisional({ ...base, escala: nueva, posicion: limitarPosicion(hallazgo, nueva, base.posicion) });
+        break;
+      }
+      case 'ancho':
+      case 'alto': {
+        // Se mide sobre el eje del sticker girado: así un lado estira hacia donde apunta.
+        const local = enEjes(e.clientX - centro.x, e.clientY - centro.y, base.rotacion);
+        const sobreEje = a.tipo === 'ancho' ? Math.abs(local.x) : Math.abs(local.y);
+        const factor = sobreEje / a.distancia;
+        const estirado = a.tipo === 'ancho'
+          ? { ...base.estiramiento, x: limitarEstiramiento(base.estiramiento.x * factor) }
+          : { ...base.estiramiento, y: limitarEstiramiento(base.estiramiento.y * factor) };
+        setProvisional({ ...base, estiramiento: estirado });
+        break;
+      }
+      default: {
+        const inalcanzable: never = a.tipo;
+        throw new Error(`Arrastre desconocido: ${String(inalcanzable)}`);
+      }
     }
   };
 
@@ -171,10 +215,10 @@ export function MarcoSticker({ hallazgo, emoji, revision, ancho, alto, lienzo, s
       data-sticker={hallazgo.id}
       className={`sticker${seleccionado ? ' seleccionado' : ''}${provisional !== null ? ' moviendo' : ''}`}
       style={{
-        left: pct(cx - lado / 2, ancho),
-        top: pct(cy - lado / 2, alto),
-        width: pct(lado, ancho),
-        height: pct(lado, alto),
+        left: pct(cx - anchoMarco / 2, ancho),
+        top: pct(cy - altoMarco / 2, alto),
+        width: pct(anchoMarco, ancho),
+        height: pct(altoMarco, alto),
         transform: rotacion === 0 ? undefined : `rotate(${rotacion}deg)`,
       }}
       onPointerDown={(e) => { empezar(e, 'mover'); }}
@@ -196,6 +240,16 @@ export function MarcoSticker({ hallazgo, emoji, revision, ancho, alto, lienzo, s
           className={`manija ${esquina}`}
           data-manija={esquina}
           onPointerDown={(e) => { empezar(e, 'escala'); }}
+          {...eventos}
+        />
+      ))}
+      {seleccionado && LADOS.map(({ lado: l, tipo, titulo }) => (
+        <span
+          key={l}
+          className={`manija lado ${l}`}
+          data-manija={l}
+          title={titulo}
+          onPointerDown={(e) => { empezar(e, tipo); }}
           {...eventos}
         />
       ))}
