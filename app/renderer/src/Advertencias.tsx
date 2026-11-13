@@ -31,7 +31,6 @@ import {
   soloAvisaSinZona,
   stickerAjustado,
   textoMotivo,
-  tieneNucleo,
   tituloGrupo,
   tituloVeredicto,
   usaIntensidad,
@@ -216,15 +215,16 @@ export function ControlIntensidad({ valor, etiqueta, alCambiar, conAviso = false
 
 // --- Sticker ------------------------------------------------------------------------------------
 
-function textoTamano(valor: number, _minimo: number, _cara: boolean): string {
-  const debajo = 'Debajo del emoji la zona queda tapada con un color sólido: aunque lo achiques o lo muevas, no se ve.';
-  if (valor === LIMITES.escalaSticker.porDefecto) return `Es el tamaño que elegimos. ${debajo}`;
-  return debajo;
+function textoTamano(valor: number): string {
+  if (valor === LIMITES.escalaSticker.porDefecto) return 'Es el tamaño que elegimos: tapa toda la zona.';
+  return valor > LIMITES.escalaSticker.porDefecto
+    ? 'Más grande que la zona.'
+    : 'Más chico que la zona: lo que el emoji no cubra se verá en tu foto.';
 }
 
 function textoPosicion(h: Hallazgo, escala: number, p: Posicion): string | null {
   if (p.x === 0 && p.y === 0) return null;
-  return enElTope(h, escala, p) ? 'Hasta aquí se puede mover.' : 'Lo moviste del centro. Lo que estaba debajo sigue tapado.';
+  return enElTope(h, escala, p) ? 'Hasta aquí se puede mover.' : 'Lo moviste del centro: lo que el emoji no cubra se verá en tu foto.';
 }
 
 interface PropsAjuste {
@@ -324,7 +324,7 @@ export function AjusteSticker({ hallazgo, nombre, revision, abierto, alAbrir, al
             </button>
           </div>
           <p id={`${id}-ayuda`} className="suave" aria-live="polite">
-            {textoTamano(valor, minimo, tieneNucleo(hallazgo))}
+            {textoTamano(valor)}
             {enPosicion !== null && <> {enPosicion}</>}
           </p>
           {ajustado && moviendo === null && (

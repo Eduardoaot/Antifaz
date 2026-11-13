@@ -137,7 +137,7 @@ async function caraConSticker(tema: 'claro' | 'oscuro'): Promise<Locator> {
 }
 
 for (const tema of ['claro', 'oscuro'] as const) {
-  test(`sticker en una cara: el panel cambia tamaño y posición sin destaparla, tema ${tema}`, async () => {
+  test(`sticker en una cara: el panel cambia tamaño y posición, tema ${tema}`, async () => {
     const cara = await caraConSticker(tema);
     const { pagina, app } = sesion;
 
@@ -150,20 +150,18 @@ for (const tema of ['claro', 'oscuro'] as const) {
     const tamano = cara.getByRole('slider', { name: /^Tamaño/ });
     await expect(tamano).toHaveValue('1');
 
-    // Inicio lleva al mínimo; ahí no se puede mover.
+    // Más chico que la zona: avisa que lo que no cubra se verá.
     await tamano.focus();
     await pagina.keyboard.press('Home');
-    await expect(cara).toContainText('Es lo más chico: tapa justo la cara.');
-    await expect(cara).toContainText('Para moverlo, primero hazlo más grande.');
+    await expect(cara).toContainText('lo que el emoji no cubra se verá en tu foto');
 
-    // Más grande, y la cruceta lo mueve hasta el tope (el imán).
+    // Más grande, y la cruceta lo mueve.
     await pagina.keyboard.press('End');
-    await expect(cara.locator('.tamano-sticker output')).toHaveText('200 %');
+    await expect(cara.locator('.tamano-sticker output').first()).toHaveText('200 %');
     const derecha = cara.getByRole('button', { name: 'Mover a la derecha' });
     await derecha.click();
-    await expect(cara).toContainText('Lo moviste del centro.');
-    for (let i = 0; i < 40; i += 1) await derecha.click();
-    await expect(cara).toContainText('Hasta aquí: más lejos dejaría ver la cara.');
+    await derecha.click();
+    await expect(cara).toContainText('Lo moviste del centro');
     await expect(ajustar).toContainText('ajustado');
     await pagina.waitForTimeout(800);
     await sinViolaciones(pagina);
@@ -172,19 +170,16 @@ for (const tema of ['claro', 'oscuro'] as const) {
     // Deshacer regresa un paso de la cruceta.
     await pagina.locator('body').click({ position: { x: 5, y: 5 } });
     await pagina.keyboard.press('Control+z');
-    await expect(cara).toContainText('Lo moviste del centro.');
+    await expect(cara).toContainText('Lo moviste del centro');
 
-    // En el tope, más chico lo acerca al centro: exportado, la cara no se detecta.
-    await tamano.focus();
-    await pagina.keyboard.press('Home');
+    // Restablecido, tapa toda la zona: exportada, la cara no se detecta.
+    await cara.getByRole('button', { name: /^Restablecer/ }).click();
+    await expect(ajustar).not.toContainText('ajustado');
     const salida = join(mkdtempSync(join(tmpdir(), 'revisor-salida-')), 'sticker.jpg');
     await simularGuardar(app, salida);
     await pagina.getByRole('button', { name: 'Exportar copia' }).click();
     await expect(pagina.getByTestId('anuncio')).toContainText('con 1 zona oculta');
-    expect(cuentaCaras(salida), 'con el sticker ajustado, la cara exportada aún se detecta').toBe('0');
-
-    await cara.getByRole('button', { name: /^Restablecer/ }).click();
-    await expect(ajustar).not.toContainText('ajustado');
+    expect(cuentaCaras(salida), 'con el sticker en su lugar, la cara exportada aún se detecta').toBe('0');
   });
 }
 
@@ -203,13 +198,16 @@ test('sticker en una cara: se arrastra y se agranda en la foto, y el teclado lo 
   await pagina.mouse.move(cx, cy);
   await pagina.mouse.down();
   await pagina.mouse.move(cx + 6, cy, { steps: 3 });
-  await expect(pagina.locator('.ovalo-cara'), 'mientras arrastras se ve la cara que no puede destaparse').toBeVisible();
-  await pagina.mouse.move(cx + 400, cy - 400, { steps: 8 });
+  await pagina.mouse.move(cx + 120, cy, { steps: 8 });
+  // A medio arrastre la vista previa va sin el sticker: solo se ve la copia que se mueve.
+  await pagina.waitForTimeout(800);
+  await pagina.screenshot({ path: join(CAPTURAS, 'sticker-a-medio-arrastre.png') });
   await pagina.mouse.up();
   await expect(cara.getByRole('button', { name: /^Ajustar sticker/ })).toHaveAttribute('aria-expanded', 'true');
   await expect(marco).toHaveClass(/seleccionado/);
-  // A tamaño normal casi no se aleja: el imán lo deja en el tope.
-  await expect(cara).toContainText('Hasta aquí: más lejos dejaría ver la cara.');
+  await expect(cara).toContainText('Lo moviste del centro');
+  // Movido lejos, la zona queda como en la foto: sin mancha del relleno.
+  await expect.poll(async () => (await marco.boundingBox())?.x ?? 0).toBeGreaterThan(caja0.x + 60);
 
   // La esquina lo agranda.
   const caja1 = await marco.boundingBox();
@@ -221,7 +219,7 @@ test('sticker en una cara: se arrastra y se agranda en la foto, y el teclado lo 
   await pagina.mouse.up();
   const caja2 = await marco.boundingBox();
   expect(caja2?.width ?? 0).toBeGreaterThan(caja1.width);
-  await expect(cara.locator('.tamano-sticker output')).not.toHaveText('100 %');
+  await expect(cara.locator('.tamano-sticker output').first()).not.toHaveText('100 %');
 
   // Con teclado en la imagen: flechas, [ y ], y Esc lo suelta.
   await pagina.getByRole('group', { name: 'Imagen', exact: true }).focus();
@@ -239,10 +237,11 @@ test('sticker en una cara: se arrastra y se agranda en la foto, y el teclado lo 
   await simularGuardar(app, salida);
   await pagina.getByRole('button', { name: 'Exportar copia' }).click();
   await expect(pagina.getByTestId('anuncio')).toContainText('con 1 zona oculta');
-  expect(cuentaCaras(salida), 'con el sticker movido, la cara exportada aún se detecta').toBe('0');
+  // La persona lo movió fuera de la cara: la exportación lo respeta y la cara queda a la vista.
+  expect(cuentaCaras(salida), 'movido lejos, la cara debería verse').not.toBe('0');
 });
 
-test('sticker en tu zona: se agranda, se mueve en la foto y con el panel, y no destapa nada', async () => {
+test('sticker en tu zona: se agranda y se mueve en la foto y con el panel', async () => {
   sesion = await lanzar();
   const { pagina, app } = sesion;
   await abrir(sesion, [m('cara con ñ.jpg')]);
@@ -260,21 +259,17 @@ test('sticker en tu zona: se agranda, se mueve en la foto y con el panel, y no d
   const marco = pagina.locator('[data-sticker]');
   await expect(marco).toHaveCount(1);
 
-  // A tamaño normal no se aleja: la zona completa debe quedar tapada.
   const ajustar = zona.getByRole('button', { name: /^Ajustar sticker/ });
   await ajustar.click();
   await expect(zona).toContainText('Es el tamaño que elegimos: tapa toda la zona.');
-  await zona.getByRole('button', { name: 'Mover a la derecha' }).click();
-  await expect(zona).toContainText('Para moverlo, primero hazlo más grande.');
 
-  // Más grande, se mueve con la cruceta hasta el tope.
+  // Más grande, se mueve con la cruceta.
   const tamano = zona.getByRole('slider', { name: /^Tamaño/ });
   await tamano.focus();
   await pagina.keyboard.press('End');
-  await expect(zona.locator('.tamano-sticker output')).toHaveText('200 %');
-  const derecha = zona.getByRole('button', { name: 'Mover a la derecha' });
-  for (let i = 0; i < 40; i += 1) await derecha.click();
-  await expect(zona).toContainText('Hasta aquí: más lejos dejaría ver la zona.');
+  await expect(zona.locator('.tamano-sticker output').first()).toHaveText('200 %');
+  await zona.getByRole('button', { name: 'Mover a la derecha' }).click();
+  await expect(zona).toContainText('Lo moviste del centro');
 
   // Y en la foto: arrastrarlo lo mueve.
   await pagina.waitForTimeout(800);
@@ -283,21 +278,19 @@ test('sticker en tu zona: se agranda, se mueve en la foto y con el panel, y no d
   await pagina.mouse.move(antes.x + antes.width / 2, antes.y + antes.height / 2);
   await pagina.mouse.down();
   await pagina.mouse.move(antes.x + antes.width / 2 - 6, antes.y + antes.height / 2, { steps: 3 });
-  await expect(pagina.locator('.ovalo-cara.zona-fija'), 'mientras arrastras se ve la zona que no puede destaparse').toBeVisible();
   await pagina.mouse.move(antes.x + antes.width / 2 - 120, antes.y + antes.height / 2 + 40, { steps: 8 });
   await pagina.mouse.up();
   await expect.poll(async () => (await marco.boundingBox())?.x ?? 0).toBeLessThan(antes.x);
   await pagina.waitForTimeout(800);
   await pagina.screenshot({ path: join(CAPTURAS, 'sticker-zona-propia.png') });
 
-  // Exportada, la cara que quedó bajo tu zona no se detecta.
+  // Exportada con el sticker donde quedó. La cara detectada y la pregunta de menores siguen sin
+  // decidir: aquí solo cuenta tu zona.
   const salida = join(mkdtempSync(join(tmpdir(), 'revisor-salida-')), 'zona-propia.jpg');
   await simularGuardar(app, salida);
   await pagina.getByRole('button', { name: 'Exportar copia' }).click();
-  // La cara detectada y la pregunta de menores siguen sin decidir: aquí solo cuenta tu zona.
   await pagina.getByRole('button', { name: 'Exportar de todos modos' }).click();
   await expect(pagina.getByTestId('anuncio')).toContainText('con 1 zona oculta');
-  expect(cuentaCaras(salida), 'con el sticker de tu zona movido, la cara exportada aún se detecta').toBe('0');
 });
 
 test('foto sin nada: lo dice sin prometer de más', async () => {

@@ -1,5 +1,10 @@
 import { useRef, useState, type PointerEvent, type RefObject } from 'react';
-import { ETIQUETA_EMOJI, LIMITES, type Emoji, type Hallazgo } from '../../shared/contrato';
+import gato from '../../../sidecar/recursos/emojis/emoji_u1f431.png';
+import sonrisa from '../../../sidecar/recursos/emojis/emoji_u1f600.png';
+import lentes from '../../../sidecar/recursos/emojis/emoji_u1f60e.png';
+import mono from '../../../sidecar/recursos/emojis/emoji_u1f648.png';
+import estrella from '../../../sidecar/recursos/emojis/emoji_u2b50.png';
+import { LIMITES, type Emoji, type Hallazgo } from '../../shared/contrato';
 import {
   escalaDe,
   escalaMinimaSticker,
@@ -17,6 +22,15 @@ import {
 
 /** Más de esto, en píxeles de pantalla, ya es arrastrar y no un clic. */
 const UMBRAL = 3;
+
+// Los mismos PNG que pega el sidecar: la copia que se arrastra se ve igual que el resultado.
+const IMAGEN: Readonly<Record<Emoji, string>> = {
+  emoji_sonrisa: sonrisa,
+  emoji_lentes: lentes,
+  emoji_gato: gato,
+  emoji_estrella: estrella,
+  emoji_mono: mono,
+};
 
 type Esquina = 'no' | 'ne' | 'so' | 'se';
 const ESQUINAS: readonly Esquina[] = ['no', 'ne', 'so', 'se'];
@@ -45,29 +59,34 @@ interface Props {
   seleccionado: boolean;
   alSeleccionar: (id: string) => void;
   alAjustar: (h: Hallazgo, cambio: CambioSticker) => void;
+  /** Con el id mientras se arrastra: la vista previa se pide sin este sticker. */
+  alArrastrar: (id: string | null) => void;
+  /** Falso mientras la vista previa no corresponde a lo que se pidió. */
+  vistaAlDia: boolean;
 }
+
+type Ajuste = { escala: number; posicion: Posicion; rotacion: number };
 
 const pct = (v: number, total: number): string => `${(v / total) * 100}%`;
 
 /**
- * Marco para mover el sticker de cualquier zona y cambiar su tamaño desde la foto. Mientras se arrastra solo
- * se mueve el marco con una copia del emoji; al soltar, el sidecar dibuja la vista previa real. Así cada
- * arrastre es un paso de deshacer y una sola vista previa.
+ * Marco para mover el sticker de cualquier zona y cambiar su tamaño desde la foto. Mientras se arrastra, la
+ * vista previa va sin el sticker y se mueve una copia del emoji; al soltar, la copia se queda hasta que el
+ * sidecar dibuja la vista previa real. Así cada arrastre es un paso de deshacer.
  */
-export function MarcoSticker({ hallazgo, emoji, revision, ancho, alto, lienzo, seleccionado, alSeleccionar, alAjustar }: Props): React.JSX.Element | null {
-  const [provisional, setProvisional] = useState<{ escala: number; posicion: Posicion; rotacion: number } | null>(null);
+export function MarcoSticker({ hallazgo, emoji, revision, ancho, alto, lienzo, seleccionado, alSeleccionar, alAjustar, alArrastrar, vistaAlDia }: Props): React.JSX.Element | null {
+  const [provisional, setProvisional] = useState<Ajuste | null>(null);
+  const [soltado, setSoltado] = useState<Ajuste | null>(null);
   const arrastre = useRef<Arrastre | null>(null);
+  if (vistaAlDia && soltado !== null) setSoltado(null);
   const caja = hallazgo.caja;
   if (caja === null) return null;
-  // Lo que nunca puede quedar al descubierto: la cara del detector, o la zona completa si no es cara.
-  const cara = hallazgo.nucleo ?? null;
-  const fija = cara ?? caja;
 
-  const escala = provisional?.escala ?? escalaDe(revision, hallazgo.id);
-  const posicion = provisional?.posicion ?? posicionDe(revision, hallazgo.id);
-  const rotacion = provisional?.rotacion ?? rotacionDe(revision, hallazgo.id);
+  const copia = provisional ?? soltado;
+  const escala = copia?.escala ?? escalaDe(revision, hallazgo.id);
+  const posicion = copia?.posicion ?? posicionDe(revision, hallazgo.id);
+  const rotacion = copia?.rotacion ?? rotacionDe(revision, hallazgo.id);
   const { cx, cy, lado } = geometriaSticker(caja, emoji, escala, posicion);
-  const margenCara = LIMITES.dilatacionPx.porDefecto;
 
   const empezar = (e: PointerEvent<HTMLElement>, tipo: Arrastre['tipo']): void => {
     if (e.button !== 0) return;
@@ -102,6 +121,7 @@ export function MarcoSticker({ hallazgo, emoji, revision, ancho, alto, lienzo, s
     const dx = e.clientX - a.x;
     const dy = e.clientY - a.y;
     if (!a.movido && Math.abs(dx) + Math.abs(dy) <= UMBRAL) return;
+    if (!a.movido) alArrastrar(hallazgo.id);
     a.movido = true;
     const centro = { x: rect.left + (cx / ancho) * rect.width, y: rect.top + (cy / alto) * rect.height };
     if (a.tipo === 'mover') {
@@ -129,11 +149,16 @@ export function MarcoSticker({ hallazgo, emoji, revision, ancho, alto, lienzo, s
     if (a === null) return;
     e.stopPropagation();
     arrastre.current = null;
-    if (a.movido && provisional !== null) alAjustar(hallazgo, provisional);
+    if (a.movido) {
+      if (provisional !== null) alAjustar(hallazgo, provisional);
+      setSoltado(provisional);
+      alArrastrar(null);
+    }
     setProvisional(null);
   };
 
   const cancelar = (): void => {
+    if (arrastre.current?.movido === true) alArrastrar(null);
     arrastre.current = null;
     setProvisional(null);
   };
@@ -141,58 +166,39 @@ export function MarcoSticker({ hallazgo, emoji, revision, ancho, alto, lienzo, s
   const eventos = { onPointerMove: mover, onPointerUp: soltar, onPointerCancel: cancelar };
 
   return (
-    <>
-      {provisional !== null && (
-        // Lo que no puede quedar al descubierto, con su margen mínimo: óvalo en una cara, caja en lo demás.
-        <div
-          aria-hidden="true"
-          className={cara === null ? 'ovalo-cara zona-fija' : 'ovalo-cara'}
-          style={{
-            left: pct(fija.x - margenCara, ancho),
-            top: pct(fija.y - margenCara, alto),
-            width: pct(fija.ancho + 2 * margenCara, ancho),
-            height: pct(fija.alto + 2 * margenCara, alto),
-          }}
+    <div
+      aria-hidden="true"
+      data-sticker={hallazgo.id}
+      className={`sticker${seleccionado ? ' seleccionado' : ''}${provisional !== null ? ' moviendo' : ''}`}
+      style={{
+        left: pct(cx - lado / 2, ancho),
+        top: pct(cy - lado / 2, alto),
+        width: pct(lado, ancho),
+        height: pct(lado, alto),
+        transform: rotacion === 0 ? undefined : `rotate(${rotacion}deg)`,
+      }}
+      onPointerDown={(e) => { empezar(e, 'mover'); }}
+      {...eventos}
+    >
+      {copia !== null && <img className="fantasma" src={IMAGEN[emoji]} alt="" draggable={false} />}
+      {seleccionado && (
+        <span
+          className="manija girar"
+          data-manija="girar"
+          title="Arrastra para girar (Mayús: de 15 en 15)"
+          onPointerDown={(e) => { empezar(e, 'girar'); }}
+          {...eventos}
         />
       )}
-      <div
-        aria-hidden="true"
-        data-sticker={hallazgo.id}
-        className={`sticker${seleccionado ? ' seleccionado' : ''}${provisional !== null ? ' moviendo' : ''}`}
-        style={{
-          left: pct(cx - lado / 2, ancho),
-          top: pct(cy - lado / 2, alto),
-          width: pct(lado, ancho),
-          height: pct(lado, alto),
-          transform: rotacion === 0 ? undefined : `rotate(${rotacion}deg)`,
-        }}
-        onPointerDown={(e) => { empezar(e, 'mover'); }}
-        {...eventos}
-      >
-        {provisional !== null && (
-          <svg className="fantasma" viewBox="0 0 100 100" aria-hidden="true">
-            <text x="50" y="50" textAnchor="middle" dominantBaseline="central" fontSize="82">{ETIQUETA_EMOJI[emoji].split(' ')[0]}</text>
-          </svg>
-        )}
-        {seleccionado && (
-          <span
-            className="manija girar"
-            data-manija="girar"
-            title="Arrastra para girar (Mayús: de 15 en 15)"
-            onPointerDown={(e) => { empezar(e, 'girar'); }}
-            {...eventos}
-          />
-        )}
-        {seleccionado && ESQUINAS.map((esquina) => (
-          <span
-            key={esquina}
-            className={`manija ${esquina}`}
-            data-manija={esquina}
-            onPointerDown={(e) => { empezar(e, 'escala'); }}
-            {...eventos}
-          />
-        ))}
-      </div>
-    </>
+      {seleccionado && ESQUINAS.map((esquina) => (
+        <span
+          key={esquina}
+          className={`manija ${esquina}`}
+          data-manija={esquina}
+          onPointerDown={(e) => { empezar(e, 'escala'); }}
+          {...eventos}
+        />
+      ))}
+    </div>
   );
 }

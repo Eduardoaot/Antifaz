@@ -1,5 +1,5 @@
 import { Maximize, ZoomIn, ZoomOut } from 'lucide-react';
-import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import type { Regla } from '../../shared/catalogo';
 import { esEmoji, LIMITES, type Hallazgo, type Ocultamiento, type Punto } from '../../shared/contrato';
 import {
@@ -7,6 +7,7 @@ import {
   anchoAjustado,
   aPuntoDeImagen,
   cajaEntre,
+  construirOcultamientos,
   descartarZona,
   desplazamientoAnclado,
   efectoDe,
@@ -98,8 +99,19 @@ interface Arrastre {
 /** La imagen la dibuja el sidecar con los mismos efectos que la exportación: lo que ves es lo que sale. */
 export function Visor({ archivo, hallazgos, ocultamientos, revision, herramienta, tamanoPincel, alClic, alDibujar, alPintar, alFuera, resaltado = null, alResaltar, alCambiar, alQuitarManual, alPorQue, barra, seleccionSticker = null, alSeleccionarSticker, alAjustarSticker }: Props): React.JSX.Element {
   const { id, ancho, alto, nombre } = archivo.info;
-  const clave = JSON.stringify(ocultamientos);
+  const [arrastrado, setArrastrado] = useState<string | null>(null);
+  // Mientras se arrastra un sticker, la vista va sin él: si no, se vería dos veces.
+  const clave = useMemo(() => {
+    if (arrastrado === null || revision === null) return JSON.stringify(ocultamientos);
+    const sin = {
+      ...revision,
+      decisiones: { ...revision.decisiones, [arrastrado]: 'ignorar' as const },
+      manuales: revision.manuales.filter((z) => z.id !== arrastrado),
+    };
+    return JSON.stringify(construirOcultamientos(sin, hallazgos));
+  }, [arrastrado, revision, hallazgos, ocultamientos]);
   const [url, setUrl] = useState<string | null>(null);
+  const [vistaDe, setVistaDe] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [inicio, setInicio] = useState<{ x: number; y: number } | null>(null);
   const [actual, setActual] = useState<{ x: number; y: number } | null>(null);
@@ -143,6 +155,7 @@ export function Visor({ archivo, hallazgos, ocultamientos, revision, herramienta
       if (resultado.ok) {
         creada = URL.createObjectURL(new Blob([new Uint8Array(resultado.datos.datos)], { type: resultado.datos.mime }));
         setUrl(creada);
+        setVistaDe(clave);
         setError(null);
       } else {
         setUrl(null);
@@ -629,6 +642,8 @@ export function Visor({ archivo, hallazgos, ocultamientos, revision, herramienta
                   seleccionado={h.id === seleccionSticker}
                   alSeleccionar={(sid) => { alSeleccionarSticker?.(sid); }}
                   alAjustar={(hz, cambio) => { alAjustarSticker?.(hz, cambio); }}
+                  alArrastrar={setArrastrado}
+                  vistaAlDia={vistaDe === clave}
                 />
               );
             })}

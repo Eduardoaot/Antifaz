@@ -323,7 +323,7 @@ describe('tamaño del sticker sobre una cara', () => {
     const r = ajustarSticker(conEmoji(), h, { posicion: { x: 0.6, y: -0.4 } });
     expect(posicionDe(r, 'a')).toEqual({ x: 0.6, y: -0.4 });
     expect(enElTope(h, 1, posicionDe(r, 'a'))).toBe(false);
-    const lejos = ajustarSticker(conEmoji(), h, { posicion: { x: 9, y: 0 } });
+    const lejos = ajustarSticker(conEmoji(), h, { posicion: { x: 99, y: 0 } });
     expect(posicionDe(lejos, 'a')).toEqual({ x: LIMITES.posicionSticker.max, y: 0 });
     expect(enElTope(h, 1, posicionDe(lejos, 'a'))).toBe(true);
     expect(stickerAjustado(lejos, 'a')).toBe(true);
@@ -352,7 +352,8 @@ describe('tamaño del sticker sobre una cara', () => {
   it.each([
     [{ x: Number.NaN, y: 0 }, { x: 0, y: 0 }],
     [{ x: Number.POSITIVE_INFINITY, y: 0 }, { x: 0, y: 0 }],
-    [{ x: 0, y: -9 }, { x: 0, y: -2 }],
+    [{ x: 0, y: -99 }, { x: 0, y: -10 }],
+    [{ x: 0, y: -9 }, { x: 0, y: -9 }],
     [{ x: 0.123, y: 0 }, { x: 0.12, y: 0 }],
   ])('limitarPosicion(%j) con escala 1 = %j', (entrada, esperado) => {
     expect(limitarPosicion(conNucleo(), 1, entrada)).toEqual(esperado);
@@ -388,7 +389,7 @@ describe('tamaño del sticker sobre una cara', () => {
     expect(esquemaOcultamiento.safeParse(o).success).toBe(true);
     const [d] = construirOcultamientos(elegirEfecto(r, 'a', 'difuminado'), [h]);
     expect(d).toMatchObject({ desplazamiento_x: 0, desplazamiento_y: 0 });
-    for (const malo of [2.01, -2.01, Number.NaN, '0', null, undefined]) {
+    for (const malo of [10.01, -10.01, Number.NaN, '0', null, undefined]) {
       expect(esquemaOcultamiento.safeParse({ ...o, desplazamiento_x: malo }).success).toBe(false);
       expect(esquemaOcultamiento.safeParse({ ...o, desplazamiento_y: malo }).success).toBe(false);
     }
@@ -400,7 +401,7 @@ describe('tamaño del sticker sobre una cara', () => {
     expect(desdeEdicion(e).posiciones).toEqual({ a: { x: -0.2, y: 0.1 } });
     const { posiciones: _, ...vieja } = e;
     expect(esquemaEdicion.parse(vieja).posiciones).toEqual({});
-    expect(esquemaEdicion.safeParse({ ...e, posiciones: { a: { x: 3, y: 0 } } }).success).toBe(false);
+    expect(esquemaEdicion.safeParse({ ...e, posiciones: { a: { x: 11, y: 0 } } }).success).toBe(false);
     expect(esquemaEdicion.safeParse({ ...e, posiciones: { a: { x: 0 } } }).success).toBe(false);
   });
 });

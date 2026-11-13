@@ -211,15 +211,11 @@ const redondearPaso = (v: number): number =>
 
 /**
  * Cualquier zona con emoji puede cambiar de tamaño y moverse: caras, pecho, texto, placas o tus zonas.
- * En una cara, lo que no puede destaparse es la cara del detector; en lo demás, la zona completa, y el
- * sidecar mantiene el relleno debajo aunque el emoji se mueva.
+ * Movido o más chico, tapa solo donde quede el emoji: la persona decide.
  */
 export function ajustaSticker(r: Revision, h: Hallazgo): boolean {
   return h.caja !== null && esEmoji(efectoDe(r, h));
 }
-
-/** Verdadero si lo que no puede destaparse es una cara del detector (y no la zona completa). */
-export const tieneNucleo = (h: Hallazgo): boolean => h.nucleo !== undefined && h.nucleo !== null;
 
 /** Las zonas cuyo sticker se puede mover ahora: las ocultas con emoji, detectadas o tuyas. */
 export function zonasConSticker(r: Revision, hallazgos: readonly Hallazgo[]): Hallazgo[] {
@@ -231,10 +227,7 @@ export function zonasConSticker(r: Revision, hallazgos: readonly Hallazgo[]): Ha
 const margenZona = (c: Caja): number =>
   Math.max(LIMITES.dilatacionPx.porDefecto, Math.ceil((Math.min(c.ancho, c.alto) * LIMITES.dilatacionPct.porDefecto) / 100));
 
-/**
- * Hasta dónde puede encogerse el sticker. Es libre: debajo del emoji la zona (o la cara del detector)
- * ya queda tapada con un relleno sólido, así que achicarlo nunca deja ver lo que había.
- */
+/** Hasta dónde puede encogerse el sticker. Es libre: más chico, deja ver lo que no cubra. */
 // eslint-disable-next-line @typescript-eslint/no-unused-vars -- se conserva la firma: antes dependía de la zona.
 export function escalaMinimaSticker(_h: Hallazgo): number {
   return LIMITES.escalaSticker.min;
@@ -254,18 +247,11 @@ const sinClave = <T,>(m: Readonly<Record<string, T>>, id: string): Record<string
 
 export const posicionDe = (r: Revision, id: string): Posicion => r.posiciones[id] ?? { x: 0, y: 0 };
 
-/** Al centésimo, hacia el centro: redondear nunca debe sacar al sticker de donde tapa la cara. */
+/** Al centésimo, hacia el centro, para guardarlo tal cual. */
 const haciaElCentro = (v: number): number => Math.trunc(v * 100) / 100 || 0;
 
-
-/**
- * La posición más cercana a la pedida desde la que el sticker, con esa escala, sigue tapando la cara.
- * En fracciones de los semiejes, la cara cabe en un círculo de radio `escalaMinimaSticker` y el emoji
- * tapa uno de radio `escala`: el centro puede alejarse hasta la diferencia. Más lejos, se queda en el
- * borde (el imán). El sidecar lo comprueba en píxeles y, si no alcanza, agranda el emoji.
- */
+/** Libre dentro del rango; fuera de él, o no numérica, se limita. */
 export function limitarPosicion(_h: Hallazgo, _escala: number, p: Posicion): Posicion {
-  // Libre dentro del rango: lo que oculta la zona es el relleno sólido de debajo, no el emoji.
   const { max } = LIMITES.posicionSticker;
   const recorte = (v: number): number => (Number.isFinite(v) ? Math.min(max, Math.max(-max, v)) : 0);
   return { x: haciaElCentro(recorte(p.x)), y: haciaElCentro(recorte(p.y)) };
@@ -294,8 +280,7 @@ export const rotacionDe = (r: Revision, id: string): number => r.rotaciones[id] 
 
 
 /**
- * Cambia el tamaño, la posición o ambos. El tamaño nunca baja del mínimo de la cara, y al encogerlo
- * el sticker se acerca al centro lo necesario para seguir tapándola.
+ * Cambia el tamaño, la posición, el giro o varios, cada uno limitado a su rango.
  */
 export function ajustarSticker(r: Revision, h: Hallazgo, cambio: CambioSticker): Revision {
   const escala = cambio.escala === undefined ? escalaDe(r, h.id) : Math.max(escalaMinimaSticker(h), limitarEscala(cambio.escala));

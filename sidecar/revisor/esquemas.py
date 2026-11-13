@@ -21,7 +21,7 @@ PUNTOS_TRAZO_MAX = 5000
 ESCALA_STICKER_MIN = 0.1
 ESCALA_STICKER_MAX = 2.0
 # Posición del sticker, en fracciones de los semiejes de su zona. Coincide con LIMITES.posicionSticker.
-POSICION_STICKER_MAX = 2.0
+POSICION_STICKER_MAX = 10.0
 # Giro del emoji, en grados. El sidecar gira también su parte opaca, así sigue tapando lo mismo.
 ROTACION_STICKER_MAX = 180.0
 

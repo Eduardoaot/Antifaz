@@ -9,16 +9,10 @@ export const LIMITES = {
   intensidad: { min: 1, max: 100, porDefecto: 80, avisoBaja: 30 },
   dilatacionPx: { min: 8, max: 512, porDefecto: 8 },
   dilatacionPct: { min: 0, max: 50, porDefecto: 10 },
-  /**
-   * Tamaño de un sticker sobre una cara, en veces el tamaño que la app elige sola. Por debajo de 1 se
-   * ajusta a la cara que vio el detector; el sidecar nunca lo deja más chico que eso.
-   */
+  /** Tamaño de un sticker, en veces el tamaño que la app elige sola. Por debajo de 1 ya no tapa toda la zona. */
   escalaSticker: { min: 0.1, max: 2, porDefecto: 1, paso: 0.05 },
-  /**
-   * Posición del sticker de una cara, en fracciones de los semiejes del óvalo de su zona (0 es centrado).
-   * Solo se mueve mientras siga tapando la cara del detector; el sidecar lo agranda si hiciera falta.
-   */
-  posicionSticker: { max: 2, paso: 0.05, pasoGrande: 0.25 },
+  /** Posición del sticker, en fracciones de los semiejes de su zona (0 es centrado). Movido, ya no tapa toda la zona. */
+  posicionSticker: { max: 10, paso: 0.05, pasoGrande: 0.25 },
   /** Giro del sticker, en grados. El sidecar gira también su parte opaca: sigue tapando lo mismo. */
   rotacionSticker: { max: 180, paso: 15 },
   loteArchivos: 500,

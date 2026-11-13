@@ -626,7 +626,7 @@ input[type='range']:disabled { opacity: 0.5; cursor: not-allowed; }
 .sticker:hover { outline: 2px dashed #fff; box-shadow: 0 0 0 2px #000; }
 .sticker.seleccionado { z-index: 2; border: 2px solid #fff; outline: 2px solid var(--marca); box-shadow: 0 0 0 4px rgb(0 0 0 / 0.35); }
 .sticker.moviendo { cursor: grabbing; }
-.sticker .fantasma { display: block; width: 100%; height: 100%; opacity: 0.85; pointer-events: none; }
+.sticker .fantasma { display: block; width: 100%; height: 100%; pointer-events: none; }
 .sticker .manija {
   position: absolute; width: 14px; height: 14px; border-radius: 50%;
   background: #fff; border: 2px solid var(--marca); box-shadow: 0 0 0 1px #000;
@@ -638,8 +638,6 @@ input[type='range']:disabled { opacity: 0.5; cursor: not-allowed; }
 .sticker .manija.so { left: 0; top: 100%; transform: translate(-50%, -50%); cursor: nesw-resize; }
 .sticker .manija.se { left: 100%; top: 100%; transform: translate(-50%, -50%); cursor: nwse-resize; }
 /* Mientras se arrastra: la cara que nunca puede quedar al descubierto. */
-.ovalo-cara { position: absolute; z-index: 1; border: 2px dashed #fff; outline: 1px dashed #000; border-radius: 50%; pointer-events: none; }
-.ovalo-cara.zona-fija { border-radius: 0; }
 
 /* Tus zonas */
 .manual { display: grid; gap: 0.625rem; padding-top: 0.875rem; border-top: 1px solid var(--borde-suave); }
@@ -963,7 +961,6 @@ summary { cursor: pointer; min-height: 1.75rem; font-weight: 500; color: var(--t
   .trazo polyline { stroke: Highlight; }
   .sticker:hover, .sticker.seleccionado { outline-color: Highlight; border-color: CanvasText; box-shadow: none; }
   .sticker .manija { background: Canvas; border-color: Highlight; box-shadow: none; }
-  .ovalo-cara { border-color: Highlight; outline-color: CanvasText; }
   .tamano-sticker { border-left-color: CanvasText; }
   .cerrar-foto { opacity: 1; }
   .soltar-marco { border-color: Highlight; }
