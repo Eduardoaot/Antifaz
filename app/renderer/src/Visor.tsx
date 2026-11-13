@@ -204,9 +204,16 @@ export function Visor({ archivo, hallazgos, ocultamientos, revision, herramienta
       // En ventana ancha el área se adapta a la foto hasta un tope (max-height, que incluye el relleno
       // por box-sizing: border-box). El tope no cambia al acercar, así el tamaño base no brinca.
       // En angosta manda el ancho.
+      //
+      // Ancho desde el border-box (offsetWidth), no clientWidth: si aparece o desaparece la barra
+      // de desplazamiento (p. ej. al comparar una foto ancha), clientWidth oscila y el ajuste
+      // entra en un bucle de parpadeo. offsetWidth no depende de esa barra.
+      const bordeX = (Number.parseFloat(estilo.borderLeftWidth) || 0) + (Number.parseFloat(estilo.borderRightWidth) || 0);
+      const disponibleAncho = v.offsetWidth - bordeX - relleno.x;
       const tope = Number.parseFloat(estilo.maxHeight);
       const disponibleAlto = angosta || !Number.isFinite(tope) ? null : tope - relleno.y;
-      setAjuste(anchoAjustado(v.clientWidth - relleno.x, disponibleAlto, ancho, alto));
+      const siguiente = anchoAjustado(disponibleAncho, disponibleAlto, ancho, alto);
+      setAjuste((prev) => (prev === siguiente ? prev : siguiente));
     };
     medir();
     const observador = new ResizeObserver(medir);
@@ -546,7 +553,7 @@ export function Visor({ archivo, hallazgos, ocultamientos, revision, herramienta
   if (error !== null) return <p role="alert">No pudimos mostrar la vista previa. {error}</p>;
   if (url === null) return <p className="suave preparando">Preparando la vista previa…</p>;
   return (
-    <figure className="visor">
+    <figure className={`visor${comparando ? ' con-comparar' : ''}`}>
       {/* El marco ancla las barras flotantes al área visible: con zoom, la imagen se desplaza y ellas no. */}
       <div className="marco-visor" ref={marco}>
         <BarraHerramientas {...barra} comparando={comparando} alComparar={alternarComparar} atenuada={dibujando} />
@@ -573,11 +580,11 @@ export function Visor({ archivo, hallazgos, ocultamientos, revision, herramienta
         >
           {comparando && modoComparar === 'lado' && urlOriginal !== null && (
             <div className="dos-lados" onPointerMove={mostrarRotulos}>
-              <figure>
+              <figure style={{ aspectRatio: `${ancho} / ${alto}` }}>
                 <img src={urlOriginal} draggable={false} alt={`Original de ${nombre}, sin ocultar nada.`} />
                 <figcaption className="rotulo antes" style={{ opacity: rotulos ? 1 : 0 }}>Original</figcaption>
               </figure>
-              <figure>
+              <figure style={{ aspectRatio: `${ancho} / ${alto}` }}>
                 <img src={url} draggable={false} alt={`Tu copia de ${nombre}, con lo que decidiste ocultar.`} />
                 <figcaption className="rotulo despues" style={{ opacity: rotulos ? 1 : 0 }}>Tu copia</figcaption>
               </figure>

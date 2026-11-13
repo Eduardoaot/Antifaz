@@ -247,7 +247,11 @@ input[type='range']:disabled { opacity: 0.5; cursor: not-allowed; }
 }
 
 /* Columna central */
-.principal { min-width: 0; display: flex; flex-direction: column; gap: 0.75rem; }
+.principal {
+  min-width: 0; display: flex; flex-direction: column; gap: 0.75rem;
+  /* Evita que el ancho (y el ajuste de fotos anchas) oscile al aparecer la barra de scroll. */
+  scrollbar-gutter: stable;
+}
 .principal:focus { outline: none; }
 .titulo-foto { font-size: 1.0625rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .principal.inicio { position: relative; flex: 1; min-height: 0; overflow: auto; padding: 1rem; }
@@ -322,8 +326,11 @@ input[type='range']:disabled { opacity: 0.5; cursor: not-allowed; }
   display: flex; min-width: 0; max-height: calc(100vh - 12.5rem); min-height: 15rem;
   overflow: auto; border-radius: 12px;
   padding: 4rem 1.5rem 3.5rem; background: var(--lienzo);
+  /* Siempre: sin esto, al comparar una foto ancha la barra aparece/desaparece y el ajuste parpadea. */
+  scrollbar-gutter: stable;
 }
-.ventana-lienzo.ampliada { scrollbar-gutter: stable; }
+/* Al comparar, la barra de controles pide espacio: bajamos el tope para no empujar scroll en .principal. */
+.visor.con-comparar .ventana-lienzo { max-height: calc(100vh - 16.5rem); }
 .lienzo {
   position: relative; flex: none; margin: auto;
   box-shadow: 0 1px 2px rgb(0 0 0 / 0.08), 0 4px 14px rgb(0 0 0 / 0.08);
@@ -890,7 +897,7 @@ summary { cursor: pointer; min-height: 1.75rem; font-weight: 500; color: var(--t
 }
 .lienzo.comparando-video { width: 100%; box-shadow: none; aspect-ratio: auto !important; }
 .dos-lados { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem; }
-.dos-lados figure { position: relative; margin: 0; }
+.dos-lados figure { position: relative; margin: 0; overflow: hidden; border-radius: 6px; background: var(--lienzo); }
 /* Aviso de frame perdido: sobre la imagen, sin empujar la línea de tiempo. */
 .aviso-frame-perdido {
   position: absolute; left: 0.5rem; right: 0.5rem; bottom: 0.5rem; margin: 0; z-index: 1;
@@ -1103,7 +1110,7 @@ summary { cursor: pointer; min-height: 1.75rem; font-weight: 500; color: var(--t
 /* Comparar: elegir entre la línea y lado a lado. */
 .modo-comparar { justify-self: start; }
 .ventana-lienzo .dos-lados { width: 100%; align-self: center; }
-.dos-lados img { display: block; width: 100%; height: auto; border-radius: 6px; }
+.dos-lados img { display: block; width: 100%; height: 100%; object-fit: contain; border-radius: 6px; }
 @media (max-width: 1000px) {
   .cuerpo.fotos-plegadas, .cuerpo.panel-plegado, .cuerpo.fotos-plegadas.panel-plegado { grid-template-columns: minmax(0, 1fr); }
   .riel { flex-direction: row; justify-content: center; padding: 0.5rem; }
