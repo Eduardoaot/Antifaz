@@ -170,7 +170,7 @@ export function AnimacionInicio({ alTerminar }: Props): React.JSX.Element | null
               fill="currentColor"
               d="M2 2H18V6H6V18H2ZM46 2H62V18H58V6H46ZM62 62H46V58H58V46H62ZM2 62V46H6V58H18V62Z"
             />
-            {/* Máscara Antifaz */}
+            {/* Máscara del logo */}
             <path
               className="intro-mascara"
               fill="currentColor"

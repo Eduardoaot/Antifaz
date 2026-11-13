@@ -83,7 +83,8 @@ def forma_de_cara(f: list[float]) -> bool:
     x, y, w, h = f[0], f[1], f[2], f[3]
     if w <= 0 or h <= 0:
         return False
-    ojo_d, ojo_i, nariz, boca_d, boca_i = (f[4], f[5]), (f[6], f[7]), (f[8], f[9]), (f[10], f[11]), (f[12], f[13])
+    ojo_d, ojo_i, nariz = (f[4], f[5]), (f[6], f[7]), (f[8], f[9])
+    boca_d, boca_i = (f[10], f[11]), (f[12], f[13])
     margen_x, margen_y = 0.15 * w, 0.15 * h
     for px, py in (ojo_d, ojo_i, nariz, boca_d, boca_i):
         if not (x - margen_x <= px <= x + w + margen_x and y - margen_y <= py <= y + h + margen_y):
@@ -102,7 +103,8 @@ def forma_de_cara(f: list[float]) -> bool:
     if not 0.25 * entre_ojos <= ancho_boca <= 1.6 * entre_ojos:
         return False
     # La nariz queda entre los ojos y la boca, no lejos de ambos.
-    return math.dist(nariz, centro_ojos) < 1.2 * ojos_a_boca and math.dist(nariz, centro_boca) < 1.2 * ojos_a_boca
+    tope = 1.2 * ojos_a_boca
+    return math.dist(nariz, centro_ojos) < tope and math.dist(nariz, centro_boca) < tope
 
 
 class DetectorCaras:
