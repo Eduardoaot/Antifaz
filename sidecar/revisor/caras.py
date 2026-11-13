@@ -1,4 +1,4 @@
-"""Detección de caras con YuNet. Cuadros de confianza baja se conservan: prioridad al recall."""
+"""Detección de caras con YuNet, filtrada por la geometría de sus puntos faciales."""
 
 from __future__ import annotations
 
@@ -28,12 +28,6 @@ MAX_LADO_MOSAICOS = 5120
 IOU_DUPLICADO = 0.3
 UMBRAL_NMS = 0.3
 MAX_CARAS = 5000
-# Por debajo de esta confianza, la detección solo cuenta si sus 5 puntos (ojos, nariz, comisuras) tienen
-# forma de cara. Encima, nunca se descarta. Propuesta del 2026-11-11: hombros, pecho y texturas daban
-# cajas con puntos sin forma.
-CONFIANZA_SIN_REVISAR_FORMA = 0.6
-
-
 class ModeloNoDisponible(Exception):
     """El modelo falta o no coincide con el hash esperado."""
 
@@ -45,6 +39,14 @@ class Cara:
     ancho: int
     alto: int
     confianza: float
+
+
+def _decodificar_candidatas(salida: Any) -> list[tuple[float, float, float, float, float]]:
+    return [
+        (float(f[0]), float(f[1]), float(f[2]), float(f[3]), float(f[14]))
+        for f in salida
+        if forma_de_cara([float(v) for v in f[:14]])
+    ]
 
 
 def _iou(a: Cara, b: Cara) -> float:
@@ -128,11 +130,7 @@ class DetectorCaras:
         _, salida = detector.detect(bgr)
         if salida is None:  # pyright: ignore[reportUnnecessaryComparison]
             return []
-        return [
-            (float(f[0]), float(f[1]), float(f[2]), float(f[3]), float(f[14]))
-            for f in salida
-            if float(f[14]) >= CONFIANZA_SIN_REVISAR_FORMA or forma_de_cara([float(v) for v in f[:14]])
-        ]
+        return _decodificar_candidatas(salida)
 
     def detectar(self, pixeles: Pixeles, umbral: float) -> list[Cara]:
         rgb = pixeles[:, :, :3]

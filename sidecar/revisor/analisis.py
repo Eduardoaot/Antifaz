@@ -74,6 +74,9 @@ def _umbral_escena(regla: str) -> float:
 
 
 def _zona_creible(zona: contenido.Zona, escena: dict[str, float]) -> bool:
+    if zona.regla_id == "SUG-01":
+        # Una parte cubierta (por ejemplo, un traje de baño) no basta para llamarla sugerente.
+        return escena["SUG-01"] >= _umbral_escena(zona.regla_id)
     if zona.regla_id != "DES-01" or zona.confianza >= DESNUDEZ_SEGURA:
         return True
     return escena["DES-01"] + escena["SUG-01"] >= ESCENA_RESPALDA_DESNUDEZ

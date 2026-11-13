@@ -444,7 +444,7 @@ export function ModoVideo({ activo, alAnunciar, alFallar, pedido }: Props): Reac
               <button type="button" className="boton primario boton-destacado" disabled={ocupado !== null} onClick={() => { void abrir(); }}>
                 <FolderOpen aria-hidden="true" /> {ocupado === 'abriendo' ? 'Abriendo…' : 'Abrir video'}
               </button>
-              <span className="suave vacio-arrastrar">o arrastra un video a la ventana (si el selector se queda en «Trabajando en ello…», cancélalo y arrastra)</span>
+              <span className="suave vacio-arrastrar">o arrastra un video a la ventana</span>
             </div>
           </div>
         </div>
@@ -458,6 +458,7 @@ export function ModoVideo({ activo, alAnunciar, alFallar, pedido }: Props): Reac
   const todas = pistas.map((p) => p.id);
   const efectoComun = valorComun(pistas.map((p) => p.efecto));
   const intensidadComun = valorComun(pistas.map((p) => p.intensidad));
+  const muestraIntensidad = efectoComun !== null ? usaIntensidad(efectoComun) : pistas.some((p) => usaIntensidad(p.efecto));
   const ultimo = info.posiciones - 1;
   const libre = ocupado === null;
 
@@ -641,7 +642,9 @@ export function ModoVideo({ activo, alAnunciar, alFallar, pedido }: Props): Reac
             {estiloAbierto && (
               <div id={`${id}-estilo`} className="panel-estilo">
                 <SelectorEfecto valor={efectoComun} etiqueta="Efecto para todo" alCambiar={(efecto) => { cambiarPistas(todas, { efecto }); }} />
-                <ControlIntensidad valor={intensidadComun} etiqueta="Intensidad del efecto" conAviso alCambiar={(v) => { cambiarPistas(todas, { intensidad: limitarIntensidad(v) }); }} />
+                {muestraIntensidad && (
+                  <ControlIntensidad valor={intensidadComun} etiqueta="Intensidad del efecto" conAviso alCambiar={(v) => { cambiarPistas(todas, { intensidad: limitarIntensidad(v) }); }} />
+                )}
               </div>
             )}
           </section>

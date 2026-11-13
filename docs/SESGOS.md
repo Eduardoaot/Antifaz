@@ -5,7 +5,8 @@ La app no debe tratar distinto a nadie por su tono de piel, su género, su edad 
 ## Por diseño
 
 - **No se infiere ningún grupo.** La app no estima edad, género, tono de piel ni origen de nadie. La pregunta "¿Hay menores en esta foto?" sale con cualquier cara segura, sin mirar cómo es la persona. Por eso se descartó MiVOLO (ver `docs/INVESTIGACION.md`).
-- **Recall antes que precisión.** Una cara que no se detecta no se puede ocultar. Los umbrales favorecen encontrar de más, y una detección dudosa se muestra como "podría ser una cara" en vez de descartarse.
+- **Equilibrio entre recall y precisión.** Los cinco puntos de una detección facial deben tener forma de cara, también con confianza alta. Esto puede omitir caras parciales o muy pequeñas; los casos reales deben medirse por grupo antes de aprobar el cambio.
+- **Contexto antes de etiquetar zonas cubiertas.** Una parte cubierta, como un traje de baño, no se considera sugerente por sí sola: la escena completa también debe superar el umbral de contenido sugerente. Esto reduce falsas alarmas y puede omitir algunos casos; no se infiere edad.
 - **La persona decide.** Los avisos de contenido dicen "podría" y nada se oculta solo, salvo la desnudez, que se marca y se puede desmarcar. Un clasificador sesgado no puede tapar ni borrar a alguien sin que la persona lo vea.
 - **El baño va aparte.** Su puntaje no compite con el de desnudez, para que una escena común no cambie lo que se avisa.
 - **Lenguaje.** Los avisos describen objetos y lugares, nunca a la persona.

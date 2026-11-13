@@ -54,6 +54,11 @@ export interface Revision {
   estiramientos: Readonly<Record<string, Estiramiento>>;
   /** Zonas detectadas que quitaste de la foto: quedan visibles y sin marca. Se pueden volver a poner. */
   descartadas: readonly string[];
+  /**
+   * Margen extra de cada zona detectada, en % del lado corto (`dilatacion_pct`). Sin entrada, el
+   * por defecto: así se agranda o achica la censura auto sin redibujar la detección.
+   */
+  margenes: Readonly<Record<string, number>>;
 }
 
 export interface Posicion {
@@ -79,6 +84,7 @@ export const REVISION_INICIAL: Revision = {
   rotaciones: {},
   estiramientos: {},
   descartadas: [],
+  margenes: {},
 };
 
 export interface Historial {
@@ -232,9 +238,51 @@ export function zonasConSticker(r: Revision, hallazgos: readonly Hallazgo[]): Ha
   return [...detectadas, ...r.manuales.map(hallazgoDeManual).filter((h) => ajustaSticker(r, h))];
 }
 
+/** Lleva el % de margen al rango de `dilatacion_pct`. */
+export function limitarMargen(valor: number): number {
+  if (!Number.isFinite(valor)) return LIMITES.dilatacionPct.porDefecto;
+  return Math.min(LIMITES.dilatacionPct.max, Math.max(LIMITES.dilatacionPct.min, Math.round(valor)));
+}
+
+export const margenPctDe = (r: Revision, id: string): number => r.margenes[id] ?? LIMITES.dilatacionPct.porDefecto;
+
+/** Margen propio para varias zonas detectadas. */
+export function elegirMargenVarias(r: Revision, ids: readonly string[], valor: number): Revision {
+  if (ids.length === 0) return r;
+  const pct = limitarMargen(valor);
+  const elegidas = new Set(ids);
+  const margenes: Record<string, number> = Object.fromEntries(
+    Object.entries(r.margenes).filter(([id]) => !elegidas.has(id)),
+  );
+  if (pct !== LIMITES.dilatacionPct.porDefecto) {
+    for (const id of ids) margenes[id] = pct;
+  }
+  return { ...r, margenes };
+}
+
+/** El margen en px que el sidecar agrega (`region_dilatada` en efectos.py). */
+export function margenPxDe(c: Caja, dilatacionPct: number = LIMITES.dilatacionPct.porDefecto): number {
+  return Math.max(
+    LIMITES.dilatacionPx.porDefecto,
+    Math.ceil((Math.min(c.ancho, c.alto) * limitarMargen(dilatacionPct)) / 100),
+  );
+}
+
+/** Caja de la marca en pantalla: la detección más el margen de censura. */
+export function cajaConMargen(c: Caja, dilatacionPct: number, ancho: number, alto: number): Caja {
+  const m = margenPxDe(c, dilatacionPct);
+  const x = Math.max(0, c.x - m);
+  const y = Math.max(0, c.y - m);
+  return {
+    x,
+    y,
+    ancho: Math.min(ancho - x, c.ancho + 2 * m),
+    alto: Math.min(alto - y, c.alto + 2 * m),
+  };
+}
+
 /** El margen que el sidecar agrega a una zona de cara (`region_dilatada` en efectos.py). */
-const margenZona = (c: Caja): number =>
-  Math.max(LIMITES.dilatacionPx.porDefecto, Math.ceil((Math.min(c.ancho, c.alto) * LIMITES.dilatacionPct.porDefecto) / 100));
+const margenZona = (c: Caja): number => margenPxDe(c, LIMITES.dilatacionPct.porDefecto);
 
 /** Hasta dónde puede encogerse el sticker. Es libre: más chico, deja ver lo que no cubra. */
 // eslint-disable-next-line @typescript-eslint/no-unused-vars -- se conserva la firma: antes dependía de la zona.
@@ -387,7 +435,7 @@ export function construirOcultamientos(r: Revision, hallazgos: readonly Hallazgo
       efecto: efectoDe(r, h),
       intensidad: intensidadDe(r, h.id),
       dilatacion_px: LIMITES.dilatacionPx.porDefecto,
-      dilatacion_pct: LIMITES.dilatacionPct.porDefecto,
+      dilatacion_pct: margenPctDe(r, h.id),
       mascara_id: null,
       // Con el margen de las caras, el óvalo contiene toda la cara detectada: el emoji puede ajustarse a ella.
       forma: h.regla_id === 'CAR-01' ? 'elipse' : 'caja',
@@ -683,6 +731,7 @@ export function quitarManual(r: Revision, id: string): Revision {
     intensidades: sinClave(r.intensidades, id),
     rotaciones: sinClave(r.rotaciones, id),
     estiramientos: sinClave(r.estiramientos, id),
+    margenes: sinClave(r.margenes, id),
   };
 }
 
@@ -789,6 +838,7 @@ export function aEdicion(archivoId: string, r: Revision): Edicion {
     rotaciones: { ...r.rotaciones },
     estiramientos: Object.fromEntries(Object.entries(r.estiramientos).map(([id, e]) => [id, { ...e }])),
     descartadas: [...r.descartadas],
+    margenes: { ...r.margenes },
   };
 }
 
@@ -805,6 +855,7 @@ export function desdeEdicion(e: Edicion): Revision {
     rotaciones: e.rotaciones,
     estiramientos: e.estiramientos,
     descartadas: e.descartadas,
+    margenes: e.margenes,
   };
 }
 
@@ -819,6 +870,7 @@ export function hayCambios(r: Revision): boolean {
     Object.keys(r.intensidades).length > 0 ||
     Object.keys(r.rotaciones).length > 0 ||
     Object.keys(r.estiramientos).length > 0 ||
+    Object.keys(r.margenes).length > 0 ||
     r.descartadas.length > 0 ||
     r.intensidad !== LIMITES.intensidad.porDefecto
   );

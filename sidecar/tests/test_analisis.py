@@ -77,6 +77,15 @@ def test_nunca_afirma_una_edad() -> None:
     assert "años" not in str(_analizar(ASTRONAUTA)).lower()
 
 
+def test_deteccion_de_alta_confianza_sin_geometria_se_descarta() -> None:
+    sin_forma = [0, 0, 100, 100, 50, 50, 51, 50, 50, 51, 51, 51, 50, 52, 0.99]
+    con_forma = [0, 0, 100, 100, 35, 40, 65, 40, 50, 55, 38, 72, 62, 72, 0.7]
+    candidatas = caras._decodificar_candidatas(np.array([sin_forma, con_forma], dtype=np.float32))
+    assert len(candidatas) == 1
+    assert candidatas[0][:4] == (0.0, 0.0, 100.0, 100.0)
+    assert candidatas[0][4] == pytest.approx(0.7)
+
+
 def test_caja_cabe_en_la_imagen_con_cualquier_multiplicador() -> None:
     imagen = cargador.abrir(str(ASTRONAUTA))
     for factor in (1.0, 1.3, 3.0):

@@ -1,5 +1,4 @@
 /** Proceso principal. Es el único con acceso al sistema; el renderer solo usa la API de contrato.ts. */
-import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { basename, dirname, extname, join, parse, relative, resolve, sep } from 'node:path';
@@ -187,10 +186,7 @@ async function elegirConDialogo(opciones: Electron.OpenDialogOptions): Promise<s
   return elegido.canceled ? [] : elegido.filePaths;
 }
 
-/**
- * Carpeta local para el selector de video. El picker moderno de Windows suele ignorar
- * defaultPath y reabrir Descargas (OneDrive/miniaturas → «Trabajando en ello…»).
- */
+/** Carpeta local inicial para el selector de video. */
 function carpetaInicialVideo(): string {
   const carpeta = join(app.getPath('userData'), 'elegir-video');
   try {
@@ -199,49 +195,6 @@ function carpetaInicialVideo(): string {
   } catch {
     return app.getPath('videos');
   }
-}
-
-/**
- * Selector clásico de WinForms (AutoUpgradeEnabled=$false): no usa el picker moderno
- * que se cuelga listando Descargas. Corre en PowerShell -STA, aparte de Electron.
- */
-function elegirVideoWindows(): Promise<string | null> {
-  const carpeta = carpetaInicialVideo().replace(/'/g, "''");
-  const script = [
-    "Add-Type -AssemblyName System.Windows.Forms",
-    "$d = New-Object System.Windows.Forms.OpenFileDialog",
-    "$d.Title = 'Elige el video que quieres revisar'",
-    `$d.InitialDirectory = '${carpeta}'`,
-    "$d.RestoreDirectory = $false",
-    "$d.AutoUpgradeEnabled = $false",
-    "$d.Filter = 'Videos|*.mp4;*.mov;*.m4v;*.webm;*.mkv'",
-    "if ($d.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { [Console]::Out.Write($d.FileName) }",
-  ].join('; ');
-  return new Promise((resolver) => {
-    const proceso = spawn(
-      'powershell.exe',
-      ['-NoProfile', '-STA', '-ExecutionPolicy', 'Bypass', '-Command', script],
-      { windowsHide: false },
-    );
-    let salida = '';
-    const limite = setTimeout(() => {
-      registrar('El selector de video superó el tiempo y se cerró');
-      proceso.kill();
-    }, 3 * 60 * 1000);
-    proceso.stdout.on('data', (bloque: Buffer) => {
-      salida += bloque.toString('utf8');
-    });
-    proceso.on('error', () => {
-      clearTimeout(limite);
-      resolver(null);
-    });
-    proceso.on('exit', () => {
-      clearTimeout(limite);
-      const ruta = salida.trim();
-      resolver(ruta === '' ? null : ruta);
-      ventana?.focus();
-    });
-  });
 }
 
 async function pedirCarpeta(titulo: string): Promise<string | null> {
@@ -642,21 +595,6 @@ const esquemaPistaId = z.string().min(1).max(64);
 function registrarCanalesVideo(): void {
   manejar(CANALES.abrirVideo, FALLO, async (): Promise<Resultado<unknown>> => {
     if (ventana === null) return invalido;
-    // En Windows el diálogo de Electron/IFileDialog se cuelga en Descargas; usamos el clásico.
-    if (process.platform === 'win32') {
-      const ruta = await elegirVideoWindows();
-      if (ruta === null) return { ok: true, datos: null };
-      if (!esVideo(ruta)) {
-        return {
-          ok: false,
-          error: {
-            codigo: 'NO_ES_VIDEO',
-            mensaje: 'Ese archivo no es un video que podamos abrir. Usa MP4, MOV, M4V, WebM o MKV.',
-          },
-        };
-      }
-      return videos.abrir(ruta);
-    }
     const rutas = await elegirConDialogo({
       title: 'Elige el video que quieres revisar',
       defaultPath: carpetaInicialVideo(),

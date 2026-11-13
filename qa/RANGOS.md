@@ -71,7 +71,7 @@ Cada parámetro de este archivo tiene pruebas parametrizadas de mínimo-1, míni
 | Parámetro | Tipo | Mín | Máx | Default | Ante un valor inválido |
 |---|---|---|---|---|---|
 | `mascara.dilatacion_px` | entero, px | 8 | 512 (propuesta) | 8 | Estándar. El mínimo evita dejar bordes sin ocultar |
-| `mascara.dilatacion_pct` | decimal, % del lado corto | 0 | 50 | 10 | Estándar. Se usa el mayor entre este valor y `dilatacion_px` |
+| `mascara.dilatacion_pct` | decimal, % del lado corto | 0 | 50 | 10 | Estándar. Se usa el mayor entre este valor y `dilatacion_px`. En la UI, «Tamaño de la zona» de una detección auto ajusta este valor por zona (recuperable en `margenes`) |
 | `mascara.multiplicador_cara` | decimal | 1.0 | 3.0 | 1.3 | Estándar |
 | `mascara.cobertura` | decimal, % de la imagen | Más de 0 | 100 | Calculado | 0%: se rechaza con "La máscara está vacía". 100%: se permite tras confirmar |
 | `pincel.tamano_px` | entero, px de la foto original | 1 | 512 | 32 | Estándar. En la UI es un slider, que no puede salirse del rango. Un tamaño par da un píxel de más, nunca de menos |
@@ -87,8 +87,7 @@ Cada parámetro de este archivo tiene pruebas parametrizadas de mínimo-1, míni
 | `deteccion.umbral_confianza` | decimal | 0 | 1 | 0.25 (propuesta, favorece recall) | Estándar |
 | `deteccion.umbral_revision` | decimal | 0 | 1 | 0.6 (medido en una muestra chica) | Estándar. Debe ser mayor o igual que `umbral_confianza`, o se rechaza. Por debajo se dice "podría ser una cara" y no se pregunta por menores |
 | `caras.umbral_confirmar` | decimal | n/a | n/a | 0.6 (medido en una muestra chica) | Constante interna. Una detección dudosa por debajo de este valor se descarta. Si no se puede confirmar, se conserva |
-| `caras.confianza_sin_revisar_forma` | decimal | n/a | n/a | 0.6 | Constante interna (prendida). Por debajo, la detección de YuNet solo cuenta si los 5 puntos tienen forma de cara; encima, nunca se descarta por forma |
-| `contenido.umbral_escena` | decimal | n/a | n/a | 0.35; extremismo 0.6 (medido en una muestra chica) | Constante interna. Por encima se avisa sobre toda la imagen |
+| `contenido.umbral_escena` | decimal | n/a | n/a | 0.35; extremismo 0.6 (medido en una muestra chica) | Constante interna. Por encima se avisa sobre toda la imagen; las zonas de partes cubiertas solo se marcan como sugerentes cuando la escena también supera este umbral |
 | `contenido.desnudez_segura` | decimal | n/a | n/a | 0.7 (medido en una muestra chica) | Constante interna. Por debajo, la zona solo cuenta si la escena suma 0.1 o más en desnudez y sugerente |
 | `objetos.umbral` | decimal, por clase | n/a | n/a | Placa 0.1; joya y tarjeta 0.15; pantallas y bandera 0.2; armas 0.3 (medido en una muestra chica); letrero 0.15 y ventana con vista 0.3 (propuestas sin medir, subidas por ruido el 2026-11-11) | Constante interna |
 | `objetos.dentro_de_otra` | fracción del área | n/a | n/a | 0.7 | Constante interna. Una caja con esa parte dentro de otra mejor del mismo tipo se descarta |
