@@ -85,11 +85,13 @@ function textoAlcance(f: Fuente): string {
   }
 }
 
-export function DialogoPorQue({ regla, alCerrar }: { regla: Regla; alCerrar: () => void }): React.JSX.Element {
+/** `contexto` va antes del porqué: la Guía pone ahí el tema completo y qué significa su nivel. */
+export function DialogoPorQue({ regla, alCerrar, contexto }: { regla: Regla; alCerrar: () => void; contexto?: React.ReactNode }): React.JSX.Element {
   const referencia = useModal(alCerrar);
   return (
     <dialog ref={referencia} aria-labelledby="titulo-porque" className="dialogo ancho dialogo-porque" onClick={(e) => { if (clicFuera(e)) alCerrar(); }}>
       <h2 id="titulo-porque">¿Por qué {MARCA.nombre} te avisa de esto?</h2>
+      {contexto}
       <p className="porque-texto">{regla.por_que}</p>
       {regla.estado === 'pendiente_de_verificar' && (
         <p className="nota"><strong>Aún no tenemos una fuente oficial directa.</strong> {regla.nota}</p>

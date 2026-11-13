@@ -675,23 +675,13 @@ summary { cursor: pointer; min-height: 1.75rem; font-weight: 500; color: var(--t
 .guia-cabecera p { color: var(--texto-suave); font-size: 1.0625rem; margin-top: 0.25rem; }
 .guia-icono { flex: none; display: grid; place-items: center; width: 3.25rem; height: 3.25rem; border-radius: 14px; background: var(--marca-suave); color: var(--marca); }
 .guia-icono svg { width: 1.5rem; height: 1.5rem; }
-.guia-bloque, .guia-tema { scroll-margin-top: 4.5rem; }
-.guia-bloque {
-  padding: 0.875rem 1.375rem;
-  background: var(--superficie); border: 1px solid var(--borde-suave); border-radius: var(--radio-lg); box-shadow: var(--sombra-sm);
-}
-.guia-bloque summary { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; cursor: pointer; list-style: none; }
-.guia-bloque summary::-webkit-details-marker { display: none; }
-.guia-bloque summary h2 { font-size: 1rem; }
-.guia-bloque summary svg { flex: none; width: 1.125rem; height: 1.125rem; color: var(--texto-suave); transition: transform 150ms; }
-.guia-bloque[open] summary svg { transform: rotate(180deg); }
-.guia-bloque-cuerpo { display: grid; gap: 0.875rem; margin-top: 0.875rem; }
-.guia-niveles { display: grid; gap: 0.625rem; }
-.guia-niveles li { display: grid; grid-template-columns: 8.5rem minmax(0, 1fr); align-items: center; gap: 0.75rem; font-size: 0.9375rem; }
-.guia-niveles .pildora-nivel { justify-self: start; }
-.guia-leyenda { display: grid; gap: 0.5rem; padding-top: 0.75rem; border-top: 1px dashed var(--borde-suave); font-size: 0.9375rem; color: var(--texto-suave); }
-.guia-leyenda li { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
-.guia-nota { font-size: 0.8125rem; }
+.guia-tema { scroll-margin-top: 4.5rem; }
+.guia-leyenda { display: flex; flex-wrap: wrap; gap: 0.5rem 1.25rem; margin-top: -0.75rem; font-size: 0.8125rem; color: var(--texto-suave); }
+.guia-leyenda li { display: flex; align-items: center; gap: 0.375rem; }
+.guia-pie { display: grid; gap: 0.375rem; padding-top: 1rem; border-top: 1px solid var(--borde-suave); font-size: 0.8125rem; line-height: 1.55; }
+.porque-contexto { display: grid; gap: 0.5rem; padding-bottom: 0.75rem; border-bottom: 1px solid var(--borde-suave); }
+.porque-tema { font-weight: 650; }
+.porque-nivel { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; color: var(--texto-suave); font-size: 0.9375rem; }
 .insignia-revision {
   display: inline-flex; align-items: center; gap: 0.25rem; padding: 0.125rem 0.5rem; border-radius: 999px;
   font-size: 0.75rem; font-weight: 600; white-space: nowrap;
@@ -699,12 +689,6 @@ summary { cursor: pointer; min-height: 1.75rem; font-weight: 500; color: var(--t
 .insignia-revision svg { width: 0.875rem; height: 0.875rem; }
 .insignia-revision.sola { background: var(--marca-suave); color: var(--marca); }
 .insignia-revision.tuya { background: var(--superficie-2); color: var(--texto-suave); border: 1px dashed var(--borde-control); }
-.alcance-columnas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
-.alcance-caja { display: grid; gap: 0.625rem; align-content: start; padding: 0.875rem; border-radius: var(--radio-md); background: var(--superficie-2); }
-.alcance-caja h3 { display: flex; align-items: center; gap: 0.375rem; font-size: 0.9375rem; }
-.alcance-caja h3 svg { color: var(--marca); }
-.lista-chips { display: flex; flex-wrap: wrap; gap: 0.375rem; }
-.lista-chips li { padding: 0.25rem 0.625rem; border-radius: 999px; background: var(--superficie); border: 1px solid var(--borde-suave); font-size: 0.8125rem; }
 .guia-filtros {
   position: sticky; top: 0; z-index: 2; display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem;
   padding: 0.75rem; margin: 0 -0.75rem; border-radius: var(--radio-lg);
@@ -720,20 +704,28 @@ summary { cursor: pointer; min-height: 1.75rem; font-weight: 500; color: var(--t
 .guia-tema { display: grid; gap: 0.875rem; }
 .guia-tema-cabecera { display: flex; align-items: center; gap: 0.625rem; }
 .guia-tema-cabecera h2 { font-size: 1.25rem; font-weight: 750; }
-.guia-tarjetas { display: grid; grid-template-columns: repeat(auto-fill, minmax(19rem, 1fr)); gap: 0.875rem; }
+.guia-tarjetas { display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: 0.75rem; }
 .guia-tarjeta {
-  display: flex; flex-direction: column; gap: 0.625rem; padding: 1rem 1.125rem;
+  display: flex; flex-direction: column; gap: 0.625rem; width: 100%; height: 100%; padding: 0.875rem 1rem;
+  font: inherit; color: inherit; text-align: left; cursor: pointer;
   background: var(--superficie); border: 1px solid var(--borde-suave); border-top: 3px solid var(--borde-control);
   border-radius: var(--radio-md); box-shadow: var(--sombra-sm);
+  transition: transform 120ms, box-shadow 120ms, border-color 120ms;
 }
+.guia-tarjeta:hover { transform: translateY(-2px); box-shadow: var(--sombra-md); border-color: var(--borde-control); }
+.guia-tarjeta:focus-visible { outline: 3px solid var(--marca); outline-offset: 2px; }
 .guia-tarjeta.alto { border-top-color: var(--riesgo-alto); }
 .guia-tarjeta.medio { border-top-color: var(--riesgo-medio); }
 .guia-tarjeta.bajo { border-top-color: var(--riesgo-bajo); }
 .guia-tarjeta-meta { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.375rem; }
-.guia-tarjeta h3 { font-size: 1rem; line-height: 1.35; }
-.guia-tarjeta p { font-size: 0.9375rem; line-height: 1.55; color: var(--texto-suave); flex: 1; }
-.guia-tarjeta-pie { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem; padding-top: 0.5rem; border-top: 1px solid var(--borde-suave); font-size: 0.8125rem; }
-.guia-tarjeta-pie .enlace { font-size: 0.875rem; }
+.guia-tarjeta-titulo { flex: 1; font-size: 1rem; font-weight: 650; line-height: 1.35; }
+.guia-tarjeta-pie { display: flex; align-items: center; gap: 0.25rem; font-size: 0.8125rem; font-weight: 600; color: var(--marca); }
+.guia-tarjeta-pie svg { width: 0.875rem; height: 0.875rem; transition: transform 120ms; }
+.guia-tarjeta:hover .guia-tarjeta-pie svg { transform: translateX(2px); }
+@media (prefers-reduced-motion: reduce) {
+  .guia-tarjeta, .guia-tarjeta-pie svg { transition: none; }
+  .guia-tarjeta:hover { transform: none; }
+}
 .advertencias { display: grid; gap: 0.75rem; }
 
 /* Inicio: mini tutorial de tres pasos, unidos por flechas. */
@@ -933,10 +925,9 @@ summary { cursor: pointer; min-height: 1.75rem; font-weight: 500; color: var(--t
   .app { height: auto; min-height: 100%; }
   .cuerpo { grid-template-columns: minmax(0, 1fr); padding: 0.75rem; }
   .cuerpo > * { overflow: visible; }
-  .caracteristicas-grid, .alcance-columnas, .atajos-grupos { grid-template-columns: minmax(0, 1fr); }
+  .caracteristicas-grid, .atajos-grupos { grid-template-columns: minmax(0, 1fr); }
   .guia-marco { grid-template-columns: minmax(0, 1fr); }
   .guia-indice { position: static; }
-  .guia-niveles li { grid-template-columns: minmax(0, 1fr); gap: 0.25rem; }
   .vacio-tarjeta { padding: 1.5rem 1rem; }
   .ventana-lienzo { max-height: none; min-height: 0; padding: 3.75rem 0.75rem 3.25rem; }
   .ventana-lienzo.ampliada { height: 75vh; }

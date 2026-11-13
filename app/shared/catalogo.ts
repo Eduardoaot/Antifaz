@@ -23,6 +23,8 @@ const esquemaRegla = z.object({
   id: z.string(),
   categoria: z.string(),
   que_detecta: z.string(),
+  /** Nombre del tema en la Guía, para leerla de un vistazo. Sin él, se usa `que_detecta`. */
+  titulo_corto: z.string().optional(),
   nivel_riesgo: z.enum(['alto', 'medio', 'bajo']),
   por_que: z.string(),
   fuentes: z.array(esquemaFuente),

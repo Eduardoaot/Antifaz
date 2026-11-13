@@ -101,6 +101,7 @@
       "id": "MEN-01",
       "categoria": "posibles_menores",
       "que_detecta": "Cualquier cara, junto con pistas de contexto como uniformes. No se estima ninguna edad",
+      "titulo_corto": "Niñas y niños",
       "nivel_riesgo": "alto",
       "por_que": "Una foto puede revelar la escuela, el horario o la rutina de una niña o un niño. Conviene ocultar su cara o preguntarte si debe aparecer.",
       "fuentes": [
@@ -168,6 +169,7 @@
       "id": "DOC-01",
       "categoria": "documentos_identidad",
       "que_detecta": "INE, pasaporte, licencia, actas y otros documentos de identidad",
+      "titulo_corto": "Documentos de identidad",
       "nivel_riesgo": "alto",
       "por_que": "Se ve un documento de identidad. Alguien podría usar mal sus datos, así que es mejor ocultarlo.",
       "fuentes": [
@@ -219,6 +221,7 @@
       "id": "FIN-01",
       "categoria": "informacion_financiera",
       "que_detecta": "Tarjetas, estados de cuenta, cheques y números de cuenta",
+      "titulo_corto": "Datos bancarios",
       "nivel_riesgo": "alto",
       "por_que": "Se ve información de tus finanzas. Con esos datos alguien podría intentar un fraude, así que conviene ocultarla.",
       "fuentes": [
@@ -283,6 +286,7 @@
       "id": "VIA-01",
       "categoria": "boletos_viajes",
       "que_detecta": "Pases de abordar y su código, y boletos",
+      "titulo_corto": "Boletos y pases de abordar",
       "nivel_riesgo": "alto",
       "por_que": "Se ve un boleto o pase de abordar. Revela tus fechas de viaje y su código puede contener tus datos, así que conviene ocultarlo.",
       "fuentes": [
@@ -345,6 +349,7 @@
       "id": "UBI-01",
       "categoria": "ubicacion",
       "que_detecta": "Coordenadas GPS en los metadatos del archivo",
+      "titulo_corto": "Ubicación GPS del archivo",
       "nivel_riesgo": "alto",
       "por_que": "Este archivo guarda el lugar exacto donde se tomó. Al exportar, se borra para que no viaje con tu foto o video.",
       "fuentes": [
@@ -397,6 +402,7 @@
       "id": "UBI-02",
       "categoria": "ubicacion",
       "que_detecta": "Fachadas de casas y números de domicilio",
+      "titulo_corto": "Fachadas y números de casa",
       "nivel_riesgo": "medio",
       "por_que": "Se ve algo que podría ubicar tu casa. Si no quieres que se sepa dónde vives, conviene ocultarlo.",
       "fuentes": [
@@ -488,6 +494,7 @@
       "id": "UBI-04",
       "categoria": "ubicacion",
       "que_detecta": "Letreros de calles y referencias del lugar",
+      "titulo_corto": "Letreros y calles",
       "nivel_riesgo": "medio",
       "por_que": "Se ve un letrero que podría indicar dónde estás. Si no quieres compartir el lugar, conviene ocultarlo.",
       "fuentes": [
@@ -589,6 +596,7 @@
       "id": "VAL-02",
       "categoria": "objetos_valor",
       "que_detecta": "Joyas, efectivo y compras costosas",
+      "titulo_corto": "Objetos de valor",
       "nivel_riesgo": "bajo",
       "por_que": "Se ve algo de valor. Mostrarlo puede llamar la atención de quien no quieres, así que tú decides si dejarlo.",
       "fuentes": [
@@ -615,6 +623,7 @@
       "id": "PAN-01",
       "categoria": "pantallas",
       "que_detecta": "Celulares, monitores o TV con contenido legible",
+      "titulo_corto": "Pantallas con texto",
       "nivel_riesgo": "bajo",
       "por_que": "Se ve una pantalla con texto. Podría mostrar mensajes o datos que no quieres compartir, así que conviene ocultarla.",
       "fuentes": [
@@ -641,6 +650,7 @@
       "id": "CON-01",
       "categoria": "contacto_personal",
       "que_detecta": "Teléfonos, correos y direcciones escritas",
+      "titulo_corto": "Datos de contacto",
       "nivel_riesgo": "alto",
       "por_que": "Se ve un dato de contacto. Cualquiera podría usarlo para buscarte o molestarte, así que conviene ocultarlo.",
       "fuentes": [
@@ -706,6 +716,7 @@
       "id": "MED-01",
       "categoria": "informacion_medica",
       "que_detecta": "Recetas, pulseras de hospital y resultados médicos",
+      "titulo_corto": "Información médica",
       "nivel_riesgo": "alto",
       "por_que": "Se ve información de salud. Es un dato muy personal, tuyo o de alguien más, así que conviene ocultarlo.",
       "fuentes": [
@@ -744,6 +755,7 @@
       "id": "COD-01",
       "categoria": "codigos",
       "que_detecta": "Códigos QR y de barras legibles",
+      "titulo_corto": "Códigos QR y de barras",
       "nivel_riesgo": "bajo",
       "por_que": "Se ve un código que se puede leer. Podría guardar datos que no se ven a simple vista, así que conviene ocultarlo.",
       "fuentes": [],
@@ -756,6 +768,7 @@
       "id": "DES-01",
       "categoria": "desnudez",
       "que_detecta": "Posible desnudez, en fotos o en dibujos",
+      "titulo_corto": "Posible desnudez",
       "nivel_riesgo": "alto",
       "por_que": "Podría verse desnudez, y una vez publicada es muy difícil de borrar. Si es de otra persona necesitas su permiso, así que la marcamos para taparla.",
       "fuentes": [
@@ -795,6 +808,7 @@
       "id": "SUG-01",
       "categoria": "contenido_sugerente",
       "que_detecta": "Contenido que podría ser sexualmente sugerente, en fotos o en dibujos",
+      "titulo_corto": "Contenido sugerente",
       "nivel_riesgo": "medio",
       "por_que": "Esta imagen podría considerarse sugerente, e Instagram podría limitarla. Tú decides si quieres que todos la vean.",
       "fuentes": [
@@ -832,6 +846,7 @@
       "id": "ARM-01",
       "categoria": "armas",
       "que_detecta": "Posibles armas o personas armadas o con uniforme militar",
+      "titulo_corto": "Armas",
       "nivel_riesgo": "alto",
       "por_que": "Esta imagen podría mostrar armas o personas armadas. Podría ponerte en riesgo a ti o a quienes aparecen, o limitar su alcance en la plataforma.",
       "fuentes": [
@@ -859,6 +874,7 @@
       "id": "EXT-01",
       "categoria": "extremismo",
       "que_detecta": "Posibles símbolos de grupos armados o extremistas",
+      "titulo_corto": "Símbolos extremistas",
       "nivel_riesgo": "alto",
       "por_que": "Esta imagen podría mostrar símbolos de un grupo armado o extremista. Sin contexto podría malinterpretarse o traerte problemas con la plataforma.",
       "fuentes": [

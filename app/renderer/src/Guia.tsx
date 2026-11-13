@@ -1,7 +1,7 @@
-import { BookOpen, CheckCircle2, ChevronDown, CircleDashed, Search, X } from 'lucide-react';
+import { BookOpen, CheckCircle2, ChevronRight, CircleDashed, Search, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { AVISO_LEGAL, catalogo, type Nivel, type Regla } from '../../shared/catalogo';
-import { agruparReglas, alcanceRevision, revisaSola } from '../../shared/logica';
+import { agruparReglas, revisaSola } from '../../shared/logica';
 import { IconoCategoria, PildoraNivel } from './Advertencias';
 import { DialogoPorQue } from './Dialogos';
 
@@ -14,30 +14,41 @@ const FILTROS: readonly { valor: Filtro; texto: string }[] = [
   { valor: 'bajo', texto: 'Riesgo bajo' },
 ];
 
-const SIGNIFICADO: readonly { nivel: Nivel; texto: string }[] = [
-  { nivel: 'alto', texto: 'Podría exponerte a ti o a alguien más a un daño serio. Conviene ocultarlo.' },
-  { nivel: 'medio', texto: 'Da pistas sobre ti o tu entorno. Decide según quién verá la foto.' },
-  { nivel: 'bajo', texto: 'Es común y casi nunca es un problema, pero vale la pena notarlo.' },
-];
+const SIGNIFICADO: Readonly<Record<Nivel, string>> = {
+  alto: 'Podría exponerte a ti o a alguien más a un daño serio. Conviene ocultarlo.',
+  medio: 'Da pistas sobre ti o tu entorno. Decide según quién verá la foto.',
+  bajo: 'Es común y casi nunca es un problema, pero vale la pena notarlo.',
+};
 
 const ancla = (titulo: string): string => `guia-${titulo.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
 
 const normalizar = (texto: string): string => texto.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
-/** Se puede consultar sin cargar ninguna foto y sin internet: el catálogo viaja dentro de la app. */
+const tituloDe = (r: Regla): string => r.titulo_corto ?? r.que_detecta;
+
+function Insignia({ sola }: { sola: boolean }): React.JSX.Element {
+  return sola
+    ? <span className="insignia-revision sola"><CheckCircle2 aria-hidden="true" /> Lo buscamos solos</span>
+    : <span className="insignia-revision tuya"><CircleDashed aria-hidden="true" /> Revísalo tú</span>;
+}
+
+/**
+ * Se puede consultar sin cargar ninguna foto y sin internet: el catálogo viaja dentro de la app.
+ * Cada tema se lee de un vistazo (nivel, quién lo revisa y nombre); el porqué y las fuentes se abren al tocarlo.
+ */
 export function Guia(): React.JSX.Element {
   const [abierta, setAbierta] = useState<Regla | null>(null);
   const [busqueda, setBusqueda] = useState('');
   const [filtro, setFiltro] = useState<Filtro>('todos');
-  const { revisa, noRevisa } = alcanceRevision();
   const grupos = useMemo(() => agruparReglas(), []);
   const termino = normalizar(busqueda.trim());
   const filtrados = grupos
     .map(({ titulo, reglas }) => ({
       titulo,
+      // Busca también en lo que no se ve en la tarjeta, para que nada quede fuera de alcance.
       reglas: reglas.filter((r) =>
         (filtro === 'todos' || r.nivel_riesgo === filtro)
-        && (termino === '' || normalizar(`${r.que_detecta} ${r.por_que} ${titulo}`).includes(termino))),
+        && (termino === '' || normalizar(`${tituloDe(r)} ${r.que_detecta} ${r.por_que} ${titulo}`).includes(termino))),
     }))
     .filter((g) => g.reglas.length > 0);
   const total = filtrados.reduce((n, g) => n + g.reglas.length, 0);
@@ -47,9 +58,6 @@ export function Guia(): React.JSX.Element {
       <div className="guia-marco">
         <nav className="guia-indice" aria-label="En esta guía">
           <p className="guia-indice-titulo">En esta guía</p>
-          <a href="#guia-como-leer">Cómo leerla</a>
-          <a href="#guia-alcance">Qué revisamos en cada foto</a>
-          <span className="guia-indice-separador" aria-hidden="true" />
           {grupos.map(({ titulo, reglas }) => (
             <a key={titulo} href={`#${ancla(titulo)}`}>
               <span>{titulo}</span>
@@ -63,7 +71,7 @@ export function Guia(): React.JSX.Element {
             <span className="guia-icono" aria-hidden="true"><BookOpen /></span>
             <div>
               <h1>Guía de privacidad</h1>
-              <p>Qué conviene revisar antes de publicar, por qué, y de dónde sale cada recomendación.</p>
+              <p>Lo que conviene revisar antes de publicar. Toca un tema para ver por qué importa.</p>
             </div>
           </header>
 
@@ -86,46 +94,10 @@ export function Guia(): React.JSX.Element {
             <p className="suave guia-resultados" aria-live="polite">{total} de {catalogo.reglas.length} temas</p>
           </div>
 
-          {/* Plegados: lo primero que se ve son los temas, no la explicación. */}
-          <details id="guia-como-leer" className="guia-bloque">
-            <summary><h2>Cómo leer esta guía</h2><ChevronDown aria-hidden="true" /></summary>
-            <div className="guia-bloque-cuerpo">
-              <ul className="guia-niveles">
-                {SIGNIFICADO.map(({ nivel, texto }) => (
-                  <li key={nivel}><PildoraNivel nivel={nivel} /><span>{texto}</span></li>
-                ))}
-              </ul>
-              <ul className="guia-leyenda">
-                <li><span className="insignia-revision sola"><CheckCircle2 aria-hidden="true" /> Lo buscamos solos</span> La app lo marca en cada foto.</li>
-                <li><span className="insignia-revision tuya"><CircleDashed aria-hidden="true" /> Revísalo tú</span> Todavía no lo detectamos: puedes taparlo con las herramientas.</li>
-              </ul>
-              <p className="suave guia-nota">Cuando no encontramos una fuente oficial directa, lo decimos. {AVISO_LEGAL} Versión del catálogo: {catalogo.version}.</p>
-            </div>
-          </details>
-
-          <details id="guia-alcance" className="guia-bloque">
-            <summary><h2>Qué revisamos en cada foto</h2><ChevronDown aria-hidden="true" /></summary>
-            <div className="guia-bloque-cuerpo">
-              <p className="suave">
-                La revisión es orientativa. Si en una foto algo no se pudo revisar, te lo decimos en esa foto.
-                Un documento o una tarjeta sin texto legible podría pasar sin aviso.
-              </p>
-              <div className="alcance-columnas">
-                <div className="alcance-caja">
-                  <h3><CheckCircle2 aria-hidden="true" /> Lo buscamos solos ({revisa.length})</h3>
-                  <ul className="lista-chips">
-                    {revisa.map((nombre) => <li key={nombre}>{nombre}</li>)}
-                  </ul>
-                </div>
-                <div className="alcance-caja">
-                  <h3><CircleDashed aria-hidden="true" /> Todavía no lo revisamos solos ({noRevisa.length})</h3>
-                  <ul className="lista-chips">
-                    {noRevisa.map((r) => <li key={r.id}>{r.que_detecta}</li>)}
-                  </ul>
-                </div>
-              </div>
-            </div>
-          </details>
+          <ul className="guia-leyenda" aria-label="Qué significan las insignias">
+            <li><Insignia sola /> la app lo marca en cada foto</li>
+            <li><Insignia sola={false} /> tápalo tú con las herramientas</li>
+          </ul>
 
           {filtrados.length === 0 && (
             <p className="guia-vacia">Nada coincide con tu búsqueda. Prueba con otra palabra o quita el filtro.</p>
@@ -142,32 +114,43 @@ export function Guia(): React.JSX.Element {
                 </div>
                 <ul className="guia-tarjetas">
                   {reglas.map((r) => (
-                    <li key={r.id} className={`guia-tarjeta ${r.nivel_riesgo}`}>
-                      <div className="guia-tarjeta-meta">
-                        <PildoraNivel nivel={r.nivel_riesgo} />
-                        {revisaSola(r.id)
-                          ? <span className="insignia-revision sola"><CheckCircle2 aria-hidden="true" /> Lo buscamos solos</span>
-                          : <span className="insignia-revision tuya"><CircleDashed aria-hidden="true" /> Revísalo tú</span>}
-                      </div>
-                      <h3>{r.que_detecta}</h3>
-                      <p>{r.por_que}</p>
-                      <div className="guia-tarjeta-pie">
-                        {r.estado === 'pendiente_de_verificar'
-                          ? <span className="suave">Aún no tenemos una fuente oficial directa.</span>
-                          : <span className="suave">{r.fuentes.length} {r.fuentes.length === 1 ? 'fuente' : 'fuentes'}</span>}
-                        <button type="button" className="enlace" onClick={() => { setAbierta(r); }}>
-                          Ver fuentes<span className="solo-lector">: {r.que_detecta}</span>
-                        </button>
-                      </div>
+                    <li key={r.id}>
+                      <button type="button" className={`guia-tarjeta ${r.nivel_riesgo}`} data-regla={r.id} onClick={() => { setAbierta(r); }}>
+                        <span className="guia-tarjeta-meta">
+                          <PildoraNivel nivel={r.nivel_riesgo} />
+                          <Insignia sola={revisaSola(r.id)} />
+                        </span>
+                        <span className="guia-tarjeta-titulo">{tituloDe(r)}</span>
+                        <span className="guia-tarjeta-pie">Por qué y fuentes <ChevronRight aria-hidden="true" /></span>
+                      </button>
                     </li>
                   ))}
                 </ul>
               </section>
             );
           })}
+
+          <footer className="guia-pie suave">
+            <p>
+              La revisión es orientativa: si en una foto algo no se pudo revisar, te lo decimos ahí. Un documento o una
+              tarjeta sin texto legible podría pasar sin aviso.
+            </p>
+            <p>Cuando no encontramos una fuente oficial directa, lo decimos. {AVISO_LEGAL} Versión del catálogo: {catalogo.version}.</p>
+          </footer>
         </div>
       </div>
-      {abierta !== null && <DialogoPorQue regla={abierta} alCerrar={() => { setAbierta(null); }} />}
+      {abierta !== null && (
+        <DialogoPorQue
+          regla={abierta}
+          alCerrar={() => { setAbierta(null); }}
+          contexto={(
+            <div className="porque-contexto">
+              <p className="porque-tema">{abierta.que_detecta}</p>
+              <p className="porque-nivel"><PildoraNivel nivel={abierta.nivel_riesgo} /> {SIGNIFICADO[abierta.nivel_riesgo]}</p>
+            </div>
+          )}
+        />
+      )}
     </main>
   );
 }

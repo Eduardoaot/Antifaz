@@ -302,10 +302,8 @@ test('foto sin nada: lo dice sin prometer de más', async () => {
   // Qué se revisa y qué no ya no se repite en cada foto: está en la Guía.
   await expect(pagina.getByText(/Lo que todavía no revisamos/)).toHaveCount(0);
   await irA(pagina, 'Guía de privacidad');
-  await expect(pagina.getByText(/La revisión es orientativa/)).toBeHidden();
-  await pagina.getByRole('heading', { name: 'Qué revisamos en cada foto' }).click();
   await expect(pagina.getByText(/La revisión es orientativa/)).toBeVisible();
-  await expect(pagina.getByRole('heading', { name: /^Todavía no lo revisamos solos/ })).toBeVisible();
+  await expect(pagina.locator('.guia-tarjeta .insignia-revision.tuya').first()).toBeVisible();
 });
 
 // Muestras sensibles fuera del repo: se corre en local con REVISOR_MUESTRAS apuntando a la carpeta.
@@ -370,13 +368,35 @@ test('Guía de privacidad: se consulta sin ninguna foto', async () => {
   await irA(pagina, 'Guía de privacidad');
   await expect(pagina.getByRole('heading', { name: 'Guía de privacidad', level: 1 })).toBeVisible();
   await expect(pagina.getByRole('heading', { name: 'Armas y grupos armados' })).toBeVisible();
+  // La tarjeta lleva el nombre corto; el detalle completo está en el diálogo.
+  await expect(pagina.locator('[data-regla="MEN-01"]')).toContainText('Niñas y niños');
+  await expect(pagina.locator('[data-regla="MEN-01"]')).not.toContainText('No se estima ninguna edad');
   await expect(pagina.getByText('Placas de autos y motos', { exact: true })).toBeVisible();
   await sinViolaciones(pagina);
-  await pagina.getByRole('button', { name: /^Ver fuentes\s*:\s*Placas/ }).click();
-  await expect(pagina.getByRole('dialog')).toContainText('Aún no tenemos una fuente oficial directa');
+  await pagina.screenshot({ path: join(CAPTURAS, 'guia-claro.png') });
+  await pagina.locator('[data-regla="MAT-01"]').click();
+  const dialogo = pagina.getByRole('dialog');
+  await expect(dialogo).toContainText('Aún no tenemos una fuente oficial directa');
+  await expect(dialogo).toContainText('Da pistas sobre ti o tu entorno');
   await sinViolaciones(pagina);
+  await pagina.screenshot({ path: join(CAPTURAS, 'guia-dialogo-claro.png') });
   await pagina.keyboard.press('Escape');
-  await irA(pagina, 'Guía de privacidad');
+
+  // El buscador también encuentra lo que no se ve en la tarjeta.
+  await pagina.getByPlaceholder(/^Buscar:/).fill('fraude');
+  await expect(pagina.locator('[data-regla="FIN-01"]')).toBeVisible();
+  await expect(pagina.locator('.guia-tarjeta')).toHaveCount(1);
+  await pagina.getByRole('button', { name: 'Borrar la búsqueda' }).click();
+
+  await elegirTema(pagina, 'oscuro');
+  await expect(pagina.getByRole('heading', { name: 'Guía de privacidad', level: 1 })).toBeVisible();
+  await sinViolaciones(pagina);
+  await pagina.screenshot({ path: join(CAPTURAS, 'guia-oscuro.png') });
+  await pagina.locator('[data-regla="MEN-01"]').click();
+  await expect(pagina.getByRole('dialog')).toContainText('No se estima ninguna edad');
+  await pagina.screenshot({ path: join(CAPTURAS, 'guia-dialogo-oscuro.png') });
+  await pagina.keyboard.press('Escape');
+  await irA(pagina, 'Fotos');
   await expect(pagina.getByRole('heading', { name: 'Revisa tus fotos antes de publicarlas' })).toBeVisible();
 });
 

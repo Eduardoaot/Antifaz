@@ -43,6 +43,7 @@
           "enum": ["caras_terceros", "posibles_menores", "documentos_identidad", "informacion_financiera", "boletos_viajes", "ubicacion", "matriculas", "objetos_valor", "pantallas", "contacto_personal", "informacion_medica", "codigos", "desnudez", "contenido_sugerente", "armas", "extremismo", "espacios_intimos"]
         },
         "que_detecta": { "type": "string", "minLength": 1 },
+        "titulo_corto": { "type": "string", "minLength": 1, "maxLength": 32 },
         "nivel_riesgo": { "enum": ["alto", "medio", "bajo"] },
         "por_que": { "type": "string", "minLength": 1, "maxLength": 240 },
         "fuentes": { "type": "array", "items": { "$ref": "#/$defs/fuente" } },
