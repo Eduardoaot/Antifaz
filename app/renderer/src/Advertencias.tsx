@@ -24,6 +24,9 @@ import {
   etiquetaNivelMostrado,
   intensidadDe,
   limitarIntensidad,
+  limitarMargen,
+  margenPctDe,
+  elegirMargenVarias,
   posicionDe,
   responderMenores,
   restablecerSticker,
@@ -209,6 +212,49 @@ export function ControlIntensidad({ valor, etiqueta, alCambiar, conAviso = false
       <p id={`${id}-ayuda`} className="suave ayuda-intensidad" aria-live="polite">
         {baja && 'Con poca intensidad es más fácil reconocer lo que hay debajo. '}
         {conAviso && 'El difuminado y el pixelado conservan los colores de tu foto, y con herramientas especiales alguien podría reconstruir parte. Para la máxima protección, usa Bloque sólido o un emoji.'}
+      </p>
+    </div>
+  );
+}
+
+interface PropsMargen {
+  /** Null si las zonas tienen márgenes distintos. */
+  valor: number | null;
+  etiqueta: string;
+  alCambiar: (valor: number) => void;
+}
+
+/** Margen alrededor de la detección: agranda o achica la censura auto. */
+export function ControlMargen({ valor, etiqueta, alCambiar }: PropsMargen): React.JSX.Element {
+  const id = useId();
+  const [moviendo, setMoviendo] = useState<number | null>(null);
+  const actual = moviendo ?? valor ?? LIMITES.dilatacionPct.porDefecto;
+  const confirmar = (): void => {
+    if (moviendo === null) return;
+    setMoviendo(null);
+    if (moviendo !== valor) alCambiar(limitarMargen(moviendo));
+  };
+  return (
+    <div className="campo-intensidad">
+      <label htmlFor={id}>{etiqueta}</label>
+      <div className="fila-rango">
+        <input
+          id={id}
+          type="range"
+          min={LIMITES.dilatacionPct.min}
+          max={LIMITES.dilatacionPct.max}
+          value={actual}
+          aria-valuetext={valor === null && moviendo === null ? 'Varias' : `${actual} por ciento de margen`}
+          aria-describedby={`${id}-ayuda`}
+          onChange={(e) => { setMoviendo(Number(e.target.value)); }}
+          onPointerUp={confirmar}
+          onKeyUp={confirmar}
+          onBlur={confirmar}
+        />
+        <output htmlFor={id}>{valor === null && moviendo === null ? 'Varias' : actual}</output>
+      </div>
+      <p id={`${id}-ayuda`} className="suave ayuda-intensidad">
+        Más alto cubre con más margen alrededor de lo detectado. Más bajo se acerca al borde de la detección.
       </p>
     </div>
   );
@@ -464,6 +510,7 @@ function GrupoRiesgo({ grupo, hallazgos, revision, alCambiar, abierto, alAbrir, 
   const efectos = conZona.map((h) => efectoDe(revision, h));
   const efecto = valorComun(efectos);
   const intensidades = ids.map((z) => intensidadDe(revision, z));
+  const margenes = ids.map((z) => margenPctDe(revision, z));
   const conIntensidad = efectos.some(usaIntensidad);
   const primero = grupo.hallazgos[0];
   const resaltadoAqui = resaltado !== null && ids.includes(resaltado.id);
@@ -533,6 +580,11 @@ function GrupoRiesgo({ grupo, hallazgos, revision, alCambiar, abierto, alAbrir, 
                     alCambiar={(v) => { alCambiar((r) => elegirIntensidadVarias(r, ids, v)); }}
                   />
                 )}
+                <ControlMargen
+                  valor={valorComun(margenes)}
+                  etiqueta={`Tamaño de ${conZona.length === 1 ? 'la zona' : 'las zonas'}`}
+                  alCambiar={(v) => { alCambiar((r) => elegirMargenVarias(r, ids, v)); }}
+                />
               </div>
               {conZona.length > 1 && (
                 <ul className="zonas">
@@ -617,6 +669,7 @@ function FilaZona({ hallazgo, nombre, titulo, revision, alCambiar, resaltado, al
       {usaIntensidad(efecto) && (
         <ControlIntensidad valor={intensidadDe(revision, hallazgo.id)} etiqueta="Intensidad" alCambiar={(v) => { alCambiar((r) => elegirIntensidadVarias(r, [hallazgo.id], v)); }} />
       )}
+      <ControlMargen valor={margenPctDe(revision, hallazgo.id)} etiqueta="Tamaño de la zona" alCambiar={(v) => { alCambiar((r) => elegirMargenVarias(r, [hallazgo.id], v)); }} />
       <ExtrasZona hallazgo={hallazgo} nombre={nombre} revision={revision} alCambiar={alCambiar} seleccionSticker={seleccionSticker} alSeleccionarSticker={alSeleccionarSticker} />
     </li>
   );
@@ -704,6 +757,7 @@ export function ControlesZona({ hallazgo, nombre, revision, alCambiar }: { halla
       {usaIntensidad(efecto) && (
         <ControlIntensidad valor={intensidadDe(revision, hallazgo.id)} etiqueta="Intensidad" alCambiar={(v) => { alCambiar((r) => elegirIntensidadVarias(r, [hallazgo.id], v)); }} />
       )}
+      <ControlMargen valor={margenPctDe(revision, hallazgo.id)} etiqueta="Tamaño de la zona" alCambiar={(v) => { alCambiar((r) => elegirMargenVarias(r, [hallazgo.id], v)); }} />
     </div>
   );
 }

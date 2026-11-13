@@ -6,6 +6,7 @@ import {
   agregarPuntoTrazo,
   anchoAjustado,
   aPuntoDeImagen,
+  cajaConMargen,
   cajaEntre,
   descartarZona,
   desplazamientoAnclado,
@@ -13,6 +14,7 @@ import {
   escalaDe,
   limitarCorte,
   limitarZoom,
+  margenPctDe,
   opacidadRotulo,
   pasoZoom,
   posicionDe,
@@ -299,8 +301,13 @@ export function Visor({ archivo, hallazgos, ocultamientos, revision, herramienta
   }, [listo]);
 
   const conCaja = hallazgos.filter((h) => h.caja !== null && revision?.descartadas.includes(h.id) !== true);
+  // Las marcas auto se dibujan dilatadas: el clic usa la misma caja para que coincida con lo que se ve.
   const zonas = [
-    ...conCaja.flatMap((h) => (h.caja === null ? [] : [{ id: h.id, caja: h.caja }])),
+    ...conCaja.flatMap((h) => {
+      if (h.caja === null) return [];
+      const caja = revision === null ? h.caja : cajaConMargen(h.caja, margenPctDe(revision, h.id), ancho, alto);
+      return [{ id: h.id, caja }];
+    }),
     ...(revision?.manuales ?? []).map((z) => ({ id: z.id, caja: { x: z.x, y: z.y, ancho: z.ancho, alto: z.alto } })),
   ];
 
@@ -603,13 +610,14 @@ export function Visor({ archivo, hallazgos, ocultamientos, revision, herramienta
             {!comparando && conCaja.map((h) => {
               const caja = h.caja;
               if (caja === null) return null;
+              const vista = revision === null ? caja : cajaConMargen(caja, margenPctDe(revision, h.id), ancho, alto);
               return (
                 <div
                   key={h.id}
                   aria-hidden="true"
                   data-marca={h.id}
-                  className={`marca ${revision?.decisiones[h.id] ?? 'sin-decidir'}${claseMarca(h.id, caja)}`}
-                  style={porcentajes(caja, ancho, alto)}
+                  className={`marca ${revision?.decisiones[h.id] ?? 'sin-decidir'}${claseMarca(h.id, vista)}`}
+                  style={porcentajes(vista, ancho, alto)}
                 />
               );
             })}

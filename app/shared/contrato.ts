@@ -396,6 +396,8 @@ export const esquemaEdicion = z.strictObject({
   // Opcionales por la misma razón: giro del sticker y zonas detectadas que quitaste de la foto.
   rotaciones: z.record(z.string(), z.number().min(-LIMITES.rotacionSticker.max).max(LIMITES.rotacionSticker.max)).default({}),
   descartadas: z.array(z.string().min(1).max(64)).max(LIMITES.ocultamientos).default([]),
+  // Margen/tamaño de la censura auto (`dilatacion_pct`). Opcional: recuperaciones anteriores no lo traen.
+  margenes: z.record(z.string(), z.number().min(LIMITES.dilatacionPct.min).max(LIMITES.dilatacionPct.max)).default({}),
 });
 export type Edicion = z.infer<typeof esquemaEdicion>;
 

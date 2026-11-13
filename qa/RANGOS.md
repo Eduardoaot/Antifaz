@@ -70,7 +70,7 @@ Cada parámetro de este archivo tiene pruebas parametrizadas de mínimo-1, míni
 | Parámetro | Tipo | Mín | Máx | Default | Ante un valor inválido |
 |---|---|---|---|---|---|
 | `mascara.dilatacion_px` | entero, px | 8 | 512 (propuesta) | 8 | Estándar. El mínimo evita dejar bordes sin ocultar |
-| `mascara.dilatacion_pct` | decimal, % del lado corto | 0 | 50 | 10 | Estándar. Se usa el mayor entre este valor y `dilatacion_px` |
+| `mascara.dilatacion_pct` | decimal, % del lado corto | 0 | 50 | 10 | Estándar. Se usa el mayor entre este valor y `dilatacion_px`. En la UI, «Tamaño de la zona» de una detección auto ajusta este valor por zona (recuperable en `margenes`) |
 | `mascara.multiplicador_cara` | decimal | 1.0 | 3.0 | 1.3 | Estándar |
 | `mascara.cobertura` | decimal, % de la imagen | Más de 0 | 100 | Calculado | 0%: se rechaza con "La máscara está vacía". 100%: se permite tras confirmar |
 | `pincel.tamano_px` | entero, px de la foto original | 1 | 512 | 32 | Estándar. En la UI es un slider, que no puede salirse del rango. Un tamaño par da un píxel de más, nunca de menos |

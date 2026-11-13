@@ -26,12 +26,16 @@ import {
   desdeEdicion,
   efectoDe,
   elegirEfectoVarias,
+  cajaConMargen,
   elegirIntensidadGlobal,
   elegirIntensidadVarias,
+  elegirMargenVarias,
   estadoDeZonas,
   hayCambios,
   intensidadDe,
   limitarIntensidad,
+  limitarMargen,
+  margenPctDe,
   quitarManual,
   responderMenores,
   tituloGrupo,
@@ -145,6 +149,32 @@ describe('intensidad global e individual', () => {
     expect(usaIntensidad('pixelado')).toBe(true);
     expect(usaIntensidad('solido')).toBe(false);
     expect(usaIntensidad('emoji_mono')).toBe(false);
+  });
+});
+
+describe('margen / tamaño de zona auto', () => {
+  it('limita el % y usa el por defecto si no hay valor propio', () => {
+    expect(limitarMargen(-1)).toBe(LIMITES.dilatacionPct.min);
+    expect(limitarMargen(99)).toBe(LIMITES.dilatacionPct.max);
+    expect(limitarMargen(Number.NaN)).toBe(LIMITES.dilatacionPct.porDefecto);
+    expect(margenPctDe(REVISION_INICIAL, 'a')).toBe(LIMITES.dilatacionPct.porDefecto);
+  });
+
+  it('agranda la caja de la marca y viaja a la exportación', () => {
+    const r = decidir(elegirMargenVarias(REVISION_INICIAL, ['a'], 30), 'a', 'ocultar');
+    const h = zona('a', 'CAR-01');
+    const o = construirOcultamientos(r, [h])[0];
+    expect(o?.dilatacion_pct).toBe(30);
+    const marca = cajaConMargen(h.caja!, 30, 200, 200);
+    expect(marca.ancho).toBeGreaterThan(h.caja!.ancho);
+    expect(hayCambios(r)).toBe(true);
+    const edicion = esquemaEdicion.parse(aEdicion('00000000-0000-4000-8000-000000000000', r));
+    expect(desdeEdicion(edicion).margenes).toEqual({ a: 30 });
+  });
+
+  it('una recuperación anterior, sin márgenes, sigue valiendo', () => {
+    const vieja = { archivoId: '00000000-0000-4000-8000-000000000000', decisiones: {}, efectos: {}, intensidad: 80, hayMenores: null };
+    expect(esquemaEdicion.parse(vieja).margenes).toEqual({});
   });
 });
 
