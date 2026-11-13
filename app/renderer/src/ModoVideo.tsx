@@ -458,6 +458,7 @@ export function ModoVideo({ activo, alAnunciar, alFallar, pedido }: Props): Reac
   const todas = pistas.map((p) => p.id);
   const efectoComun = valorComun(pistas.map((p) => p.efecto));
   const intensidadComun = valorComun(pistas.map((p) => p.intensidad));
+  const muestraIntensidad = efectoComun !== null ? usaIntensidad(efectoComun) : pistas.some((p) => usaIntensidad(p.efecto));
   const ultimo = info.posiciones - 1;
   const libre = ocupado === null;
 
@@ -641,7 +642,9 @@ export function ModoVideo({ activo, alAnunciar, alFallar, pedido }: Props): Reac
             {estiloAbierto && (
               <div id={`${id}-estilo`} className="panel-estilo">
                 <SelectorEfecto valor={efectoComun} etiqueta="Efecto para todo" alCambiar={(efecto) => { cambiarPistas(todas, { efecto }); }} />
-                <ControlIntensidad valor={intensidadComun} etiqueta="Intensidad del efecto" conAviso alCambiar={(v) => { cambiarPistas(todas, { intensidad: limitarIntensidad(v) }); }} />
+                {muestraIntensidad && (
+                  <ControlIntensidad valor={intensidadComun} etiqueta="Intensidad del efecto" conAviso alCambiar={(v) => { cambiarPistas(todas, { intensidad: limitarIntensidad(v) }); }} />
+                )}
               </div>
             )}
           </section>

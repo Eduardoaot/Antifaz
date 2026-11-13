@@ -411,6 +411,8 @@ export function EstiloGlobal({ hallazgos, revision, alCambiar, alOcultarTodo, al
   const efectos = [...hallazgos.filter((h) => h.caja !== null).map((h) => efectoDe(revision, h)), ...revision.manuales.map((z) => z.efecto)];
   const comun = valorComun(efectos);
   const intensidades = zonas.map((z) => intensidadDe(revision, z));
+  // Bloque sólido y emoji no usan intensidad: no mostrarla en el estilo general.
+  const muestraIntensidad = comun !== null ? usaIntensidad(comun) : efectos.some(usaIntensidad);
   return (
     <section className="estilo-global" aria-label="Para todas las zonas">
       <div className="atajos">
@@ -424,12 +426,14 @@ export function EstiloGlobal({ hallazgos, revision, alCambiar, alOcultarTodo, al
       {abierto && (
         <div id={`${id}-panel`} className="panel-estilo">
           <SelectorEfecto valor={comun} etiqueta="Efecto para todo" alCambiar={(efecto) => { alCambiar((r) => elegirEfectoVarias(r, zonas, efecto)); }} />
-          <ControlIntensidad
-            valor={valorComun(intensidades)}
-            etiqueta="Intensidad del efecto"
-            conAviso
-            alCambiar={(valor) => { alCambiar((r) => elegirIntensidadGlobal(r, valor)); }}
-          />
+          {muestraIntensidad && (
+            <ControlIntensidad
+              valor={valorComun(intensidades)}
+              etiqueta="Intensidad del efecto"
+              conAviso
+              alCambiar={(valor) => { alCambiar((r) => elegirIntensidadGlobal(r, valor)); }}
+            />
+          )}
         </div>
       )}
     </section>
