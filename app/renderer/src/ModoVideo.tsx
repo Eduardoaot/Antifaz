@@ -444,7 +444,7 @@ export function ModoVideo({ activo, alAnunciar, alFallar, pedido }: Props): Reac
               <button type="button" className="boton primario boton-destacado" disabled={ocupado !== null} onClick={() => { void abrir(); }}>
                 <FolderOpen aria-hidden="true" /> {ocupado === 'abriendo' ? 'Abriendo…' : 'Abrir video'}
               </button>
-              <span className="suave vacio-arrastrar">o arrastra un video a la ventana (si el selector se queda en «Trabajando en ello…», cancélalo y arrastra)</span>
+              <span className="suave vacio-arrastrar">o arrastra un video a la ventana</span>
             </div>
           </div>
         </div>

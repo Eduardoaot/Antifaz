@@ -187,7 +187,7 @@ def test_escena_avisa_sobre_la_imagen_completa(tmp_path: Path, monkeypatch: pyte
 
 
 def test_zona_lleva_caja_y_posicion_y_no_se_repite_el_aviso_de_escena(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    _simular(monkeypatch, {**NEUTRO, "DES-01": 0.9}, [Zona("DES-01", 10, 10, 50, 50, 0.9), Zona("SUG-01", 300, 300, 40, 40, 0.4)])
+    _simular(monkeypatch, {**NEUTRO, "DES-01": 0.9, "SUG-01": 0.4}, [Zona("DES-01", 10, 10, 50, 50, 0.9), Zona("SUG-01", 300, 300, 40, 40, 0.4)])
     hallazgos = _analizar(tmp_path)["hallazgos"]
     desnudez = [h for h in hallazgos if h["regla_id"] == "DES-01"]
     assert len(desnudez) == 1
@@ -195,6 +195,25 @@ def test_zona_lleva_caja_y_posicion_y_no_se_repite_el_aviso_de_escena(tmp_path: 
     assert desnudez[0]["posicion"] == "en la parte superior izquierda"
     assert desnudez[0]["requiere_revision"] is False
     assert [h["requiere_revision"] for h in hallazgos if h["regla_id"] == "SUG-01"] == [True]
+
+
+@pytest.mark.parametrize(("escena_sugerente", "zona_visible"), [(0.34, False), (0.35, True)])
+def test_zona_cubierta_solo_se_marca_sugerente_con_respaldo_de_escena(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    escena_sugerente: float,
+    zona_visible: bool,
+) -> None:
+    _simular(
+        monkeypatch,
+        {**NEUTRO, "SUG-01": escena_sugerente},
+        [Zona("SUG-01", 40, 30, 60, 50, 0.95)],
+    )
+    hallazgos = [h for h in _analizar(tmp_path)["hallazgos"] if h["regla_id"] == "SUG-01"]
+    zonas = [h for h in hallazgos if h["caja"] is not None]
+    assert bool(zonas) is zona_visible
+    if not zona_visible:
+        assert hallazgos == []
 
 
 def test_fail_closed_sin_modelos_de_contenido(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

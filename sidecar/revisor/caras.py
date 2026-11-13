@@ -1,4 +1,4 @@
-"""Detección de caras con YuNet. Cuadros de confianza baja se conservan: prioridad al recall."""
+"""Detección de caras con YuNet, filtrada por la geometría de sus puntos faciales."""
 
 from __future__ import annotations
 
@@ -28,12 +28,6 @@ MAX_LADO_MOSAICOS = 5120
 IOU_DUPLICADO = 0.3
 UMBRAL_NMS = 0.3
 MAX_CARAS = 5000
-# Por debajo de esta confianza, la detección solo cuenta si sus 5 puntos (ojos, nariz, comisuras) tienen
-# forma de cara. Encima, nunca se descarta. Propuesta del 2026-11-11: hombros, pecho y texturas daban
-# cajas con puntos sin forma.
-CONFIANZA_SIN_REVISAR_FORMA = 0.6
-
-
 class ModeloNoDisponible(Exception):
     """El modelo falta o no coincide con el hash esperado."""
 
@@ -45,6 +39,14 @@ class Cara:
     ancho: int
     alto: int
     confianza: float
+
+
+def _decodificar_candidatas(salida: Any) -> list[tuple[float, float, float, float, float]]:
+    return [
+        (float(f[0]), float(f[1]), float(f[2]), float(f[3]), float(f[14]))
+        for f in salida
+        if forma_de_cara([float(v) for v in f[:14]])
+    ]
 
 
 def _iou(a: Cara, b: Cara) -> float:
@@ -83,7 +85,8 @@ def forma_de_cara(f: list[float]) -> bool:
     x, y, w, h = f[0], f[1], f[2], f[3]
     if w <= 0 or h <= 0:
         return False
-    ojo_d, ojo_i, nariz, boca_d, boca_i = (f[4], f[5]), (f[6], f[7]), (f[8], f[9]), (f[10], f[11]), (f[12], f[13])
+    ojo_d, ojo_i = (f[4], f[5]), (f[6], f[7])
+    nariz, boca_d, boca_i = (f[8], f[9]), (f[10], f[11]), (f[12], f[13])
     margen_x, margen_y = 0.15 * w, 0.15 * h
     for px, py in (ojo_d, ojo_i, nariz, boca_d, boca_i):
         if not (x - margen_x <= px <= x + w + margen_x and y - margen_y <= py <= y + h + margen_y):
@@ -102,7 +105,9 @@ def forma_de_cara(f: list[float]) -> bool:
     if not 0.25 * entre_ojos <= ancho_boca <= 1.6 * entre_ojos:
         return False
     # La nariz queda entre los ojos y la boca, no lejos de ambos.
-    return math.dist(nariz, centro_ojos) < 1.2 * ojos_a_boca and math.dist(nariz, centro_boca) < 1.2 * ojos_a_boca
+    cerca_de_ojos = math.dist(nariz, centro_ojos) < 1.2 * ojos_a_boca
+    cerca_de_boca = math.dist(nariz, centro_boca) < 1.2 * ojos_a_boca
+    return cerca_de_ojos and cerca_de_boca
 
 
 class DetectorCaras:
@@ -126,11 +131,7 @@ class DetectorCaras:
         _, salida = detector.detect(bgr)
         if salida is None:  # pyright: ignore[reportUnnecessaryComparison]
             return []
-        return [
-            (float(f[0]), float(f[1]), float(f[2]), float(f[3]), float(f[14]))
-            for f in salida
-            if float(f[14]) >= CONFIANZA_SIN_REVISAR_FORMA or forma_de_cara([float(v) for v in f[:14]])
-        ]
+        return _decodificar_candidatas(salida)
 
     def detectar(self, pixeles: Pixeles, umbral: float) -> list[Cara]:
         rgb = pixeles[:, :, :3]
