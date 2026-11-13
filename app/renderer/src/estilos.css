@@ -18,6 +18,11 @@
   --superficie-translucida: color-mix(in srgb, var(--superficie) 88%, transparent);
   --marca-suave: color-mix(in srgb, var(--marca) 12%, var(--superficie));
   --transicion: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  --duracion: 160ms;
+  --curva: cubic-bezier(0.2, 0, 0, 1);
+  /* Lo que mide la barra fija de la Guía: al saltar a un tema, su título queda debajo de ella y no tapado. */
+  --alto-filtros-guia: 5.75rem;
+  --desvanecido-filtros-guia: 1.5rem;
   /* Vidrio oscuro de las barras sobre la imagen: se lee igual sobre fotos claras y oscuras. */
   --vidrio: rgb(17 17 24 / 0.72);
   --vidrio-borde: rgb(255 255 255 / 0.14);
@@ -545,11 +550,16 @@ input[type='range']:disabled { opacity: 0.5; cursor: not-allowed; }
   display: inline-flex; align-items: center; justify-content: center; gap: 0.375rem;
   min-height: 2.125rem; padding: 0.25rem 0.75rem; border: 0; border-radius: 7px;
   background: transparent; color: var(--texto-suave); font: inherit; font-size: 0.875rem; font-weight: 500; cursor: pointer;
+  transition: background-color var(--duracion) var(--curva), color var(--duracion) var(--curva), box-shadow var(--duracion) var(--curva);
 }
 .segmentado button svg { width: 0.9375rem; height: 0.9375rem; }
 .segmentado button:hover:not([aria-pressed='true']) { color: var(--texto); background: var(--superficie); }
+/* Con más de dos opciones, las de en medio también deben verse elegidas. */
+.segmentado button[aria-pressed='true'] { background: var(--superficie); color: var(--texto); font-weight: 600; box-shadow: var(--sombra-sm); }
 .segmentado button[aria-pressed='true']:first-child { background: var(--marca); color: var(--sobre-marca); font-weight: 600; box-shadow: var(--sombra-sm); }
 .segmentado button[aria-pressed='true']:last-child { background: var(--superficie); color: var(--texto); font-weight: 600; box-shadow: var(--sombra-sm); }
+/* Un filtro es una sola elección entre iguales: la elegida se rellena, sin importar su lugar. */
+.segmentado.filtro-nivel button[aria-pressed='true'] { background: var(--marca); color: var(--sobre-marca); }
 .segmentado.compacto button { min-height: 1.875rem; padding: 0.125rem 0.5rem; font-size: 0.8125rem; }
 
 /* Grupos por tipo de riesgo */
@@ -667,32 +677,52 @@ summary { cursor: pointer; min-height: 1.75rem; font-weight: 500; color: var(--t
   padding: 0.375rem 0.5rem; border-radius: 6px; color: var(--texto); text-decoration: none; font-size: 0.875rem;
 }
 .guia-indice a:hover { background: var(--superficie-2); }
+.guia-indice-vacio {
+  display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;
+  padding: 0.375rem 0.5rem; color: var(--texto-suave); font-size: 0.875rem;
+}
 .guia-indice-conteo { font-size: 0.75rem; color: var(--texto-suave); font-variant-numeric: tabular-nums; }
-.guia-indice-separador { height: 1px; margin: 0.375rem 0.5rem; background: var(--borde-suave); }
 .guia-contenido { display: grid; gap: 1.5rem; min-width: 0; }
 .guia-cabecera { display: flex; align-items: center; gap: 1rem; }
 .guia-cabecera h1 { font-size: 1.75rem; font-weight: 800; letter-spacing: -0.02em; }
 .guia-cabecera p { color: var(--texto-suave); font-size: 1.0625rem; margin-top: 0.25rem; }
 .guia-icono { flex: none; display: grid; place-items: center; width: 3.25rem; height: 3.25rem; border-radius: 14px; background: var(--marca-suave); color: var(--marca); }
 .guia-icono svg { width: 1.5rem; height: 1.5rem; }
-.guia-tema { scroll-margin-top: 4.5rem; }
+.guia-tema { scroll-margin-top: var(--alto-filtros-guia); }
 .guia-leyenda { display: flex; flex-wrap: wrap; gap: 0.5rem 1.25rem; margin-top: -0.75rem; font-size: 0.8125rem; color: var(--texto-suave); }
 .guia-leyenda li { display: flex; align-items: center; gap: 0.375rem; }
-.guia-pie { display: grid; gap: 0.375rem; padding-top: 1rem; border-top: 1px solid var(--borde-suave); font-size: 0.8125rem; line-height: 1.55; }
+.guia-nota {
+  display: flex; align-items: flex-start; gap: 0.75rem; padding: 1rem 1.25rem;
+  background: var(--superficie); border: 1px solid var(--borde-suave); border-radius: var(--radio-lg);
+  font-size: 0.9375rem; line-height: 1.55;
+}
+.guia-nota > svg { margin-top: 0.125rem; color: var(--marca); }
+.guia-nota > div { display: grid; gap: 0.25rem; }
+.guia-nota-detalle { font-size: 0.8125rem; }
 .porque-contexto { display: grid; gap: 0.5rem; padding-bottom: 0.75rem; border-bottom: 1px solid var(--borde-suave); }
 .porque-tema { font-weight: 650; }
 .porque-nivel { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; color: var(--texto-suave); font-size: 0.9375rem; }
+/*
+ * Se distinguen por forma, no solo por color: lo que la app busca va en una pastilla con borde; lo que
+ * revisas tú es texto suelto con otro ícono.
+ */
 .insignia-revision {
   display: inline-flex; align-items: center; gap: 0.25rem; padding: 0.125rem 0.5rem; border-radius: 999px;
   font-size: 0.75rem; font-weight: 600; white-space: nowrap;
 }
 .insignia-revision svg { width: 0.875rem; height: 0.875rem; }
-.insignia-revision.sola { background: var(--marca-suave); color: var(--marca); }
-.insignia-revision.tuya { background: var(--superficie-2); color: var(--texto-suave); border: 1px dashed var(--borde-control); }
+.insignia-revision.sola { background: var(--marca-suave); color: var(--marca); border: 1px solid color-mix(in srgb, var(--marca) 45%, transparent); }
+.insignia-revision.tuya { padding-inline: 0; color: var(--texto-suave); }
+/* Opaca: lo que pasa por debajo al bajar no debe encimarse con los filtros. */
 .guia-filtros {
   position: sticky; top: 0; z-index: 2; display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem;
-  padding: 0.75rem; margin: 0 -0.75rem; border-radius: var(--radio-lg);
-  background: color-mix(in srgb, var(--fondo) 88%, transparent); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+  padding: 0.75rem; margin: 0 -0.75rem;
+  background: var(--fondo); box-shadow: 0 1px 0 var(--borde-sutil);
+}
+/* Lo que pasa por debajo se desvanece en vez de verse rebanado a media línea. */
+.guia-filtros::after {
+  content: ''; position: absolute; top: calc(100% + 1px); left: 0; right: 0; height: var(--desvanecido-filtros-guia);
+  background: linear-gradient(var(--fondo), transparent); pointer-events: none;
 }
 .buscar-guia { position: relative; flex: 1 1 16rem; display: flex; align-items: center; }
 .buscar-guia > svg { position: absolute; left: 0.75rem; width: 1rem; height: 1rem; color: var(--texto-suave); }
@@ -710,22 +740,19 @@ summary { cursor: pointer; min-height: 1.75rem; font-weight: 500; color: var(--t
   font: inherit; color: inherit; text-align: left; cursor: pointer;
   background: var(--superficie); border: 1px solid var(--borde-suave); border-top: 3px solid var(--borde-control);
   border-radius: var(--radio-md); box-shadow: var(--sombra-sm);
-  transition: transform 120ms, box-shadow 120ms, border-color 120ms;
+  transition: transform var(--duracion) var(--curva), box-shadow var(--duracion) var(--curva), border-color var(--duracion) var(--curva);
 }
 .guia-tarjeta:hover { transform: translateY(-2px); box-shadow: var(--sombra-md); border-color: var(--borde-control); }
-.guia-tarjeta:focus-visible { outline: 3px solid var(--marca); outline-offset: 2px; }
+.guia-tarjeta:active { transform: translateY(0); box-shadow: var(--sombra-sm); }
+.guia-tarjeta:focus-visible { outline: 3px solid var(--foco); outline-offset: 2px; }
 .guia-tarjeta.alto { border-top-color: var(--riesgo-alto); }
 .guia-tarjeta.medio { border-top-color: var(--riesgo-medio); }
 .guia-tarjeta.bajo { border-top-color: var(--riesgo-bajo); }
 .guia-tarjeta-meta { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.375rem; }
 .guia-tarjeta-titulo { flex: 1; font-size: 1rem; font-weight: 650; line-height: 1.35; }
 .guia-tarjeta-pie { display: flex; align-items: center; gap: 0.25rem; font-size: 0.8125rem; font-weight: 600; color: var(--marca); }
-.guia-tarjeta-pie svg { width: 0.875rem; height: 0.875rem; transition: transform 120ms; }
+.guia-tarjeta-pie svg { width: 0.875rem; height: 0.875rem; transition: transform var(--duracion) var(--curva); }
 .guia-tarjeta:hover .guia-tarjeta-pie svg { transform: translateX(2px); }
-@media (prefers-reduced-motion: reduce) {
-  .guia-tarjeta, .guia-tarjeta-pie svg { transition: none; }
-  .guia-tarjeta:hover { transform: none; }
-}
 .advertencias { display: grid; gap: 0.75rem; }
 
 /* Inicio: mini tutorial de tres pasos, unidos por flechas. */

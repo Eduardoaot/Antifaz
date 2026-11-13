@@ -1,6 +1,6 @@
-import { BookOpen, CheckCircle2, ChevronRight, CircleDashed, Search, X } from 'lucide-react';
+import { BookOpen, ChevronRight, Hand, Info, ScanSearch, Search, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import { AVISO_LEGAL, catalogo, type Nivel, type Regla } from '../../shared/catalogo';
+import { catalogo, type Nivel, type Regla } from '../../shared/catalogo';
 import { agruparReglas, revisaSola } from '../../shared/logica';
 import { IconoCategoria, PildoraNivel } from './Advertencias';
 import { DialogoPorQue } from './Dialogos';
@@ -28,8 +28,8 @@ const tituloDe = (r: Regla): string => r.titulo_corto ?? r.que_detecta;
 
 function Insignia({ sola }: { sola: boolean }): React.JSX.Element {
   return sola
-    ? <span className="insignia-revision sola"><CheckCircle2 aria-hidden="true" /> Lo buscamos solos</span>
-    : <span className="insignia-revision tuya"><CircleDashed aria-hidden="true" /> Revísalo tú</span>;
+    ? <span className="insignia-revision sola"><ScanSearch aria-hidden="true" /> La app lo busca</span>
+    : <span className="insignia-revision tuya"><Hand aria-hidden="true" /> Revísalo tú</span>;
 }
 
 /**
@@ -52,18 +52,31 @@ export function Guia(): React.JSX.Element {
     }))
     .filter((g) => g.reglas.length > 0);
   const total = filtrados.reduce((n, g) => n + g.reglas.length, 0);
+  // El índice cuenta lo mismo que cada sección: con un filtro, solo lo que se ve.
+  const visibles = new Map(filtrados.map((g) => [g.titulo, g.reglas.length]));
 
   return (
     <main id="principal" tabIndex={-1} className="guia">
       <div className="guia-marco">
         <nav className="guia-indice" aria-label="En esta guía">
           <p className="guia-indice-titulo">En esta guía</p>
-          {grupos.map(({ titulo, reglas }) => (
-            <a key={titulo} href={`#${ancla(titulo)}`}>
-              <span>{titulo}</span>
-              <span className="guia-indice-conteo">{reglas.length}</span>
-            </a>
-          ))}
+          {grupos.map(({ titulo }) => {
+            const cuantos = visibles.get(titulo) ?? 0;
+            // Sin temas visibles no hay sección a la cual saltar: se queda como texto, sin enlace.
+            return cuantos === 0
+              ? (
+                <span key={titulo} className="guia-indice-vacio">
+                  <span>{titulo}</span>
+                  <span className="guia-indice-conteo">0</span>
+                </span>
+              )
+              : (
+                <a key={titulo} href={`#${ancla(titulo)}`}>
+                  <span>{titulo}</span>
+                  <span className="guia-indice-conteo">{cuantos}</span>
+                </a>
+              );
+          })}
         </nav>
 
         <div className="guia-contenido">
@@ -95,8 +108,8 @@ export function Guia(): React.JSX.Element {
           </div>
 
           <ul className="guia-leyenda" aria-label="Qué significan las insignias">
-            <li><Insignia sola /> la app lo marca en cada foto</li>
-            <li><Insignia sola={false} /> tápalo tú con las herramientas</li>
+            <li><Insignia sola /> lo marca sola en cada foto</li>
+            <li><Insignia sola={false} /> no lo detecta: tápalo con las herramientas</li>
           </ul>
 
           {filtrados.length === 0 && (
@@ -130,13 +143,18 @@ export function Guia(): React.JSX.Element {
             );
           })}
 
-          <footer className="guia-pie suave">
-            <p>
-              La revisión es orientativa: si en una foto algo no se pudo revisar, te lo decimos ahí. Un documento o una
-              tarjeta sin texto legible podría pasar sin aviso.
-            </p>
-            <p>Cuando no encontramos una fuente oficial directa, lo decimos. {AVISO_LEGAL} Versión del catálogo: {catalogo.version}.</p>
-          </footer>
+          <aside className="guia-nota" aria-label="Sobre la revisión">
+            <Info aria-hidden="true" />
+            <div>
+              <p>
+                <strong>Es una ayuda, no una garantía.</strong> Si en una foto algo no se pudo revisar, te lo decimos ahí.
+                Un documento o una tarjeta sin texto legible podría pasar sin aviso.
+              </p>
+              <p className="suave guia-nota-detalle">
+                Si un tema no tiene una fuente oficial directa, lo verás al abrirlo. Catálogo {catalogo.version}.
+              </p>
+            </div>
+          </aside>
         </div>
       </div>
       {abierta !== null && (

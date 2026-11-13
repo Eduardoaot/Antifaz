@@ -302,7 +302,7 @@ test('foto sin nada: lo dice sin prometer de más', async () => {
   // Qué se revisa y qué no ya no se repite en cada foto: está en la Guía.
   await expect(pagina.getByText(/Lo que todavía no revisamos/)).toHaveCount(0);
   await irA(pagina, 'Guía de privacidad');
-  await expect(pagina.getByText(/La revisión es orientativa/)).toBeVisible();
+  await expect(pagina.getByText('Es una ayuda, no una garantía.')).toBeVisible();
   await expect(pagina.locator('.guia-tarjeta .insignia-revision.tuya').first()).toBeVisible();
 });
 
@@ -388,8 +388,23 @@ test('Guía de privacidad: se consulta sin ninguna foto', async () => {
   await expect(pagina.locator('.guia-tarjeta')).toHaveCount(1);
   await pagina.getByRole('button', { name: 'Borrar la búsqueda' }).click();
 
+  // Con un filtro, se ve cuál está elegido y el índice cuenta y enlaza solo lo que quedó.
+  const medio = pagina.getByRole('button', { name: 'Riesgo medio', exact: true });
+  await medio.click();
+  await expect(medio).toHaveAttribute('aria-pressed', 'true');
+  const indice = pagina.getByRole('navigation', { name: 'En esta guía' });
+  await expect(indice.getByRole('link')).toHaveCount(await pagina.locator('.guia-tema').count());
+  // Al bajar, la barra de filtros no se encima con las fichas.
+  await pagina.locator('.guia').evaluate((e) => { e.scrollTop = 420; });
+  await pagina.waitForTimeout(300);
+  await pagina.screenshot({ path: join(CAPTURAS, 'guia-filtrada-con-scroll.png') });
+  await pagina.getByRole('button', { name: 'Todo', exact: true }).click();
+  await pagina.locator('.guia').evaluate((e) => { e.scrollTop = 0; });
+
   await elegirTema(pagina, 'oscuro');
   await expect(pagina.getByRole('heading', { name: 'Guía de privacidad', level: 1 })).toBeVisible();
+  // Los colores cambian con una transición corta: el contraste se mide cuando ya terminó.
+  await pagina.waitForTimeout(400);
   await sinViolaciones(pagina);
   await pagina.screenshot({ path: join(CAPTURAS, 'guia-oscuro.png') });
   await pagina.locator('[data-regla="MEN-01"]').click();
